@@ -1,0 +1,3 @@
+syntax: glob
+ext/__pycache__
+v7.1.lnk
