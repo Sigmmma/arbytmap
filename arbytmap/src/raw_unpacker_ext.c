@@ -16,7 +16,7 @@ static void unpack_raw_4_channel_8bpp(
     Py_ssize_t packed_pix_size;
     unsigned char (*unpacked_pix)[];
     unsigned char (*a_scale)[], (*r_scale)[], (*g_scale)[], (*b_scale)[];
-    unsigned long long i=0, max_i=0, pixel=0;
+    unsigned long long i=0, j=0, max_i=0, pixel=0;
 
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
@@ -41,34 +41,38 @@ static void unpack_raw_4_channel_8bpp(
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_64)[i];
-            (*unpacked_pix)[i<<2]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_32)[i];
-            (*unpacked_pix)[(i<<2)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_16)[i];
-            (*unpacked_pix)[(i<<2)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     } else {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_8)[i];
-            (*unpacked_pix)[(i<<2)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     }
 }
@@ -82,17 +86,19 @@ static void unpack_raw_2_channel_8bpp(
     Py_ssize_t packed_pix_size;
     unsigned char (*unpacked_pix)[];
     unsigned char (*a_scale)[], (*i_scale)[];
-    unsigned long long i=0, max_i=0, pixel=0;
+    unsigned long long i=0, j=0, max_i=0, pixel=0;
 
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
     unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
     packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned char(*)[])unpacked_pix_buf->buf;
     a_scale = (unsigned char(*)[])a_scale_buf->buf;
@@ -100,23 +106,33 @@ static void unpack_raw_2_channel_8bpp(
 
     max_i = (unpacked_pix_buf->len)/2;
 
-    if (packed_pix_size == 4) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            pixel = (*packed_pix_64)[i];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
+        }
+    } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_32)[i];
-            (*unpacked_pix)[(i<<1)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<1)+1] = (*i_scale)[(pixel&i_mask)>>i_shift];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_16)[i];
-            (*unpacked_pix)[(i<<1)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<1)+1] = (*i_scale)[(pixel&i_mask)>>i_shift];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
         }
     } else {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_8)[i];
-            (*unpacked_pix)[(i<<1)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<1)+1] = (*i_scale)[(pixel&i_mask)>>i_shift];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
         }
     }
 }
@@ -132,18 +148,31 @@ static void unpack_raw_1_channel_8bpp(
 
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
+    unsigned long (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
+    // THESE ALL NEED TO BE CHANGED TO ACCEPT UP TO packed_pix_64
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
+    packed_pix_32 = (unsigned long(*)[])packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[])packed_pix_buf->buf;
 
     unpacked_pix = (unsigned char(*)[])unpacked_pix_buf->buf;
     scale = (unsigned char(*)[])scale_buf->buf;
 
     max_i = unpacked_pix_buf->len;
 
-    if (packed_pix_size == 2) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*unpacked_pix)[i] = (*scale)[(((*packed_pix_64)[i])&mask)>>shift];
+        }
+    } else if (packed_pix_size == 4) {
+        for (i=0; i < max_i; i++) {
+            (*unpacked_pix)[i] = (*scale)[(((*packed_pix_32)[i])&mask)>>shift];
+        }
+    } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
             (*unpacked_pix)[i] = (*scale)[(((*packed_pix_16)[i])&mask)>>shift];
         }
@@ -170,7 +199,7 @@ static void unpack_raw_4_channel_16bpp(
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
     unsigned short (*a_scale)[], (*r_scale)[], (*g_scale)[], (*b_scale)[];
-    unsigned long long i=0, max_i=0, pixel=0;
+    unsigned long long i=0, j=0, max_i=0, pixel=0;
 
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
@@ -195,34 +224,38 @@ static void unpack_raw_4_channel_16bpp(
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_64)[i];
-            (*unpacked_pix)[(i<<2)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_32)[i];
-            (*unpacked_pix)[(i<<2)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_16)[i];
-            (*unpacked_pix)[(i<<2)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     } else {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_8)[i];
-            (*unpacked_pix)[(i<<2)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<2)+1] = (*r_scale)[(pixel&r_mask)>>r_shift];
-            (*unpacked_pix)[(i<<2)+2] = (*g_scale)[(pixel&g_mask)>>g_shift];
-            (*unpacked_pix)[(i<<2)+3] = (*b_scale)[(pixel&b_mask)>>b_shift];
+            j = i<<2;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*r_scale)[(pixel&r_mask)>>r_shift]; j++;
+            (*unpacked_pix)[j] = (*g_scale)[(pixel&g_mask)>>g_shift]; j++;
+            (*unpacked_pix)[j] = (*b_scale)[(pixel&b_mask)>>b_shift];
         }
     }
 }
@@ -236,17 +269,19 @@ static void unpack_raw_2_channel_16bpp(
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
     unsigned short (*a_scale)[], (*i_scale)[];
-    unsigned long long i=0, max_i=0, pixel=0;
+    unsigned long long i=0, j=0, max_i=0, pixel=0;
 
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
     unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
     packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
     a_scale = (unsigned short(*)[])a_scale_buf->buf;
@@ -254,23 +289,33 @@ static void unpack_raw_2_channel_16bpp(
 
     max_i = (unpacked_pix_buf->len)/4;
 
-    if (packed_pix_size == 4) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            pixel = (*packed_pix_64)[i];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
+        }
+    } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_32)[i];
-            (*unpacked_pix)[(i<<1)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<1)+1] = (*i_scale)[(pixel&i_mask)>>i_shift];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_16)[i];
-            (*unpacked_pix)[(i<<1)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<1)+1] = (*i_scale)[(pixel&i_mask)>>i_shift];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
         }
     } else {
         for (i=0; i < max_i; i++) {
             pixel = (*packed_pix_8)[i];
-            (*unpacked_pix)[(i<<1)]   = (*a_scale)[(pixel&a_mask)>>a_shift];
-            (*unpacked_pix)[(i<<1)+1] = (*i_scale)[(pixel&i_mask)>>i_shift];
+            j = i<<1;
+            (*unpacked_pix)[j] = (*a_scale)[(pixel&a_mask)>>a_shift]; j++;
+            (*unpacked_pix)[j] = (*i_scale)[(pixel&i_mask)>>i_shift];
         }
     }
 }
@@ -286,18 +331,30 @@ static void unpack_raw_1_channel_16bpp(
 
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
+    unsigned long (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
+    packed_pix_32 = (unsigned long(*)[])packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[])packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
     scale = (unsigned short(*)[])scale_buf->buf;
 
     max_i = (unpacked_pix_buf->len)/2;
 
-    if (packed_pix_size == 2) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*unpacked_pix)[i] = (*scale)[(((*packed_pix_64)[i])&mask)>>shift];
+        }
+    } else if (packed_pix_size == 4) {
+        for (i=0; i < max_i; i++) {
+            (*unpacked_pix)[i] = (*scale)[(((*packed_pix_32)[i])&mask)>>shift];
+        }
+    } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
             (*unpacked_pix)[i] = (*scale)[(((*packed_pix_16)[i])&mask)>>shift];
         }
@@ -307,6 +364,7 @@ static void unpack_raw_1_channel_16bpp(
         }
     }
 }
+
 
 static void unpack_indexing(
     Py_buffer *unpacked_indexing_buf, Py_buffer *packed_indexing_buf,
@@ -324,30 +382,30 @@ static void unpack_indexing(
     max_i = unpacked_indexing_buf->len;
 
     if (indexing_size == 4) {
-        for (i=0; i < max_i; i += 2) {
+        for (i=0; i < max_i; i++) {
             index_chunk = (*packed_indexing)[i];
-            (*unpacked_indexing)[i]   = index_chunk&15;
-            (*unpacked_indexing)[i+1] = (index_chunk&240)>>4;
+            (*unpacked_indexing)[i] = index_chunk&15; i++;
+            (*unpacked_indexing)[i] = (index_chunk&240)>>4;
         }
     } else if (indexing_size == 2) {
-        for (i=0; i < max_i; i += 4) {
+        for (i=0; i < max_i; i++) {
             index_chunk = (*packed_indexing)[i];
-            (*unpacked_indexing)[i]   = index_chunk&3;
-            (*unpacked_indexing)[i+1] = (index_chunk&12)>>2;
-            (*unpacked_indexing)[i+2] = (index_chunk&48)>>4;
-            (*unpacked_indexing)[i+3] = (index_chunk&192)>>6;
+            (*unpacked_indexing)[i] = index_chunk&3; i++;
+            (*unpacked_indexing)[i] = (index_chunk&12)>>2; i++;
+            (*unpacked_indexing)[i] = (index_chunk&48)>>4; i++;
+            (*unpacked_indexing)[i] = (index_chunk&192)>>6;
         }
     } else {
-        for (i=0; i < max_i; i += 8) {
+        for (i=0; i < max_i; i++) {
             index_chunk = (*packed_indexing)[i];
-            (*unpacked_indexing)[i]   = index_chunk&1;
-            (*unpacked_indexing)[i+1] = (index_chunk&2)>>1;
-            (*unpacked_indexing)[i+2] = (index_chunk&4)>>2;
-            (*unpacked_indexing)[i+3] = (index_chunk&8)>>3;
-            (*unpacked_indexing)[i+4] = (index_chunk&16)>>4;
-            (*unpacked_indexing)[i+5] = (index_chunk&32)>>5;
-            (*unpacked_indexing)[i+6] = (index_chunk&64)>>6;
-            (*unpacked_indexing)[i+7] = (index_chunk&128)>>7;
+            (*unpacked_indexing)[i] = index_chunk&1; i++;
+            (*unpacked_indexing)[i] = (index_chunk&2)>>1; i++;
+            (*unpacked_indexing)[i] = (index_chunk&4)>>2; i++;
+            (*unpacked_indexing)[i] = (index_chunk&8)>>3; i++;
+            (*unpacked_indexing)[i] = (index_chunk&16)>>4; i++;
+            (*unpacked_indexing)[i] = (index_chunk&32)>>5; i++;
+            (*unpacked_indexing)[i] = (index_chunk&64)>>6; i++;
+            (*unpacked_indexing)[i] = (index_chunk&128)>>7;
         }
     }
 }

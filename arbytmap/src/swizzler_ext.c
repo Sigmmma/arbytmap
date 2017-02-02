@@ -34,7 +34,28 @@ static void swizzle_char_array(
         }
 
     if (swizz) {
-        if (stride == 4) {
+        if (stride == 8) {
+            for (zi=0; zi < z_size; zi++) {
+                z = (*z_offs)[zi];
+                for (yi=0; yi < y_size; yi++) {
+                    yz = z + (*y_offs)[yi];
+                    for (xi=0; xi < x_size; xi++) {
+                        xyz = yz + (*x_offs)[xi];
+                        for (ci=0; ci < c_size; ci++) {
+                            cxyz = (xyz + (*c_offs)[ci])<<3;
+                            (*swizz_arr)[cxyz]   = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz+1] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz+2] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz+3] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz+4] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz+5] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz+6] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz+7] = (*unswizz_arr)[i]; i++;
+                        }
+                    }
+                }
+            }
+        } else if (stride == 4) {
             for (zi=0; zi < z_size; zi++) {
                 z = (*z_offs)[zi];
                 for (yi=0; yi < y_size; yi++) {
@@ -82,7 +103,28 @@ static void swizzle_char_array(
             }
         }
     } else {
-        if (stride == 4) {
+        if (stride == 8) {
+            for (zi=0; zi < z_size; zi++) {
+                z = (*z_offs)[zi];
+                for (yi=0; yi < y_size; yi++) {
+                    yz = z + (*y_offs)[yi];
+                    for (xi=0; xi < x_size; xi++) {
+                        xyz = yz + (*x_offs)[xi];
+                        for (ci=0; ci < c_size; ci++) {
+                            cxyz = (xyz + (*c_offs)[ci])<<3;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz];   i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+1]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+2]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+3]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+4]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+5]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+6]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+7]; i++;
+                        }
+                    }
+                }
+            }
+        } else if (stride == 4) {
             for (zi=0; zi < z_size; zi++) {
                 z = (*z_offs)[zi];
                 for (yi=0; yi < y_size; yi++) {

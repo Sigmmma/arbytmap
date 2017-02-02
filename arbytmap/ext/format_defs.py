@@ -1,19 +1,4 @@
-
 from array import array
-
-"""Qwords are still new so they aren't entirely supported. Try
-to use them if possible, but default to unsigned long's if not."""
-try:
-    powers_of_2 = array("Q",[])
-    #used in calculating new dimensions
-    for pwr in range(64):
-        powers_of_2.append(pow(2, pwr))
-except:
-    powers_of_2 = array("L",[])
-    #used in calculating new dimensions
-    for pwr in range(32):
-        powers_of_2.append(pow(2, pwr))
-
 
 
 """TEXTURE TYPES"""
@@ -78,8 +63,8 @@ height - height of the texture in pixels
 depth - depth of the texture in pixels
 type - the type that the texture is(look above for the different types)
 format - the format that the texture is(look above for the different types)
-mipmap_count - the number of mipmaps in the texture(fullsize image doesnt count as a mipmap)
-sub_texture_count - the number of sub-textures in the texture(cubemaps have 6 faces, so 6 sub-bitmaps)
+mipmap_count - the number of mipmaps in the texture(fullsize doesnt count)
+sub_texture_count - the number of sub-textures in the texture(cubemaps have 6)
 swizzled - whether or not the texture is swizzled
 swizzler - the type of swizzler method to use to swizzle or deswizzle texture
 '''
@@ -126,8 +111,9 @@ COMPRESSED_FORMATS = []
 
 DDS_FORMATS = []
 
-THREE_CHANNEL_FORMATS = [FORMAT_R3G3B2, FORMAT_R5G6B5, FORMAT_R8G8B8,
-                         FORMAT_R16G16B16, FORMAT_Y8U8V8]
+THREE_CHANNEL_FORMATS = [
+    FORMAT_R3G3B2, FORMAT_R5G6B5, FORMAT_R8G8B8,
+    FORMAT_R16G16B16, FORMAT_Y8U8V8]
 
 SUB_BITMAP_COUNTS = {TYPE_2D:1, TYPE_3D:1, TYPE_CUBEMAP:6}
 
@@ -164,7 +150,7 @@ MINIMUM_D = {
     FORMAT_STENCIL:1,
     FORMAT_R16G16B16:1, FORMAT_A16R16G16B16:1}
 
-#this is how many BITS(NOT BYTES) each format's pixels take up
+# this is how many BITS(NOT BYTES) each format's pixels take up
 BITS_PER_PIXEL = {
     FORMAT_A4:4, FORMAT_A8:8,
     FORMAT_Y4:4, FORMAT_Y8:8,
@@ -176,7 +162,7 @@ BITS_PER_PIXEL = {
     FORMAT_STENCIL:1, 
     FORMAT_R16G16B16:48, FORMAT_A16R16G16B16:64}
 
-#this is the data type that each format's pixel data array will hold
+# this is the data type that each format's pixel data array will hold
 FORMAT_DATA_SIZES = {
     FORMAT_A4:"B", FORMAT_A8:"B",
     FORMAT_Y4:"B", FORMAT_Y8:"B",
@@ -188,7 +174,7 @@ FORMAT_DATA_SIZES = {
     FORMAT_STENCIL:"B", 
     FORMAT_R16G16B16:"Q", FORMAT_A16R16G16B16:"Q"}
 
-#this is the mask of each channel in each format
+# this is the mask of each channel in each format
 FORMAT_CHANNEL_MASKS = {
     FORMAT_A4:(15,), FORMAT_A8:(255,),
     FORMAT_Y4:(15,), FORMAT_Y8:(255,),
@@ -206,7 +192,7 @@ FORMAT_CHANNEL_MASKS = {
     FORMAT_A16R16G16B16:(2**64-2**48, 2**48-2**32, 4294901760, 65535)}
 
 
-#this is how many bits the depth of each channel is for each raw format
+# this is how many bits the depth of each channel is for each raw format
 FORMAT_CHANNEL_DEPTHS = {
     FORMAT_A4:(4,), FORMAT_A8:(8,),
     FORMAT_Y4:(4,), FORMAT_Y8:(8,),
@@ -219,7 +205,8 @@ FORMAT_CHANNEL_DEPTHS = {
     FORMAT_R16G16B16:(0,16,16,16),
     FORMAT_A16R16G16B16:(16,16,16,16)}
 
-#the number of channels possible in each format, regardless of whether or not they are raw formats
+# the number of channels possible in each format,
+# regardless of whether or not they are raw formats
 FORMAT_CHANNEL_COUNTS = {
     FORMAT_A4:1, FORMAT_A8:1,
     FORMAT_Y4:1, FORMAT_Y8:1,
@@ -231,7 +218,8 @@ FORMAT_CHANNEL_COUNTS = {
     FORMAT_STENCIL:1,
     FORMAT_R16G16B16:4, FORMAT_A16R16G16B16:4}
 
-#this is how far right the channel is shifted when unpacked and left when repacked
+# this is how far right the channel is shifted when
+# unpacked and left when repacked
 FORMAT_CHANNEL_OFFSETS = {
     FORMAT_A4:(0,), FORMAT_A8:(0,),
     FORMAT_Y4:(0,), FORMAT_Y8:(0,),
@@ -243,11 +231,11 @@ FORMAT_CHANNEL_OFFSETS = {
     FORMAT_STENCIL:(0,),
     FORMAT_R16G16B16:(0,32,16,0), FORMAT_A16R16G16B16:(48,32,16,0)}
 
-#if a channel has this in it's divisor it
-#will be erased when the bitmap is repacked
+# if a channel has this in it's divisor it
+# will be erased when the bitmap is repacked
 CHANNEL_ERASE_DIVISOR = 2**31-1
 
-#this is the default amount of bits per pixel for palettized bitmaps
+# this is the default amount of bits per pixel for palettized bitmaps
 DEFAULT_INDEXING_SIZE = 8
 
 DEFAULT_UNPACK_FORMAT = FORMAT_A8R8G8B8
@@ -268,19 +256,22 @@ ALL_FORMAT_COLLECTIONS = {
 ### CHANNEL MAPPINGS ###
 """##################"""
 
-#the way channel mappings work is that each index is one channel. in their standard
-#form the value at each index should be the number of that index. Ex:(0, 1, 2, 3)
+# the way channel mappings work is that each index is one channel.
+# in their standard form the value at each index should be the
+# number of that index. Ex:(0, 1, 2, 3)
 
-#to remove channels you should create a mapping with exactly how many channels you want
-#to have and have the value of each index be the channel that you want to place there.
-#Ex: (A, R, G, B) to (G, B) would use the mapping (2, 3)
+# to remove channels you should create a mapping with exactly
+# how many channels you want to have and have the value of each
+# index be the channel that you want to place there.
+# Ex: (A, R, G, B) to (G, B) would use the mapping (2, 3)
 
-#to switch channels around you would create a mapping with one index for each channel in
-#the target format. the value at each index will be the index of the channel you want from
-#the source format. Ex: (A, R, G, B) to (B, G, R, A) would use the mapping (3, 2, 1, 0)
+# to switch channels around you would create a mapping with one
+# index for each channel in the target format. the value at each
+# index will be the index of the channel you want from the source format.
+# Ex: (A, R, G, B) to (B, G, R, A) would use the mapping (3, 2, 1, 0)
 
-#if you want a blank channel to be made then set the value at that index to -1
-#Ex: converting A8 to A8R8G8B8 = (0, -1, -1, -1)
+# if you want a blank channel to be made then set the value at that index to -1
+# Ex: converting A8 to A8R8G8B8 = (0, -1, -1, -1)
 
 
 """these channel mappings are used to swap ALPHA AND
@@ -291,8 +282,9 @@ AY8_TO_A8Y8 =  ( 0, 0 )
 A8_TO_A8Y8 =   ( 0,-1 )
 Y8_TO_A8Y8 =   (-1, 0 )
 
-"""these channel mappings are used to convert different formats to Y8 and A8. these are also
-used for converting to AY8. just use the one that preserves the channel you want to keep"""
+"""these channel mappings are used to convert different
+formats to Y8 and A8. these are also used for converting to AY8.
+just use the one that preserves the channel you want to keep"""
 #                (A)
 ANYTHING_TO_A8 = (0,)
 #            (Y)
@@ -300,7 +292,8 @@ A8Y8_TO_Y8 = (1,)
 #             (AY)
 MONO_TO_AY8 = (0,)
 
-"""these channel mappings are to convert A8, Y8, AY8, and A8Y8 to A8R8G8B8 and X8R8G8B8"""
+"""these channel mappings are to convert
+A8, Y8, AY8, and A8Y8 to A8R8G8B8 and X8R8G8B8"""
 #              ( A,  R,  G,  B)
 A8_TO_ARGB =   ( 0, -1, -1, -1)
 Y8_TO_ARGB =   (-1,  0,  0,  0)
@@ -314,10 +307,11 @@ Y8A8_TO_ARGB = ( 1,  0,  0,  0)
 ### CHANNEL MERGE MAPPINGS ###
 """########################"""
 
-#why merge mappings are used is that if the target format has less channels
-#than the source then we either need to remove channels or merge them together.
-#we can remove them with the above channel mappings, but for things like RGB
-#to monochrome we need to merge the pixels together to get the average intensity.
+# why merge mappings are used is that if the target format has
+# less channels than the source then we either need to remove
+# channels or merge them together. we can remove them with the
+# above channel mappings, but for things like RGB to monochrome
+# we need to merge the pixels together to get the average intensity.
 
 #merge mapping are the length of the source's channel count. each index is
 #which channel in the target format to merge the channel from the source into.
@@ -333,103 +327,97 @@ M_ARGB_TO_A8 =   ( 0, -1, -1, -1 )
 def define_format(**kwargs):
     """THIS FUNCTION CAN BE CALLED TO DEFINE A NEW FORMAT TYPE"""
     try:
-        if "format_id" in kwargs:
-            format_id = kwargs["format_id"]
-        else:
-            print("ERROR: NO IDENTIFIER SUPPLIED FOR FORMAT.\n",
-                  "THIS MUST BE A HASHABLE TYPE SUCH AS AN INTEGER OR STRING.")
-            return
+        if "format_id" not in kwargs:
+            raise TypeError(
+                "No identifier supplied for format.\n",
+                "This must be a hashable type, such as an int or str.")
 
+        f_id = kwargs["format_id"]
+
+        if kwargs.get("remove_format"):
+            return remove_bitmap_format(f_id)
+        elif kwargs.get("format_id") in VALID_FORMATS:
+            raise TypeError(
+                "Cannot add '%s' format definition to Arbytmap as ",
+                "that format identifier is already in use.")
+
+        VALID_FORMATS.append(f_id)
+
+        if kwargs.get("raw_format"): RAW_FORMATS.append(f_id)
+        if kwargs.get("compressed"): COMPRESSED_FORMATS.append(f_id)
+        if kwargs.get("dds_format"): DDS_FORMATS.append(f_id)
+        if kwargs.get("three_channels"):
+            THREE_CHANNEL_FORMATS.append(f_id)
+
+
+        if kwargs.get("unpacker"):
+            FORMAT_UNPACKERS[f_id] = kwargs["unpacker"]
+        if kwargs.get("packer"):
+            FORMAT_PACKERS[f_id] = kwargs["packer"]
+
+        MINIMUM_W[f_id] = 1
+        MINIMUM_H[f_id] = 1
+        MINIMUM_D[f_id] = 1
+
+        if kwargs.get("min_width"):
+            MINIMUM_W[f_id] = kwargs["min_width"]            
+        if kwargs.get("min_height"):
+            MINIMUM_H[f_id] = kwargs["min_height"]            
+        if kwargs.get("min_depth"):
+            MINIMUM_D[f_id] = kwargs["min_depth"]
         
-        if "remove_format" in kwargs and kwargs["remove_format"]:
-            remove_bitmap_format(format_id)
+        if kwargs.get("bpp"):
+            BITS_PER_PIXEL[f_id] = kwargs["bpp"]
+        elif "channel_depths" in kwargs:
+            BITS_PER_PIXEL[f_id] = sum(kwargs["channel_depths"])
         else:
-            if "format_id" in kwargs and kwargs["format_id"] in VALID_FORMATS:
-                print("ERROR: CANNOT ADD NEW FORMAT TO BITMAP CONVERTOR.\n",
-                      "THE IDENTIFIER PROVIDED IS ALREADY IN USE.")
-                return()
+            print("ERROR: CANNOT DEFINE BITMAP FORMAT "+
+                  "WITHOUT A KNOWN\nBITS PER PIXEL OR A "+
+                  "DESCRIPTION OF EACH CHANNEL'S DEPTHS")
+            remove_bitmap_format(f_id)
+        
+        if kwargs.get("data_size"):
+            FORMAT_DATA_SIZES[f_id] = kwargs["data_size"]
 
-            VALID_FORMATS.append(format_id)
+        FORMAT_CHANNEL_COUNTS[f_id] = 1
+        FORMAT_DATA_SIZES[f_id] = INVERSE_PIXEL_ENCODING_SIZES[
+            BITS_PER_PIXEL.get(f_id, 0)//8]
 
-            if "raw_format" in kwargs and kwargs["raw_format"]:
-                RAW_FORMATS.append(format_id)
-            if "compressed" in kwargs and kwargs["compressed"]:
-                COMPRESSED_FORMATS.append(format_id)
-            if "dds_format" in kwargs and kwargs["dds_format"]:
-                DDS_FORMATS.append(format_id)
-            if "three_channels" in kwargs and kwargs["three_channels"]:
-                THREE_CHANNEL_FORMATS.append(format_id)
-
-
-            if "unpacker" in kwargs and kwargs["unpacker"]:
-                FORMAT_UNPACKERS[format_id] = kwargs["unpacker"]
-            if "packer" in kwargs and kwargs["packer"]:
-                FORMAT_PACKERS[format_id] = kwargs["packer"]
-
-                
-            if "min_width" in kwargs and kwargs["min_width"]:
-                MINIMUM_W[format_id] = kwargs["min_width"]
-            else: MINIMUM_W[format_id] = 1
-            
-            if "min_height" in kwargs and kwargs["min_height"]:
-                MINIMUM_H[format_id] = kwargs["min_height"]
-            else: MINIMUM_H[format_id] = 1
-            
-            if "min_depth" in kwargs and kwargs["min_depth"]:
-                MINIMUM_D[format_id] = kwargs["min_depth"]
-            else: MINIMUM_D[format_id] = 1
-            
-            if "bpp" in kwargs and kwargs["bpp"]:
-                BITS_PER_PIXEL[format_id] = kwargs["bpp"]
-            elif "channel_depths" in kwargs:
-                BITS_PER_PIXEL[format_id] = sum(kwargs["channel_depths"])
-            else:
-                print("ERROR: CANNOT DEFINE BITMAP FORMAT "+
-                      "WITHOUT A KNOWN\nBITS PER PIXEL OR A "+
-                      "DESCRIPTION OF EACH CHANNEL'S DEPTHS")
-                remove_bitmap_format(format_id)
-            
-            if "data_size" in kwargs and kwargs["data_size"]:
-                FORMAT_DATA_SIZES[format_id] = kwargs["data_size"]
-            else:
-                FORMAT_DATA_SIZES[format_id] = INVERSE_PIXEL_ENCODING_SIZES[BITS_PER_PIXEL[format_id]//8]
-            
-            if "channel_count" in kwargs and kwargs["channel_count"]:
-                FORMAT_CHANNEL_COUNTS[format_id] = kwargs["channel_count"]
-            else:
-                FORMAT_CHANNEL_COUNTS[format_id] = 1
-            
-            if "channel_masks" in kwargs and kwargs["channel_masks"]:
-                FORMAT_CHANNEL_MASKS[format_id] = kwargs["channel_masks"]
-            if "channel_depths" in kwargs and kwargs["channel_depths"]:
-                FORMAT_CHANNEL_DEPTHS[format_id] = kwargs["channel_depths"]
-            if "channel_offsets" in kwargs and kwargs["channel_offsets"]:
-                FORMAT_CHANNEL_OFFSETS[format_id] = kwargs["channel_offsets"]
+        if kwargs.get("channel_count"):
+            FORMAT_CHANNEL_COUNTS[f_id] = kwargs["channel_count"]
+        if kwargs.get("channel_masks"):
+            FORMAT_CHANNEL_MASKS[f_id] = kwargs["channel_masks"]
+        if kwargs.get("channel_depths"):
+            FORMAT_CHANNEL_DEPTHS[f_id] = kwargs["channel_depths"]
+        if kwargs.get("channel_offsets"):
+            FORMAT_CHANNEL_OFFSETS[f_id] = kwargs["channel_offsets"]
 
     except:
-        print("ERROR OCCURED WHILE TRYING TO DEFINE NEW FORMAT IN BITMAP CONVERTOR")
+        print("Error occurred while trying to defien new texture format.")
         print(format_exc())
 
 
-def print_format(format_id):
-    print(format_id, "Format Definition:")
+def print_format(format_id, printout=True):
+    out_str = "%s Format Definition:\n" % format_id
     for key in sorted(ALL_FORMAT_COLLECTIONS.keys()):
         val = ALL_FORMAT_COLLECTIONS[key]
         if not isinstance(val, dict):
-            print('    %s:' % (key, format_id in val))
+            out_str += '    %s:\n' % (key, format_id in val)
         elif format_id in val:
-            print('    %s:%s' % (key, val[format_id]))
+            out_str += '    %s:%s\n' % (key, val[format_id])
         else:
-            print('    %s:' % key)
-    print()
-
+            out_str += '    %s:\n' % key
+    out_str += '\n'
+    if printout:
+        print(out_str)
+    return out_str
 
 def remove_bitmap_format(format_id):
     for val in ALL_FORMAT_COLLECTIONS.values():
         if format_id not in val:
             continue
         elif isinstance(val, dict):
-            del(val[format_id])
+            del val[format_id]
         else:
             val.pop(val.index(format_id))
 
@@ -438,27 +426,26 @@ def array_length_to_pixel_count(array_len, pixel_size, format):
     '''used to figure out the number of pixels in an array
     of a certain length, with each pixel of a certain
     integer size per pixel, and a certain texture format'''
-    return(array_len*8*pixel_size)//BITS_PER_PIXEL[format]
-           
+    return (array_len*8*pixel_size)//BITS_PER_PIXEL[format]
+
+
 def pixel_count_to_array_length(pixel_count, pixel_size, format):
     '''used to figure out the length of an array that will
     hold a certain number of pixels which will take up a
     certain number of bytes each and are of a certain format'''
-    return((pixel_count*BITS_PER_PIXEL[format]) // 8 ) // pixel_size
-
-
+    return ((pixel_count*BITS_PER_PIXEL[format])//8)//pixel_size
 
 
 def get_mipmap_dimensions(width, height, depth, mipmap_level, format):
     '''This function will give the dimensions of the
     specified mipmap level, format, and fullsize dimensions'''
     #since the dimensions change per mipmap we need to calculate them
-    return(dimension_lower_bound_check(width//powers_of_2[mipmap_level],
-                                       height//powers_of_2[mipmap_level],
-                                       depth//powers_of_2[mipmap_level],
-                                       format))
+    return (clip_dimensions(
+        width//2**mipmap_level, height//2**mipmap_level,
+        depth//2**mipmap_level, format))
 
-def dimension_lower_bound_check(width, height, depth=1, fmt=FORMAT_A8R8G8B8):
+
+def clip_dimensions(width, height, depth=1, fmt=FORMAT_A8R8G8B8):
     '''clips the supplied width, height, and depth to
     what the minimum is defined for the format'''
     return(max(width,  MINIMUM_W[fmt]),
