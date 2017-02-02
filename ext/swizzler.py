@@ -1,5 +1,5 @@
 from array import array
-from math import ceil
+from math import ceil, log
 from traceback import format_exc
 import time
 
@@ -8,11 +8,6 @@ try:
     fast_swizzler = True
 except Exception:
     fast_swizzler = False
-
-logs_of_2 = {}
-
-for log in range(64):
-    logs_of_2[2**log] = log
 
     
 class Swizzler():
@@ -28,79 +23,76 @@ class Swizzler():
         else:
             self.converter = None
 
-
     def swizzle_texture(self, force_swizzle=False, delete_old_array=True):
         '''this is the function to call if you want to swizzle or
         unswizzle an entire texture, mipmaps, cube faces and all'''
-        if self.converter is None:
+        conv = self.converter
+        if conv is None:
             return False
+
+        tex_block = conv.texture_block
         
-        if self.converter.texture_block is not None:
-            '''if we are forcing the texture to be swizzled or deswizzled then we set
-            the swizzle mode to the inverse of whether or not it is swizzled'''
+        if tex_block is not None:
+            '''if we are forcing the texture to be swizzled or
+            deswizzled then we set the swizzle mode to the
+            inverse of whether or not it is swizzled'''
+            mode = conv.swizzler_mode
             if force_swizzle:
-                swizzler_mode = not(self.converter.swizzled)
-            else:
-                swizzler_mode = self.converter.swizzler_mode
+                mode = not(conv.swizzled)
 
-            #only run if the texture is swizzled and we want to unswizzle it or vice versa.
-            #this prevents it from unswizzling a bitmap that's unswizzled and vice versa.
-            #also check that that the bitmap is being saved to a format that supports swizzling
-            if swizzler_mode != self.converter.swizzled:
-                #this variable is used to keep track of which pixel array we are reading
-                curr_b_index = 0
+            #only run if the texture is swizzled and we want to
+            #unswizzle it or vice versa. this prevents it from
+            #unswizzling a bitmap that's unswizzled and vice versa.
+            #also check that that the bitmap is being saved to
+            #a format that supports swizzling.
+            if mode != conv.swizzled:
+                #used to keep track of which pixel array we are reading
+                i = 0
+                w, h, d = (conv.width, conv.height, conv.depth)
+                ucc = 1
+                if not conv.packed:
+                    ucc = conv.unpacked_channel_count
 
-                #make the variables to hold the width, height, and depth as we iterate over the mipmaps
-                width, height, depth = (self.converter.width,
-                                        self.converter.height,
-                                        self.converter.depth)
-
-                for mipmap in range(self.converter.mipmap_count+1):
-                    
-                    for sub_bitmap in range(self.converter.sub_bitmap_count):
+                for m in range(conv.mipmap_count + 1):
+                    for s in range(conv.sub_bitmap_count):
                         #get the pixel array to be swizzled/unswizzled
-                        orig_pixel_array = self.converter.texture_block[curr_b_index]
-                        swizzled_pixel_array = None
+                        orig_pixels = tex_block[i]
                         
                         #make the new array to place the swizzled data into
-                        if isinstance(orig_pixel_array, array):
-                            swizzled_pixel_array = array(orig_pixel_array.typecode,
-                                                         orig_pixel_array)
-                        elif isinstance(orig_pixel_array, bytearray):
-                            swizzled_pixel_array = bytearray(orig_pixel_array)
-                        
-                        if swizzled_pixel_array is not None:
-                            if self.converter.packed:
-                                ucc = 1
-                            else:
-                                ucc = self.converter.unpacked_channel_count
-                                
-                            self._swizzle_block(swizzler_mode, orig_pixel_array,
-                                                swizzled_pixel_array, ucc,
-                                                width, height, depth)
-
-                            #replace the old pixel array with the new swizzled one
-                            self.converter.texture_block[curr_b_index] = swizzled_pixel_array
-
-                            #delete the old pixel array
-                            if delete_old_array:
-                                #delete the old pixel array
-                                del orig_pixel_array[:]
+                        if isinstance(orig_pixels, array):
+                            swizzled_pixels = array(
+                                orig_pixels.typecode, orig_pixels)
+                        elif isinstance(orig_pixels, bytearray):
+                            swizzled_pixels = bytearray(orig_pixels)
                         else:
-                            raise TypeError('Pixel array is not the proper type.'+
-                                            'Expected array.array or bytearray, got %s'
-                                            % type(orig_pixel_array))
-                            
-                        curr_b_index += 1
+                            raise TypeError(
+                                'Pixel array is not the proper type. ' +
+                                'Expected array.array or bytearray, got %s'
+                                % type(orig_pixels))
 
-                    #we're going to the next lowest mipmap level so we halve the resolution
-                    width = int(ceil(width/2))
-                    height = int(ceil(height/2))
-                    depth = int(ceil(depth/2))
+                        self._swizzle_block(
+                            mode, orig_pixels, swizzled_pixels,
+                            ucc, w, h, d)
+
+                        #replace the old pixels with the new swizzled one
+                        tex_block[i] = swizzled_pixels
+
+                        #delete the old pixel array
+                        if delete_old_array:
+                            #delete the old pixel array
+                            del orig_pixels[:]
+                            
+                        i += 1
+
+                    #we're going to the next lowest mipmap
+                    #level so we halve the resolution
+                    w = int(ceil(w/2))
+                    h = int(ceil(h/2))
+                    d = int(ceil(d/2))
     
                 #now that we're done (un)swizzling
                 #the bitmap we invert the boolean
-                self.converter.swizzled = not(self.converter.swizzled)
+                conv.swizzled = not(conv.swizzled)
         else:
             print("ERROR: NO TEXTURE LOADED. CANNOT PREFORM "+
                   "SWIZZLE OPERATION WITHOUT A LOADED TEXTURE")
@@ -109,41 +101,35 @@ class Swizzler():
         #no errors occurred so we return a success
         return True
 
-
-
     def swizzle_single_array(self, orig_array, swizzler_mode,
-                             channel_count, width, height, depth=1,
+                             channel_count, w, h, d=1,
                              delete_old_array=True):
         '''this is the function to call if you just
         want to swizzle or unswizzle a single array
         swizzler_mode: True = Swizzle    False = Deswizzle'''
         try:
-            swizzled_array = None
-            
             #make the new array to place the swizzled data into
             if isinstance(orig_array, array):
                 swizzled_array = array(orig_array.typecode, orig_array)
             elif isinstance(orig_array, bytearray):
                 swizzled_array = bytearray(orig_array)
-            
-            if swizzled_array is not None:
-                self._swizzle_block(swizzler_mode, orig_array, swizzled_array,
-                                    channel_count, width, height, depth)
-                
-                if delete_old_array:
-                    #delete the old pixel array
-                    del orig_array[:]
-                
-                return swizzled_array
             else:
-                raise TypeError('Array is not the proper type.'+
+                raise TypeError('Array is not the proper type. ' +
                                 'Expected array.array or bytearray, got %s'
                                 % type(orig_array))
-        except:
+
+            self._swizzle_block(swizzler_mode, orig_array,
+                                swizzled_array, channel_count, w, h, d)
+            
+            if delete_old_array:
+                #delete the old pixel array
+                del orig_array[:]
+
+            return swizzled_array
+        except Exception:
             print("ERROR OCCURRED WHILE TRYING TO SWIZZLE ARRAY")
             print(format_exc())
             return False
-
 
     def _swizzle_block(self, swizzler_mode, orig_array, swizzled_array,
                        channels, width, height, depth):
@@ -153,26 +139,27 @@ class Swizzler():
 
         #this is the number of bits per axis. We'll use it
         #when calculating how much to bitshift the offsets
-        c_blocks, x_blocks, y_blocks, z_blocks = (logs_of_2[channels],
-                                                  logs_of_2[width],
-                                                  logs_of_2[height],
-                                                  logs_of_2[depth])
+        c_blocks, x_blocks, y_blocks, z_blocks = (
+            int(log(channels, 2)), int(log(width, 2)),
+            int(log(height, 2)), int(log(depth, 2)))
 
-        #these are the masks that will be used for calculating the swizzled offsets
-        c_mask, x_mask, y_mask, z_mask = (array("B",[]), array("B",[]),
-                                          array("B",[]), array("B",[]))
+        #these are the masks that will be used
+        #for calculating the swizzled offsets.
+        c_mask, x_mask, y_mask, z_mask = (
+            array("B",[]), array("B",[]), array("B",[]), array("B",[]))
         
         #generate the mask for the swizzler pattern
         self.swizzler_mask.mask_set(c_blocks, x_blocks, y_blocks, z_blocks,
                                     c_mask,   x_mask,   y_mask,   z_mask)
 
-        bit_swizzler = self._bit_swizzler
+        bs = self._bit_swizzler
 
-        #swizzle the bits of the offsets. supports up to 2^32 array elements(4GB if each element is 1 byte)
-        c_block_offs = array("L", map(bit_swizzler, range(channels), (c_mask,)*channels))
-        x_block_offs = array("L", map(bit_swizzler, range(width), (x_mask,)*width))
-        y_block_offs = array("L", map(bit_swizzler, range(height), (y_mask,)*height))
-        z_block_offs = array("L", map(bit_swizzler, range(depth), (z_mask,)*depth))
+        #swizzle the bits of the offsets. supports up to
+        #2^32 array elements(4GB if each element is 1 byte)
+        c_block_offs = array("L", map(bs, range(channels), (c_mask,)*channels))
+        x_block_offs = array("L", map(bs, range(width), (x_mask,)*width))
+        y_block_offs = array("L", map(bs, range(height), (y_mask,)*height))
+        z_block_offs = array("L", map(bs, range(depth), (z_mask,)*depth))
         
         if fast_swizzler:
             if swizzler_mode:
@@ -186,102 +173,94 @@ class Swizzler():
 
             return
 
-        array_idx = 0
+        i = 0
         #swizzler_mode: True = Swizzle    False = Deswizzle
-        if swizzler_mode:
-            if channels == 1:
-                for z in z_block_offs:
-                    for y in y_block_offs:
-                        zy = z+y
-                        for x in x_block_offs:
-                            swizzled_array[zy+x] = orig_array[array_idx]
-                            
-                            array_idx += 1
-            else:
-                for z in z_block_offs:
-                    for y in y_block_offs:
-                        zy = z+y
-                        for x in x_block_offs:
-                            zyx = zy+x
-                            for c in c_block_offs:
-                                swizzled_array[zyx+c] = orig_array[array_idx]
-                                
-                                array_idx += 1
+        if swizzler_mode and channels == 1:
+            for z in z_block_offs:
+                for y in y_block_offs:
+                    zy = z+y
+                    for x in x_block_offs:
+                        swizzled_array[zy+x] = orig_array[i]
+                        i += 1
+        elif swizzler_mode:
+            for z in z_block_offs:
+                for y in y_block_offs:
+                    zy = z+y
+                    for x in x_block_offs:
+                        zyx = zy+x
+                        for c in c_block_offs:
+                            swizzled_array[zyx+c] = orig_array[i]
+                            i += 1
+        elif channels == 1:
+            for z in z_block_offs:
+                for y in y_block_offs:
+                    zy = z+y
+                    for x in x_block_offs:
+                        swizzled_array[i] = orig_array[zy+x]
+                        i += 1
         else:
-            if channels == 1:
-                for z in z_block_offs:
-                    for y in y_block_offs:
-                        zy = z+y
-                        for x in x_block_offs:
-                            swizzled_array[array_idx] = orig_array[zy+x]
-                            
-                            array_idx += 1
-            else:
-                for z in z_block_offs:
-                    for y in y_block_offs:
-                        zy = z+y
-                        for x in x_block_offs:
-                            zyx = zy+x                       
-                            for c in c_block_offs:
-                                swizzled_array[array_idx] = orig_array[zyx+c]
-                                
-                                array_idx += 1
-        
+            for z in z_block_offs:
+                for y in y_block_offs:
+                    zy = z+y
+                    for x in x_block_offs:
+                        zyx = zy+x                       
+                        for c in c_block_offs:
+                            swizzled_array[i] = orig_array[zyx+c]
+                            i += 1
     
     def _bit_swizzler(self, axis_offset, axis_mask):
         '''axis_offset is the x, y, or z index who's bits we are swizzling
-        axis_mask is an array which is the length of Log2(Dimension). Each index
-        corrosponds to the equivelant bit in the dimension's binary form. The value
-        of each index is how far left the bit should be shifted. if the value is
-        negative then the bit will instead be shifted to the right by that amount.'''
+        axis_mask is an array which is the length of Log2(Dimension).
+        Each index corrosponds to the equivelant bit in the dimension's
+        binary form. The value of each index is how far left the bit should
+        be shifted. if the value is negative then the bit will instead be
+        shifted to the right by that amount.'''
         
         #this will be used to store the index after we swizzle it's bits
         swizzled_axis_offset = 0
-
-        ##########################
-        '''COULD USE MORE SPEED'''
-        ##########################
         
         #we loop through each of the bits in the axis_offset
-        for bit_idx in range(len(axis_mask)):
-            '''Mask off the value of the bit, shift it to the index it needs to be
-            in, and add the result to the return value "swizzled_axis_offset" '''
-            if axis_mask[bit_idx] < 0:
-                swizzled_axis_offset += (axis_offset&(1<<bit_idx)) >> (-1*axis_mask[bit_idx])
+        for i in range(len(axis_mask)):
+            '''Mask off the value of the bit, shift it to
+            the index it needs to be in, and add the result
+            to the return value "swizzled_axis_offset" '''
+            mask = axis_mask[i]
+            if mask < 0:
+                swizzled_axis_offset += (axis_offset&(1<<i)) >> (-1*mask)
             else:
-                swizzled_axis_offset += (axis_offset&(1<<bit_idx)) << axis_mask[bit_idx]
+                swizzled_axis_offset += (axis_offset&(1<<i)) << mask
         
         return swizzled_axis_offset
-    
 
 
 class SwizzlerMask():
-    """This swizzler uses a z-order curve based swizzling routine, but the exact pattern is modifiable.
-    Currently there is a Morton style nested z swizzle pattern, a pattern which will place pixels within
-    a certain size square directly next to each other(for merging together), and a pattern that will
-    place pixels within a 4x4 square directly next to each other(to aid in calculating DXT texels)"""
+    """This swizzler uses a z-order curve based swizzling
+    routine, but the exact pattern is modifiable.
+    Currently there is a Morton style nested z swizzle
+    pattern, a pattern which will place pixels within
+    a certain size square directly next to each other(for
+    merging together), and a pattern that will place pixels
+    within a 4x4 square directly next to each other(to aid
+    in calculating DXT texels)"""
 
     def __init__(self, **kwargs):
         '''this is a list of functions to swizzle masks in different formats.
         unless more are added the default will be the only available one.
         Default is z-order curve, or morton order'''
-        self.masks = {"DEFAULT":self._z_order_mask_set,
-                      "MORTON":self._z_order_mask_set,
-                      "DXT_CALC":self._dxt_calculation_mask_set,
-                      "DOWNSAMPLER":self._pixel_merge_mask_set}
+        self.masks = {"DEFAULT": self._z_order_mask_set,
+                      "MORTON": self._z_order_mask_set,
+                      "DXT_CALC": self._dxt_calculation_mask_set,
+                      "DOWNSAMPLER": self._pixel_merge_mask_set}
         
         self.swizzler_settings = kwargs
     
-        if "mask_type" in kwargs and kwargs["mask_type"] in self.masks:
-            self.mask_set = self.masks[kwargs["mask_type"]]
-        else:
-            print("ERROR: UNKNOWN SWIZZLER MASK TYPE.")
+        if kwargs.get("mask_type") not in self.masks:
+            raise TypeError("Unknown swizzler mask type")
 
+        self.mask_set = self.masks[kwargs.get("mask_type")]
 
     def mask_set(self, *args, **kwargs):
-        '''PLACEHOLDER'''
-        pass
-
+        raise NotImplementedError
 
     def _z_order_mask_set(self, c_blocks, x_blocks, y_blocks, z_blocks,
                           c_mask,   x_mask,   y_mask,   z_mask):
@@ -290,27 +269,22 @@ class SwizzlerMask():
 
         #do this separately and FIRST. its not likely that
         #we want swizzled channels so we do this separate
-        c_mask.extend( [0] * c_blocks )
-        current_bit = c_blocks
+        c_mask.extend([0]*c_blocks)
+        i = c_blocks
         
         #Loop for each of the bits in the largest dimension
-        for BLOCK_SIZE in range(max(x_blocks, y_blocks, z_blocks)):
+        for size in range(max(x_blocks, y_blocks, z_blocks)):
             """WE CHECK IF THERE ARE STILL ANY BITS FOR EACH AXIS"""
-                
-            if x_blocks > BLOCK_SIZE:
-                x_mask.append(current_bit)
-                current_bit += 1
-                
-            if y_blocks > BLOCK_SIZE:
-                y_mask.append(current_bit)
-                current_bit += 1
-                
-            if z_blocks > BLOCK_SIZE:
-                z_mask.append(current_bit)
-                current_bit += 1
-                
-            current_bit -= 1
-
+            if x_blocks > size:
+                x_mask.append(i)
+                i += 1
+            if y_blocks > size:
+                y_mask.append(i)
+                i += 1
+            if z_blocks > size:
+                z_mask.append(i)
+                i += 1
+            i -= 1
 
     def _dxt_calculation_mask_set(self, log_c,  log_x,  log_y,  log_z,
                                   c_mask, x_mask, y_mask, z_mask):
@@ -334,10 +308,8 @@ class SwizzlerMask():
         y_mask.extend([log_c+tmp_x]*tmp_y)
         
         z_mask.extend([log_c+tmp_x+tmp_y]*log_z)
-        
-        x_mask.extend([log_c+tmp_y+log_z]*(log_x-tmp_x) )
-
-        y_mask.extend([log_c+log_x+log_z]*(log_y-tmp_y) )
+        x_mask.extend([log_c+tmp_y+log_z]*(log_x-tmp_x))
+        y_mask.extend([log_c+log_x+log_z]*(log_y-tmp_y))
 
 
     def _pixel_merge_mask_set(self, log_c,  log_w,  log_h,  log_d,
@@ -345,96 +317,90 @@ class SwizzlerMask():
         """THIS FUNCTION WILL SWIZZLE AN ARRAY OF C, X, Y,
         AND Z OFFSETS IN SUCH A WAY THAT THE PIXELS BEING
         MERGED END UP DIRECTLY ADJACENT EACH OTHER"""
-        current_bit = 0
-        
-        new_width, new_height, new_depth = (self.swizzler_settings["new_width"],
-                                            self.swizzler_settings["new_height"],
-                                            self.swizzler_settings["new_depth"])
+        config = self.swizzler_settings
+        new_width, new_height, new_depth = (
+            config["new_width"], config["new_height"], config["new_depth"])
         
         #these are how many blocks are being merged on eachs of the axis
-        log_x_merge = log_w - logs_of_2[new_width]
-        log_y_merge = log_h - logs_of_2[new_height]
-        log_z_merge = log_d - logs_of_2[new_depth]
+        x_merge = log_w - int(log(new_width, 2))
+        y_merge = log_h - int(log(new_height, 2))
+        z_merge = log_d - int(log(new_depth, 2))
 
         """so we can properly swizzle each of the axis we need to know
         which one we are currently working on and ONLY increment that
         one. when we have reached the last bit for that axis this number
         is incremented. when this number reaches 4 it is reset to 0."""
-        current_axis = 0
-        current_axis_bit = 0
-        bit_shift_amounts = [0,0,0,0]
+        axis = 0
+        axis_bit = 0
+        bit_shifts = [0, 0, 0, 0]
         
-        curr_x_bit = 0
-        curr_y_bit = 0
-        curr_z_bit = 0
-        current_c_bit = 0
+        x_bit = y_bit = z_bit = c_bit = i = 0
         
         #Loop for each of the bits in the integer (W*H*D*C)
-        for current_bit in range(log_x_merge+log_y_merge+log_z_merge+log_c):
-            selecting_axis = True
+        for i in range(x_merge + y_merge + z_merge + log_c):
+            choosing_axis = True
 
-            while selecting_axis:
-                selecting_axis = False
-                
-                if curr_x_bit >= log_w and current_axis == 0:
-                    current_axis = 1
-                    current_axis_bit = 0
-                if curr_y_bit >= log_h and current_axis == 1:
-                    current_axis = 2
-                    current_axis_bit = 0
-                if curr_z_bit >= log_d and current_axis == 2:
-                    current_axis = 3
-                    current_axis_bit = 0
-                if current_c_bit >= log_c and current_axis == 3:
-                    current_axis = -1
-                    current_axis_bit = 0
-                    
-                
-                if current_axis_bit >= log_x_merge and current_axis == 0:
-                    current_axis = 1
-                    current_axis_bit = 0
-                    selecting_axis = True
-                if current_axis_bit >= log_y_merge and current_axis == 1:
-                    current_axis = 2
-                    current_axis_bit = 0
-                    selecting_axis = True
-                if current_axis_bit >= log_z_merge and current_axis == 2:
-                    current_axis = 3
-                    current_axis_bit = 0
-                    selecting_axis = True
-                if current_axis_bit >= log_c and current_axis == 3:
-                    current_axis = -1
-                    current_axis_bit = 0
-            
-            if current_axis == 0:
-                x_mask.append(bit_shift_amounts[0])
-                bit_shift_amounts[0] -= 1
-                curr_x_bit += 1
-            elif current_axis == 1:
-                y_mask.append(bit_shift_amounts[1])
-                bit_shift_amounts[1] -= 1
-                curr_y_bit += 1
-            elif current_axis == 2:
-                z_mask.append(bit_shift_amounts[2])
-                bit_shift_amounts[2] -= 1
-                curr_z_bit += 1
-            elif current_axis == 3:
-                c_mask.append(bit_shift_amounts[3])
-                bit_shift_amounts[3] -= 1
-                current_c_bit += 1
-            
-            bit_shift_amounts[0] += 1
-            bit_shift_amounts[1] += 1
-            bit_shift_amounts[2] += 1
-            bit_shift_amounts[3] += 1
-            current_axis_bit += 1
-            
-        x_remainder = log_w-log_x_merge
-        y_remainder = log_h-log_y_merge
-        z_remainder = log_d-log_z_merge
+            while choosing_axis:
+                choosing_axis = False
 
-        shift_amount = (log_x_merge + log_y_merge + log_z_merge + log_c)
-        
-        x_mask.extend([shift_amount-len(x_mask)]*x_remainder)
-        y_mask.extend([shift_amount+x_remainder-len(y_mask)]*y_remainder)
-        z_mask.extend([shift_amount+x_remainder+y_remainder-len(z_mask)]*z_remainder)
+                if x_bit >= log_w and axis == 0:
+                    axis = 1
+                    axis_bit = 0
+                if y_bit >= log_h and axis == 1:
+                    axis = 2
+                    axis_bit = 0
+                if z_bit >= log_d and axis == 2:
+                    axis = 3
+                    axis_bit = 0
+                if c_bit >= log_c and axis == 3:
+                    axis = -1
+                    axis_bit = 0
+
+                if axis_bit >= x_merge and axis == 0:
+                    axis = 1
+                    axis_bit = 0
+                    choosing_axis = True
+                if axis_bit >= y_merge and axis == 1:
+                    axis = 2
+                    axis_bit = 0
+                    choosing_axis = True
+                if axis_bit >= z_merge and axis == 2:
+                    axis = 3
+                    axis_bit = 0
+                    choosing_axis = True
+                if axis_bit >= log_c and axis == 3:
+                    axis = -1
+                    axis_bit = 0
+
+            if axis == 0:
+                x_mask.append(bit_shifts[0])
+                bit_shifts[0] -= 1
+                x_bit += 1
+            elif axis == 1:
+                y_mask.append(bit_shifts[1])
+                bit_shifts[1] -= 1
+                y_bit += 1
+            elif axis == 2:
+                z_mask.append(bit_shifts[2])
+                bit_shifts[2] -= 1
+                z_bit += 1
+            elif axis == 3:
+                c_mask.append(bit_shifts[3])
+                bit_shifts[3] -= 1
+                c_bit += 1
+
+            bit_shifts[0] += 1
+            bit_shifts[1] += 1
+            bit_shifts[2] += 1
+            bit_shifts[3] += 1
+            axis_bit += 1
+
+        x_rem = log_w - x_merge
+        y_rem = log_h - y_merge
+        z_rem = log_d - z_merge
+
+        shift = (x_merge + y_merge + z_merge + log_c)
+
+        x_mask.extend([shift - len(x_mask)]*x_rem)
+        y_mask.extend([shift + x_rem - len(y_mask)]*y_rem)
+        z_mask.extend([shift + x_rem + y_rem - len(z_mask)]*z_rem)

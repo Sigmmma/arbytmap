@@ -88,12 +88,14 @@ static void pack_raw_2_channel_merge_8bpp(
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
     unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
     packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned char(*)[])unpacked_pix_buf->buf;
     a_scale = (unsigned char(*)[])a_scale_buf->buf;
@@ -101,7 +103,13 @@ static void pack_raw_2_channel_merge_8bpp(
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
 
-    if (packed_pix_size == 4) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_64)[i] = (
+                ((*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
+                ((*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffFFffFFffL;
+        }
+    } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_32)[i] = (
                 ((*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
@@ -201,12 +209,14 @@ static void pack_raw_2_channel_8bpp(
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
     unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
     packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned char(*)[])unpacked_pix_buf->buf;
     a_scale = (unsigned char(*)[])a_scale_buf->buf;
@@ -214,7 +224,13 @@ static void pack_raw_2_channel_8bpp(
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
 
-    if (packed_pix_size == 4) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_64)[i] = (
+                ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
+                ((*i_scale)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffFFffFFffL;
+        }
+    } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_32)[i] = (
                 ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
@@ -245,18 +261,30 @@ static void pack_raw_1_channel_8bpp(
 
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
+    unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
+    packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[])packed_pix_buf->buf;
 
     unpacked_pix = (unsigned char(*)[])unpacked_pix_buf->buf;
     scale = (unsigned char(*)[])scale_buf->buf;
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
 
-    if (packed_pix_size == 2) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_64)[i] = (*scale)[(*unpacked_pix)[i]];
+        }
+    } else if (packed_pix_size == 4) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_32)[i] = (*scale)[(*unpacked_pix)[i]];
+        }
+    } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]];
         }
@@ -355,12 +383,14 @@ static void pack_raw_2_channel_merge_16bpp(
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
     unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
     packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
     a_scale = (unsigned short(*)[])a_scale_buf->buf;
@@ -368,7 +398,13 @@ static void pack_raw_2_channel_merge_16bpp(
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
 
-    if (packed_pix_size == 4) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_64)[i] = (
+                ((*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
+                ((*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffFFffFFffL;
+        }
+    } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_32)[i] = (
                 ((*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
@@ -469,12 +505,14 @@ static void pack_raw_2_channel_16bpp(
     unsigned char  (*packed_pix_8)[];
     unsigned short (*packed_pix_16)[];
     unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_8  = (unsigned char(*)[]) packed_pix_buf->buf;
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
     packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
     a_scale = (unsigned short(*)[])a_scale_buf->buf;
@@ -482,7 +520,13 @@ static void pack_raw_2_channel_16bpp(
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
 
-    if (packed_pix_size == 4) {
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_64)[i] = (
+                ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
+                ((*i_scale)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffFFffFFffL;
+        }
+    } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_32)[i] = (
                 ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
@@ -511,17 +555,32 @@ static void pack_raw_1_channel_16bpp(
     unsigned short (*scale)[];
     unsigned long long i=0, max_i=0;
     unsigned short (*packed_pix_16)[];
+    unsigned long  (*packed_pix_32)[];
+    unsigned long long (*packed_pix_64)[];
 
     packed_pix_size = packed_pix_buf->itemsize;
 
     packed_pix_16 = (unsigned short(*)[])packed_pix_buf->buf;
+    packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
+    packed_pix_64 = (unsigned long long(*)[])packed_pix_buf->buf;
+
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
     scale = (unsigned short(*)[])scale_buf->buf;
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
 
-    for (i=0; i < max_i; i++) {
-        (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]];
+    if (packed_pix_size == 8) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_64)[i] = (*scale)[(*unpacked_pix)[i]];
+        }
+    } else if (packed_pix_size == 4) {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_32)[i] = (*scale)[(*unpacked_pix)[i]];
+        }
+    } else {
+        for (i=0; i < max_i; i++) {
+            (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]];
+        }
     }
 }
 
@@ -532,7 +591,7 @@ static void pack_indexing(
     //THIS FUNCTION IS CURRENTLY UNTESTED.
     unsigned char (*packed_indexing)[];
     unsigned char (*unpacked_indexing)[];
-    unsigned long long i=0, max_i=0;
+    unsigned long long i=0, j=0, max_i=0;
 
     packed_indexing = (unsigned char(*)[]) packed_indexing_buf->buf;
     unpacked_indexing = (unsigned char(*)[]) unpacked_indexing_buf->buf;
@@ -541,26 +600,29 @@ static void pack_indexing(
 
     if (indexing_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_indexing)[i] = ( (*unpacked_indexing)[(i<<1)] +
-                                     ((*unpacked_indexing)[(i<<1)+1]<<4))&255;
+            j = i<<1;
+            (*packed_indexing)[i] = ( (*unpacked_indexing)[j] +
+                                     ((*unpacked_indexing)[j+1]<<4))&255;
         }
     } else if (indexing_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_indexing)[i] = ( (*unpacked_indexing)[(i<<2)] +
-                                     ((*unpacked_indexing)[(i<<2)+1]<<2)+
-                                     ((*unpacked_indexing)[(i<<2)+2]<<4)+
-                                     ((*unpacked_indexing)[(i<<2)+3]<<6))&255;
+            j = i<<2;
+            (*packed_indexing)[i] = ( (*unpacked_indexing)[j] +
+                                     ((*unpacked_indexing)[j+1]<<2)+
+                                     ((*unpacked_indexing)[j+2]<<4)+
+                                     ((*unpacked_indexing)[j+3]<<6))&255;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_indexing)[i] = ( (*unpacked_indexing)[(i<<3)] +
-                                     ((*unpacked_indexing)[(i<<3)+1]<<1)+
-                                     ((*unpacked_indexing)[(i<<3)+2]<<2)+
-                                     ((*unpacked_indexing)[(i<<3)+3]<<3)+
-                                     ((*unpacked_indexing)[(i<<3)+4]<<4)+
-                                     ((*unpacked_indexing)[(i<<3)+5]<<5)+
-                                     ((*unpacked_indexing)[(i<<3)+6]<<6)+
-                                     ((*unpacked_indexing)[(i<<3)+7]<<7))&255;
+            j = i<<3;
+            (*packed_indexing)[i] = ( (*unpacked_indexing)[j] +
+                                     ((*unpacked_indexing)[j+1]<<1)+
+                                     ((*unpacked_indexing)[j+2]<<2)+
+                                     ((*unpacked_indexing)[j+3]<<3)+
+                                     ((*unpacked_indexing)[j+4]<<4)+
+                                     ((*unpacked_indexing)[j+5]<<5)+
+                                     ((*unpacked_indexing)[j+6]<<6)+
+                                     ((*unpacked_indexing)[j+7]<<7))&255;
         }
     }
 }
