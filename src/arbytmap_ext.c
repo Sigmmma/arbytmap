@@ -152,11 +152,11 @@ static PyObject *py_depalettize_bitmap(PyObject *self, PyObject *args) {
 
 static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
-    char channel_count;
     unsigned long merge_count;
+    char channel_count;
 
     // Get the pointers to each of the array objects and channel count
-    if (!PyArg_ParseTuple(args, "w*w*Lb:downsample_bitmap",
+    if (!PyArg_ParseTuple(args, "w*w*kb:downsample_bitmap",
         &bufs[0], &bufs[1], &merge_count, &channel_count))
         return Py_None;
 
@@ -176,7 +176,7 @@ static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
 /* A list of all the methods defined by this module.
 "METH_VARGS" tells Python how to call the handler.
 The {NULL, NULL} entry indicates the end of the method definitions */
-static PyMethodDef arbytmap_methods[] = {
+static PyMethodDef arbytmap_ext_methods[] = {
     {"depalettize_bitmap", py_depalettize_bitmap, METH_VARARGS, ""},
     {"downsample_bitmap", py_downsample_bitmap, METH_VARARGS, ""},
     //{"downsample_bitmap_gamma", py_downsample_bitmap_gamma, METH_VARARGS, ""},
@@ -185,14 +185,14 @@ static PyMethodDef arbytmap_methods[] = {
 
 /* When Python imports a C module named 'X' it loads the
 module then looks for a method named "init"+X and calls it.*/
-static struct PyModuleDef arbytmap_module = {
+static struct PyModuleDef arbytmap_ext_module = {
     PyModuleDef_HEAD_INIT,
-    "arbytmap",
+    "arbytmap_ext",
     "A set of C functions to replace certain speed intensive Arbytmap functions",
     -1,
-    arbytmap_methods,
+    arbytmap_ext_methods,
 };
 
 PyMODINIT_FUNC PyInit_arbytmap_ext(void) {
-    return PyModule_Create(&arbytmap_module);
+    return PyModule_Create(&arbytmap_ext_module);
 }
