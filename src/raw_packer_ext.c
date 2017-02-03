@@ -5,6 +5,60 @@
 #include "modsupport.h"
 #include "object.h"
 
+//short-hand macros for packer routines
+
+//unpacking individual components
+#define PACK_ARGB_A_MERGE ((*a_scale)[((*unpacked_pix)[i<<2]+a_rnd)/a_div]<<a_shift)
+#define PACK_ARGB_R_MERGE ((*r_scale)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
+#define PACK_ARGB_G_MERGE ((*g_scale)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
+#define PACK_ARGB_B_MERGE ((*b_scale)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
+#define PACK_AI_A_MERGE   ((*a_scale)[((*unpacked_pix)[i<<1]+a_rnd)/a_div]<<a_shift)
+#define PACK_AI_I_MERGE   ((*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
+
+#define PACK_ARGB_A ((*a_scale)[(*unpacked_pix)[(i<<2)]]<<a_shift)
+#define PACK_ARGB_R ((*r_scale)[(*unpacked_pix)[(i<<2)+1]]<<r_shift)
+#define PACK_ARGB_G ((*g_scale)[(*unpacked_pix)[(i<<2)+2]]<<g_shift)
+#define PACK_ARGB_B ((*b_scale)[(*unpacked_pix)[(i<<2)+3]]<<b_shift)
+#define PACK_AI_A   ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift)
+#define PACK_AI_I   ((*i_scale)[(*unpacked_pix)[(i<<1)+1]]<<i_shift)
+
+#define PACK_ARGB_A_MERGE_16 ((*a_scale)[((*unpacked_pix)[i<<2]+a_rnd)/a_div]<<a_shift)
+#define PACK_ARGB_R_MERGE_16 ((*r_scale)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
+#define PACK_ARGB_G_MERGE_16 ((*g_scale)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
+#define PACK_ARGB_B_MERGE_16 ((*b_scale)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
+#define PACK_AI_A_MERGE_16   ((*a_scale)[((*unpacked_pix)[i<<1]+a_rnd)/a_div]<<a_shift)
+#define PACK_AI_I_MERGE_16   ((*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
+
+#define PACK_ARGB_A_16 ((*a_scale_16)[(*unpacked_pix)[(i<<2)]]<<a_shift)
+#define PACK_ARGB_R_16 ((*r_scale_16)[(*unpacked_pix)[(i<<2)+1]]<<r_shift)
+#define PACK_ARGB_G_16 ((*g_scale_16)[(*unpacked_pix)[(i<<2)+2]]<<g_shift)
+#define PACK_ARGB_B_16 ((*b_scale_16)[(*unpacked_pix)[(i<<2)+3]]<<b_shift)
+#define PACK_AI_A_16   ((*a_scale_16)[(*unpacked_pix)[(i<<1)]]<<a_shift)
+#define PACK_AI_I_16   ((*i_scale_16)[(*unpacked_pix)[(i<<1)+1]]<<i_shift)
+
+//unpacking ARGB and AI in different ways
+#define PACK_ARGB_MERGE (\
+    PACK_ARGB_A_MERGE + PACK_ARGB_R_MERGE +\
+    PACK_ARGB_G_MERGE + PACK_ARGB_B_MERGE)
+#define PACK_AI_MERGE (PACK_AI_A_MERGE + PACK_AI_I_MERGE)
+
+#define PACK_ARGB (\
+    PACK_ARGB_A + PACK_ARGB_R +\
+    PACK_ARGB_G + PACK_ARGB_B)
+#define PACK_AI (PACK_AI_A + PACK_AI_I)
+
+//deep color versions of the above
+#define PACK_ARGB_MERGE_16 (\
+    PACK_ARGB_A_MERGE_16 + PACK_ARGB_R_MERGE_16 +\
+    PACK_ARGB_G_MERGE_16 + PACK_ARGB_B_MERGE_16)
+#define PACK_AI_MERGE_16 (PACK_AI_A_MERGE_16 + PACK_AI_I_MERGE_16)
+
+#define PACK_ARGB_16 (\
+    PACK_ARGB_A_16 + PACK_ARGB_R_16 +\
+    PACK_ARGB_G_16 + PACK_ARGB_B_16)
+#define PACK_AI_16 (PACK_AI_A_16 + PACK_AI_I_16)
+
+
 static void pack_raw_4_channel_merge_8bpp(
     Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
@@ -42,34 +96,22 @@ static void pack_raw_4_channel_merge_8bpp(
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_64)[i] = (
-                ((unsigned long long)(*a_scale)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                ((unsigned long long)(*r_scale)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                ((unsigned long long)(*g_scale)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                ((unsigned long long)(*b_scale)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFffFFffFFffFFffULL;
+                (unsigned long long)PACK_ARGB_A_MERGE +
+                (unsigned long long)PACK_ARGB_R_MERGE +
+                (unsigned long long)PACK_ARGB_G_MERGE +
+                (unsigned long long)PACK_ARGB_B_MERGE)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_32)[i] = (
-                ((*a_scale)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                ((*r_scale)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                ((*g_scale)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                ((*b_scale)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFffFFffUL;
+            (*packed_pix_32)[i] = PACK_ARGB_MERGE&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_16)[i] = (
-                ((*a_scale)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                ((*r_scale)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                ((*g_scale)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                ((*b_scale)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFff;
+            (*packed_pix_16)[i] = PACK_ARGB_MERGE&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_8)[i] = (
-                ((*a_scale)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                ((*r_scale)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                ((*g_scale)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                ((*b_scale)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFF;
+            (*packed_pix_8)[i] = PACK_ARGB_MERGE&0xFF;
         }
     }
 }
@@ -106,26 +148,20 @@ static void pack_raw_2_channel_merge_8bpp(
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_64)[i] = (
-                ((unsigned long long)(*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                ((unsigned long long)(*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffFFffFFffULL;
+                (unsigned long long)PACK_AI_A_MERGE +
+                (unsigned long long)PACK_AI_I_MERGE)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_32)[i] = (
-                ((*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                ((*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffUL;
+            (*packed_pix_32)[i] = PACK_AI_MERGE&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_16)[i] = (
-                ((*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                ((*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFff;
+            (*packed_pix_16)[i] = PACK_AI_MERGE&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_8)[i] = (
-                ((*a_scale)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                ((*i_scale)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFF;
+            (*packed_pix_8)[i] = PACK_AI_MERGE&0xFF;
         }
     }
 }
@@ -164,34 +200,22 @@ static void pack_raw_4_channel_8bpp(
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_64)[i] = (
-                ((unsigned long long)(*a_scale)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                ((unsigned long long)(*r_scale)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                ((unsigned long long)(*g_scale)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                ((unsigned long long)(*b_scale)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFffFFffFFffFFffULL;
+                (unsigned long long)PACK_ARGB_A +
+                (unsigned long long)PACK_ARGB_R +
+                (unsigned long long)PACK_ARGB_G +
+                (unsigned long long)PACK_ARGB_B)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_32)[i] = (
-                ((*a_scale)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                ((*r_scale)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                ((*g_scale)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                ((*b_scale)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFffFFffUL;
+            (*packed_pix_32)[i] = PACK_ARGB&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_16)[i] = (
-                ((*a_scale)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                ((*r_scale)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                ((*g_scale)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                ((*b_scale)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFff;
+            (*packed_pix_16)[i] = PACK_ARGB&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_8)[i] = (
-                ((*a_scale)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                ((*r_scale)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                ((*g_scale)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                ((*b_scale)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFF;
+            (*packed_pix_8)[i] = PACK_ARGB&0xFF;
         }
     }
 }
@@ -227,26 +251,20 @@ static void pack_raw_2_channel_8bpp(
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
             (*packed_pix_64)[i] = (
-                ((unsigned long long)(*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                ((unsigned long long)(*i_scale)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffFFffFFffULL;
+                (unsigned long long)PACK_AI_A  +
+                (unsigned long long)PACK_AI_I)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_32)[i] = (
-                ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                ((*i_scale)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffUL;
+            (*packed_pix_32)[i] = PACK_AI&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_16)[i] = (
-                ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                ((*i_scale)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFff;
+            (*packed_pix_16)[i] = PACK_AI&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_8)[i] = (
-                ((*a_scale)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                ((*i_scale)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFF;
+            (*packed_pix_8)[i] = PACK_AI&0xFF;
         }
     }
 }
@@ -313,7 +331,7 @@ static void pack_raw_4_channel_merge_16bpp(
 {
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
-    unsigned char (*a_scale_8)[], (*r_scale_8)[], (*g_scale_8)[], (*b_scale_8)[];
+    unsigned char (*a_scale)[], (*r_scale)[], (*g_scale)[], (*b_scale)[];
     unsigned short (*a_scale_16)[], (*r_scale_16)[], (*g_scale_16)[], (*b_scale_16)[];
     unsigned long long i=0, max_i=0;
     long long a_rnd=a_div/2, r_rnd=r_div/2, g_rnd=g_div/2, b_rnd=b_div/2;
@@ -331,10 +349,10 @@ static void pack_raw_4_channel_merge_16bpp(
     packed_pix_64 = (unsigned long long(*)[])packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
-    a_scale_8 = (unsigned char(*)[])a_scale_buf->buf;
-    r_scale_8 = (unsigned char(*)[])r_scale_buf->buf;
-    g_scale_8 = (unsigned char(*)[])g_scale_buf->buf;
-    b_scale_8 = (unsigned char(*)[])b_scale_buf->buf;
+    a_scale = (unsigned char(*)[])a_scale_buf->buf;
+    r_scale = (unsigned char(*)[])r_scale_buf->buf;
+    g_scale = (unsigned char(*)[])g_scale_buf->buf;
+    b_scale = (unsigned char(*)[])b_scale_buf->buf;
     a_scale_16 = (unsigned short(*)[])a_scale_buf->buf;
     r_scale_16 = (unsigned short(*)[])r_scale_buf->buf;
     g_scale_16 = (unsigned short(*)[])g_scale_buf->buf;
@@ -346,72 +364,48 @@ static void pack_raw_4_channel_merge_16bpp(
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
                 (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_16)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((unsigned long long)(*r_scale_16)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((unsigned long long)(*g_scale_16)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((unsigned long long)(*b_scale_16)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_ARGB_A_MERGE_16 +
+                    (unsigned long long)PACK_ARGB_R_MERGE_16 +
+                    (unsigned long long)PACK_ARGB_G_MERGE_16 +
+                    (unsigned long long)PACK_ARGB_B_MERGE_16)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
                 (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_8)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((unsigned long long)(*r_scale_8)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((unsigned long long)(*g_scale_8)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((unsigned long long)(*b_scale_8)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_ARGB_A_MERGE +
+                    (unsigned long long)PACK_ARGB_R_MERGE +
+                    (unsigned long long)PACK_ARGB_G_MERGE +
+                    (unsigned long long)PACK_ARGB_B_MERGE)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (
-                    ((*a_scale_16)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((*r_scale_16)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((*g_scale_16)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((*b_scale_16)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFffFFffUL;
+                (*packed_pix_32)[i] = PACK_ARGB_MERGE_16&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (
-                    ((*a_scale_8)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((*r_scale_8)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((*g_scale_8)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((*b_scale_8)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFffFFffUL;
+                (*packed_pix_32)[i] = PACK_ARGB_MERGE&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (
-                    ((*a_scale_16)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((*r_scale_16)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((*g_scale_16)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((*b_scale_16)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFff;
+                (*packed_pix_16)[i] = PACK_ARGB_MERGE_16&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (
-                    ((*a_scale_8)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((*r_scale_8)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((*g_scale_8)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((*b_scale_8)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFFff;
+                (*packed_pix_16)[i] = PACK_ARGB_MERGE&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_8)[i] = (
-                    ((*a_scale_16)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((*r_scale_16)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((*g_scale_16)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((*b_scale_16)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFF;
+                (*packed_pix_8)[i] = PACK_ARGB_MERGE_16&0xFF;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_8)[i] = (
-                    ((*a_scale_8)[((*unpacked_pix)[(i<<2)]+a_rnd)/a_div]<<a_shift) +
-                    ((*r_scale_8)[((*unpacked_pix)[(i<<2)+1]+r_rnd)/r_div]<<r_shift) +
-                    ((*g_scale_8)[((*unpacked_pix)[(i<<2)+2]+g_rnd)/g_div]<<g_shift) +
-                    ((*b_scale_8)[((*unpacked_pix)[(i<<2)+3]+b_rnd)/b_div]<<b_shift))&0xFF;
+                (*packed_pix_8)[i] = PACK_ARGB_MERGE&0xFF;
             }
         }
     }
@@ -424,7 +418,7 @@ static void pack_raw_2_channel_merge_16bpp(
 {
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
-    unsigned char  (*a_scale_8)[],  (*i_scale_8)[];
+    unsigned char  (*a_scale)[],  (*i_scale)[];
     unsigned short (*a_scale_16)[], (*i_scale_16)[];
     unsigned long long i=0, max_i=0;
     long long a_rnd=a_div/2, i_rnd=i_div/2;
@@ -442,8 +436,8 @@ static void pack_raw_2_channel_merge_16bpp(
     packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
-    a_scale_8 = (unsigned char(*)[])a_scale_buf->buf;
-    i_scale_8 = (unsigned char(*)[])i_scale_buf->buf;
+    a_scale = (unsigned char(*)[])a_scale_buf->buf;
+    i_scale = (unsigned char(*)[])i_scale_buf->buf;
     a_scale_16 = (unsigned short(*)[])a_scale_buf->buf;
     i_scale_16 = (unsigned short(*)[])i_scale_buf->buf;
 
@@ -453,56 +447,44 @@ static void pack_raw_2_channel_merge_16bpp(
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
                 (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_16)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((unsigned long long)(*i_scale_16)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_AI_A_MERGE_16 +
+                    (unsigned long long)PACK_AI_I_MERGE_16)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
                 (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_8)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((unsigned long long)(*i_scale_8)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_AI_A_MERGE +
+                    (unsigned long long)PACK_AI_I_MERGE)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (
-                    ((*a_scale_16)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((*i_scale_16)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffUL;
+                (*packed_pix_32)[i] = PACK_AI_MERGE_16&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (
-                    ((*a_scale_8)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((*i_scale_8)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFffFFffUL;
+                (*packed_pix_32)[i] = PACK_AI_MERGE&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (
-                    ((*a_scale_16)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((*i_scale_16)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFff;
+                (*packed_pix_16)[i] = PACK_AI_MERGE_16&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (
-                    ((*a_scale_8)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((*i_scale_8)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFFff;
+                (*packed_pix_16)[i] = PACK_AI_MERGE&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_8)[i] = (
-                    ((*a_scale_16)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((*i_scale_16)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFF;
+                (*packed_pix_8)[i] = PACK_AI_MERGE_16&0xFF;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_8)[i] = (
-                    ((*a_scale_8)[((*unpacked_pix)[(i<<1)]+a_rnd)/a_div]<<a_shift) +
-                    ((*i_scale_8)[((*unpacked_pix)[(i<<1)+1]+i_rnd)/i_div]<<i_shift))&0xFF;
+                (*packed_pix_8)[i] = PACK_AI_MERGE&0xFF;
             }
         }
     }
@@ -517,7 +499,7 @@ static void pack_raw_4_channel_16bpp(
 {
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
-    unsigned char (*a_scale_8)[], (*r_scale_8)[], (*g_scale_8)[], (*b_scale_8)[];
+    unsigned char (*a_scale)[], (*r_scale)[], (*g_scale)[], (*b_scale)[];
     unsigned short (*a_scale_16)[], (*r_scale_16)[], (*g_scale_16)[], (*b_scale_16)[];
     unsigned long long i=0, max_i=0;
 
@@ -533,10 +515,10 @@ static void pack_raw_4_channel_16bpp(
     packed_pix_32 = (unsigned long(*)[]) packed_pix_buf->buf;
     packed_pix_64 = (unsigned long long(*)[])packed_pix_buf->buf;
 
-    a_scale_8 = (unsigned char(*)[])a_scale_buf->buf;
-    r_scale_8 = (unsigned char(*)[])r_scale_buf->buf;
-    g_scale_8 = (unsigned char(*)[])g_scale_buf->buf;
-    b_scale_8 = (unsigned char(*)[])b_scale_buf->buf;
+    a_scale = (unsigned char(*)[])a_scale_buf->buf;
+    r_scale = (unsigned char(*)[])r_scale_buf->buf;
+    g_scale = (unsigned char(*)[])g_scale_buf->buf;
+    b_scale = (unsigned char(*)[])b_scale_buf->buf;
     a_scale_16 = (unsigned short(*)[])a_scale_buf->buf;
     r_scale_16 = (unsigned short(*)[])r_scale_buf->buf;
     g_scale_16 = (unsigned short(*)[])g_scale_buf->buf;
@@ -549,72 +531,48 @@ static void pack_raw_4_channel_16bpp(
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
                 (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_16)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((unsigned long long)(*r_scale_16)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((unsigned long long)(*g_scale_16)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((unsigned long long)(*b_scale_16)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_ARGB_A_16 +
+                    (unsigned long long)PACK_ARGB_R_16 +
+                    (unsigned long long)PACK_ARGB_G_16 +
+                    (unsigned long long)PACK_ARGB_B_16)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
                 (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_8)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((unsigned long long)(*r_scale_8)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((unsigned long long)(*g_scale_8)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((unsigned long long)(*b_scale_8)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_ARGB_A +
+                    (unsigned long long)PACK_ARGB_R +
+                    (unsigned long long)PACK_ARGB_G +
+                    (unsigned long long)PACK_ARGB_B)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (
-                    ((*a_scale_16)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((*r_scale_16)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((*g_scale_16)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((*b_scale_16)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFffFFffUL;
+                (*packed_pix_32)[i] = PACK_ARGB_16&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (
-                    ((*a_scale_8)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((*r_scale_8)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((*g_scale_8)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((*b_scale_8)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFffFFffUL;
+                (*packed_pix_32)[i] = PACK_ARGB&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (
-                    ((*a_scale_16)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((*r_scale_16)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((*g_scale_16)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((*b_scale_16)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFff;
+                (*packed_pix_16)[i] = PACK_ARGB_16&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (
-                    ((*a_scale_8)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((*r_scale_8)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((*g_scale_8)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((*b_scale_8)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFff;
+                (*packed_pix_16)[i] = PACK_ARGB&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_8)[i] = (
-                    ((*a_scale_16)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((*r_scale_16)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((*g_scale_16)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((*b_scale_16)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFFff;
+                (*packed_pix_8)[i] = PACK_ARGB_16&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_8)[i] = (
-                    ((*a_scale_8)[(*unpacked_pix)[(i<<2)]]<<a_shift) +
-                    ((*r_scale_8)[(*unpacked_pix)[(i<<2)+1]]<<r_shift) +
-                    ((*g_scale_8)[(*unpacked_pix)[(i<<2)+2]]<<g_shift) +
-                    ((*b_scale_8)[(*unpacked_pix)[(i<<2)+3]]<<b_shift))&0xFF;
+                (*packed_pix_8)[i] = PACK_ARGB&0xFF;
             }
         }
     }
@@ -627,7 +585,7 @@ static void pack_raw_2_channel_16bpp(
 {
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
-    unsigned char  (*a_scale_8)[],  (*i_scale_8)[];
+    unsigned char  (*a_scale)[],  (*i_scale)[];
     unsigned short (*a_scale_16)[], (*i_scale_16)[];
     unsigned long long i=0, max_i=0;
 
@@ -644,8 +602,8 @@ static void pack_raw_2_channel_16bpp(
     packed_pix_64 = (unsigned long long(*)[]) packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
-    a_scale_8 = (unsigned char(*)[])a_scale_buf->buf;
-    i_scale_8 = (unsigned char(*)[])i_scale_buf->buf;
+    a_scale = (unsigned char(*)[])a_scale_buf->buf;
+    i_scale = (unsigned char(*)[])i_scale_buf->buf;
     a_scale_16 = (unsigned short(*)[])a_scale_buf->buf;
     i_scale_16 = (unsigned short(*)[])i_scale_buf->buf;
 
@@ -655,56 +613,44 @@ static void pack_raw_2_channel_16bpp(
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
                (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_8)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((unsigned long long)(*i_scale_8)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_AI_A_16 +
+                    (unsigned long long)PACK_AI_I_16)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
                (*packed_pix_64)[i] = (
-                    ((unsigned long long)(*a_scale_16)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((unsigned long long)(*i_scale_16)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffFFffFFffULL;
+                    (unsigned long long)PACK_AI_A +
+                    (unsigned long long)PACK_AI_I)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-               (*packed_pix_32)[i] = (
-                    ((*a_scale_8)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((*i_scale_8)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffUL;
+               (*packed_pix_32)[i] = PACK_AI_16&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-               (*packed_pix_32)[i] = (
-                    ((*a_scale_16)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((*i_scale_16)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFffFFffUL;
+               (*packed_pix_32)[i] = PACK_AI&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-               (*packed_pix_16)[i] = (
-                    ((*a_scale_8)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((*i_scale_8)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFff;
+               (*packed_pix_16)[i] = PACK_AI_16&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-               (*packed_pix_16)[i] = (
-                    ((*a_scale_16)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((*i_scale_16)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFFff;
+               (*packed_pix_16)[i] = PACK_AI&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-               (*packed_pix_8)[i] = (
-                    ((*a_scale_8)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((*i_scale_8)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFF;
+               (*packed_pix_8)[i] = PACK_AI_16&0xFF;
             }
         } else {
             for (i=0; i < max_i; i++) {
-               (*packed_pix_8)[i] = (
-                    ((*a_scale_16)[(*unpacked_pix)[(i<<1)]]<<a_shift) +
-                    ((*i_scale_16)[(*unpacked_pix)[(i<<1)+1]]<<i_shift))&0xFF;
+               (*packed_pix_8)[i] = PACK_AI&0xFF;
             }
         }
     }
@@ -715,7 +661,7 @@ static void pack_raw_1_channel_16bpp(
 {
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
-    unsigned char  (*scale_8)[];
+    unsigned char  (*scale)[];
     unsigned short (*scale_16)[];
     unsigned long long i=0, max_i=0;
     unsigned short (*packed_pix_16)[];
@@ -729,7 +675,7 @@ static void pack_raw_1_channel_16bpp(
     packed_pix_64 = (unsigned long long(*)[])packed_pix_buf->buf;
 
     unpacked_pix = (unsigned short(*)[])unpacked_pix_buf->buf;
-    scale_8 = (unsigned char(*)[])scale_buf->buf;
+    scale = (unsigned char(*)[])scale_buf->buf;
     scale_16 = (unsigned short(*)[])scale_buf->buf;
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
@@ -741,7 +687,7 @@ static void pack_raw_1_channel_16bpp(
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_64)[i] = (*scale_8)[(*unpacked_pix)[i]];
+                (*packed_pix_64)[i] = (*scale)[(*unpacked_pix)[i]];
             }
         }
     } else if (packed_pix_size == 4) {
@@ -751,7 +697,7 @@ static void pack_raw_1_channel_16bpp(
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (*scale_8)[(*unpacked_pix)[i]];
+                (*packed_pix_32)[i] = (*scale)[(*unpacked_pix)[i]];
             }
         }
     } else {
@@ -761,7 +707,7 @@ static void pack_raw_1_channel_16bpp(
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (*scale_8)[(*unpacked_pix)[i]];
+                (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]];
             }
         }
     }
