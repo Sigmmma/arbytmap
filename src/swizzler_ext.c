@@ -43,14 +43,14 @@ static void swizzle_char_array(
                         xyz = yz + (*x_offs)[xi];
                         for (ci=0; ci < c_size; ci++) {
                             cxyz = (xyz + (*c_offs)[ci])<<3;
-                            (*swizz_arr)[cxyz]   = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+1] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+2] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+3] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+4] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+5] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+6] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+7] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++;
                         }
                     }
                 }
@@ -64,10 +64,10 @@ static void swizzle_char_array(
                         xyz = yz + (*x_offs)[xi];
                         for (ci=0; ci < c_size; ci++) {
                             cxyz = (xyz + (*c_offs)[ci])<<2;
-                            (*swizz_arr)[cxyz]   = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+1] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+2] = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+3] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++;
                         }
                     }
                 }
@@ -81,8 +81,8 @@ static void swizzle_char_array(
                         xyz = yz + (*x_offs)[xi];
                         for (ci=0; ci < c_size; ci++) {
                             cxyz = (xyz + (*c_offs)[ci])<<1;
-                            (*swizz_arr)[cxyz]   = (*unswizz_arr)[i]; i++;
-                            (*swizz_arr)[cxyz+1] = (*unswizz_arr)[i]; i++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
+                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++;
                         }
                     }
                 }
@@ -112,14 +112,14 @@ static void swizzle_char_array(
                         xyz = yz + (*x_offs)[xi];
                         for (ci=0; ci < c_size; ci++) {
                             cxyz = (xyz + (*c_offs)[ci])<<3;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz];   i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+1]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+2]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+3]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+4]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+5]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+6]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+7]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++;
                         }
                     }
                 }
@@ -133,10 +133,10 @@ static void swizzle_char_array(
                         xyz = yz + (*x_offs)[xi];
                         for (ci=0; ci < c_size; ci++) {
                             cxyz = (xyz + (*c_offs)[ci])<<2;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz];   i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+1]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+2]; i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+3]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++;
                         }
                     }
                 }
@@ -150,8 +150,8 @@ static void swizzle_char_array(
                         xyz = yz + (*x_offs)[xi];
                         for (ci=0; ci < c_size; ci++) {
                             cxyz = (xyz + (*c_offs)[ci])<<1;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz];   i++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz+1]; i++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
+                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++;
                         }
                     }
                 }
