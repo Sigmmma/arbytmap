@@ -270,7 +270,8 @@ static void pack_raw_2_channel_8bpp(
 }
 
 static void pack_raw_1_channel_8bpp(
-    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf, Py_buffer *scale_buf)
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *scale_buf, char shift)
 {
     Py_ssize_t packed_pix_size;
     unsigned char (*unpacked_pix)[];
@@ -296,19 +297,19 @@ static void pack_raw_1_channel_8bpp(
 
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_64)[i] = (*scale)[(*unpacked_pix)[i]];
+            (*packed_pix_64)[i] = (unsigned long long)((*scale)[(*unpacked_pix)[i]]<<shift);
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_32)[i] = (*scale)[(*unpacked_pix)[i]];
+            (*packed_pix_32)[i] = (*scale)[(*unpacked_pix)[i]]<<shift;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]];
+            (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]]<<shift;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_8)[i] = (*scale)[(*unpacked_pix)[i]];
+            (*packed_pix_8)[i] = (*scale)[(*unpacked_pix)[i]]<<shift;
         }
     }
 }
@@ -657,7 +658,8 @@ static void pack_raw_2_channel_16bpp(
 }
 
 static void pack_raw_1_channel_16bpp(
-    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf, Py_buffer *scale_buf)
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *scale_buf, char shift)
 {
     Py_ssize_t packed_pix_size;
     unsigned short (*unpacked_pix)[];
@@ -683,31 +685,31 @@ static void pack_raw_1_channel_16bpp(
     if (packed_pix_size == 8) {
         if (scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_64)[i] = (*scale_16)[(*unpacked_pix)[i]];
+                (*packed_pix_64)[i] = (unsigned long long)((*scale_16)[(*unpacked_pix)[i]]<<shift);
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_64)[i] = (*scale)[(*unpacked_pix)[i]];
+                (*packed_pix_64)[i] = (unsigned long long)((*scale)[(*unpacked_pix)[i]]<<shift);
             }
         }
     } else if (packed_pix_size == 4) {
         if (scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (*scale_16)[(*unpacked_pix)[i]];
+                (*packed_pix_32)[i] = (*scale_16)[(*unpacked_pix)[i]]<<shift;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_32)[i] = (*scale)[(*unpacked_pix)[i]];
+                (*packed_pix_32)[i] = (*scale)[(*unpacked_pix)[i]]<<shift;
             }
         }
     } else {
         if (scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (*scale_16)[(*unpacked_pix)[i]];
+                (*packed_pix_16)[i] = (*scale_16)[(*unpacked_pix)[i]]<<shift;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]];
+                (*packed_pix_16)[i] = (*scale)[(*unpacked_pix)[i]]<<shift;
             }
         }
     }
@@ -879,9 +881,9 @@ static PyObject *py_pack_raw_1_channel(PyObject *self, PyObject *args) {
         return Py_None;
 
     if (bufs[1].itemsize == 2) {
-        pack_raw_1_channel_16bpp(&bufs[0], &bufs[1], &bufs[2]);
+        pack_raw_1_channel_16bpp(&bufs[0], &bufs[1], &bufs[2], shift);
     } else {
-        pack_raw_1_channel_8bpp(&bufs[0], &bufs[1], &bufs[2]);
+        pack_raw_1_channel_8bpp(&bufs[0], &bufs[1], &bufs[2], shift);
     }
 
     // Release the buffer objects
