@@ -141,119 +141,113 @@ class Arbytmap():
 
     #call this when providing the convertor with a new list of pixel arrays
     def load_new_texture(self, **kwargs):
+        texture_block = self.texture_block = kwargs.get("texture_block")
+        texture_info = self.texture_info = kwargs.get("texture_info")
         
-        try:
-            texture_block = self.texture_block = kwargs.get("texture_block")
-            texture_info = self.texture_info = kwargs.get("texture_info")
-            
-            if texture_block is None:
-                raise TypeError(
-                    "ERROR: NO BITMAP BLOCK SUPPLIED.\n",
-                    "CANNOT LOAD BITMAP WITHOUT A SUPPLIED BITMAP BLOCK")
-            
-            if texture_info is None:
-                raise TypeError(
-                    "ERROR: BITMAP BLOCK SUPPLIED HAS NO TEXTURE INFO.\n",
-                      "CANNOT LOAD BITMAP WITHOUT A DESCRIPTION OF THE BITMAP")
-            
-            if "format" not in texture_info:
-                self.texture_block = None
-                raise TypeError(
-                    "ERROR: THE SUPPLIED BITMAP'S INFO BLOCK HAS NO " +
-                    "FORMAT ENTRY!\nCAN NOT LOAD BITMAP WITHOUT " +
-                    "KNOWING THE BITMAP'S FORMAT.")
-            
-            if texture_info["format"] not in VALID_FORMATS:
-                self.texture_block = None
-                raise TypeError(
-                    "ERROR: THE SUPPLIED BITMAP IS IN AN UNKNOWN FORMAT!\n",
-                    "IF YOU WISH TO USE THIS FORMAT YOU MUST " +
-                    "INCOROPRATE IT YOURSELF.")
+        if texture_block is None:
+            raise TypeError(
+                "ERROR: NO BITMAP BLOCK SUPPLIED.\n",
+                "CANNOT LOAD BITMAP WITHOUT A SUPPLIED BITMAP BLOCK")
+        
+        if texture_info is None:
+            raise TypeError(
+                "ERROR: BITMAP BLOCK SUPPLIED HAS NO TEXTURE INFO.\n",
+                  "CANNOT LOAD BITMAP WITHOUT A DESCRIPTION OF THE BITMAP")
+        
+        if "format" not in texture_info:
+            self.texture_block = None
+            raise TypeError(
+                "ERROR: THE SUPPLIED BITMAP'S INFO BLOCK HAS NO " +
+                "FORMAT ENTRY!\nCAN NOT LOAD BITMAP WITHOUT " +
+                "KNOWING THE BITMAP'S FORMAT.")
+        
+        if texture_info["format"] not in VALID_FORMATS:
+            self.texture_block = None
+            raise TypeError(
+                "ERROR: THE SUPPLIED BITMAP IS IN AN UNKNOWN FORMAT!\n",
+                "IF YOU WISH TO USE THIS FORMAT YOU MUST " +
+                "INCOROPRATE IT YOURSELF.")
 
-            max_bpc = max(FORMAT_CHANNEL_DEPTHS[texture_info["format"]])
-            unpack_bpc = PIXEL_ENCODING_SIZES[self._UNPACK_ARRAY_CODE]
-            if max_bpc > 8*unpack_bpc:
-                raise TypeError(
-                    "Format channel depth is larger than unpack " +
-                    "channel depth. Change the unpack format to convert.")
+        max_bpc = max(FORMAT_CHANNEL_DEPTHS[texture_info["format"]])
+        unpack_bpc = PIXEL_ENCODING_SIZES[self._UNPACK_ARRAY_CODE]
+        if max_bpc > 8*unpack_bpc:
+            raise TypeError(
+                "Format channel depth is larger than unpack " +
+                "channel depth. Change the unpack format to convert.")
 
-            #if provided with just a pixel data array
-            #we will need to put it inside a list
-            if isinstance(texture_block, array):
-                texture_block = [texture_block]
-            
-            #initialize the optional bitmap description variables
-            self.palette = None
-            self.indexing_size = DEFAULT_INDEXING_SIZE
-            
-            
-            #get the bitmap's info from the texture block's info dictionary
-            self.width = texture_info.get("width", 1)
-            self.height = texture_info.get("height", 1)
-            self.depth = texture_info.get("depth", 1)
-            self.format = texture_info["format"]
-            
-            self.swizzled = texture_info.get("swizzled", False)
-            self.mipmap_count = texture_info.get("mipmap_count", 0)
-            self.sub_bitmap_count = texture_info.get("sub_bitmap_count", 1)
-            self.filepath = texture_info.get("filepath", None)
-            
-            self.packed = texture_info.get("packed", True)
-            self.palette_packed = texture_info.get("palette_packed", True)
+        #if provided with just a pixel data array
+        #we will need to put it inside a list
+        if isinstance(texture_block, array):
+            texture_block = [texture_block]
+        
+        #initialize the optional bitmap description variables
+        self.palette = None
+        self.indexing_size = DEFAULT_INDEXING_SIZE
+        
+        
+        #get the bitmap's info from the texture block's info dictionary
+        self.width = texture_info.get("width", 1)
+        self.height = texture_info.get("height", 1)
+        self.depth = texture_info.get("depth", 1)
+        self.format = texture_info["format"]
+        
+        self.swizzled = texture_info.get("swizzled", False)
+        self.mipmap_count = texture_info.get("mipmap_count", 0)
+        self.sub_bitmap_count = texture_info.get("sub_bitmap_count", 1)
+        self.filepath = texture_info.get("filepath", None)
+        
+        self.packed = texture_info.get("packed", True)
+        self.palette_packed = texture_info.get("palette_packed", True)
 
-            if "deswizzler" not in texture_info:
-                self.deswizzler = swizzler.Swizzler(
-                    texture_converter=self, mask_type="DEFAULT")
-            elif swizzler is not None:
-                self.deswizzler = swizzler.Swizzler(
-                    texture_converter=self,
-                    mask_type=texture_info["deswizzler"])
-            else:
-                print("ERROR: SWIZZLER MODULE NOT LOADED. "+
-                      "CANNOT SWIZZLE/UNSWIZZLE WITHOUT SWIZZLER.")
+        if "deswizzler" not in texture_info:
+            self.deswizzler = swizzler.Swizzler(
+                texture_converter=self, mask_type="DEFAULT")
+        elif swizzler is not None:
+            self.deswizzler = swizzler.Swizzler(
+                texture_converter=self,
+                mask_type=texture_info["deswizzler"])
+        else:
+            print("ERROR: SWIZZLER MODULE NOT LOADED. "+
+                  "CANNOT SWIZZLE/UNSWIZZLE WITHOUT SWIZZLER.")
 
-            self.texture_type = texture_info.get("texture_type", TYPE_2D)
-            self.channel_order = texture_info.get(
-                "channel_order", C_ORDER_DEFAULT)
-                
-                
-            if texture_info.get("palette") is None:
-                pass
-            elif texture_info.get("indexing_size") not in (0, None):
-                self.palette = texture_info["palette"]
-                self.indexing_size = texture_info["indexing_size"]
-                self.palettize = True
-                
-                if "palette_packed" in texture_info:
-                    self.palette_packed = texture_info["palette_packed"]
-            else:
-                print("ERROR: PALETTE WAS SUPPLIED, " +
-                      "BUT BIT-SIZE OF INDEXING WAS NOT.")
-                return
+        self.texture_type = texture_info.get("texture_type", TYPE_2D)
+        self.channel_order = texture_info.get(
+            "channel_order", C_ORDER_DEFAULT)
+            
+            
+        if texture_info.get("palette") is None:
+            pass
+        elif texture_info.get("indexing_size") not in (0, None):
+            self.palette = texture_info["palette"]
+            self.indexing_size = texture_info["indexing_size"]
+            self.palettize = True
+            
+            if "palette_packed" in texture_info:
+                self.palette_packed = texture_info["palette_packed"]
+        else:
+            print("ERROR: PALETTE WAS SUPPLIED, " +
+                  "BUT BIT-SIZE OF INDEXING WAS NOT.")
+            return
 
-            self.palettized_packer = texture_info.get(
-                "palettized_packer", self._pack_palettized)
-            self.palettized_unpacker = texture_info.get(
-                "palettized_unpacker", self._unpack_palettized)
-            self.palette_packer = texture_info.get(
-                "palette_packer", self._pack_palette)
-            self.palette_unpacker = texture_info.get(
-                "palette_unpacker", self._unpack_palette)
-            self.indexing_packer = texture_info.get(
-                "indexing_packer", self._pack_indexing)
-            self.indexing_unpacker = texture_info.get(
-                "indexing_unpacker", self._unpack_indexing)
+        self.palettized_packer = texture_info.get(
+            "palettized_packer", self._pack_palettized)
+        self.palettized_unpacker = texture_info.get(
+            "palettized_unpacker", self._unpack_palettized)
+        self.palette_packer = texture_info.get(
+            "palette_packer", self._pack_palette)
+        self.palette_unpacker = texture_info.get(
+            "palette_unpacker", self._unpack_palette)
+        self.indexing_packer = texture_info.get(
+            "indexing_packer", self._pack_indexing)
+        self.indexing_unpacker = texture_info.get(
+            "indexing_unpacker", self._unpack_indexing)
 
-            #we may have been provided with conversion
-            #settings at the same time we were given the texture
-            self.load_new_conversion_settings(**kwargs)
-                
-            self.texture_block = texture_block
-            self.texture_info = texture_info
-        except:
-            print("ERROR OCCURED WHILE TRYING TO LOAD " +
-                  "TEXTURE INTO BITMAP CONVERTOR")
-            print(format_exc())
+        #we may have been provided with conversion
+        #settings at the same time we were given the texture
+        self.load_new_conversion_settings(**kwargs)
+            
+        self.texture_block = texture_block
+        self.texture_info = texture_info
 
 
     def load_new_conversion_settings(self, **kwargs):
@@ -266,81 +260,73 @@ class Arbytmap():
 
         """RESETTING THE CONVERSION VARIABLES EACH TIME IS INTENTIONAL
         TO PREVENT ACCIDENTALLY LEAVING INCOMPATIBLE ONES SET"""
-        try:
-            #initialize the bitmap CONVERSION variables
-            self.target_format = self.format
-            self.one_bit_bias = 127
-            self.downres_amount = 0
-            self.generate_mipmaps = False
-            self.swizzler_mode = self.swizzled
-            self.gamma = 1.0
-            self.color_key_transparency = False
-            self.reswizzler = self.deswizzler
-            self.palette_picker = self.default_palette_picker
-            self.palettize = self.is_palettized()
-            self.target_indexing_size = self.indexing_size
-            self.channel_mapping = None
-            self.channel_merge_mapping = None
-            self.repack = True
+        #initialize the bitmap CONVERSION variables
+        self.target_format = self.format
+        self.one_bit_bias = 127
+        self.downres_amount = 0
+        self.generate_mipmaps = False
+        self.swizzler_mode = self.swizzled
+        self.gamma = 1.0
+        self.color_key_transparency = False
+        self.reswizzler = self.deswizzler
+        self.palette_picker = self.default_palette_picker
+        self.palettize = self.is_palettized()
+        self.target_indexing_size = self.indexing_size
+        self.channel_mapping = None
+        self.channel_merge_mapping = None
+        self.repack = True
+        
+        if kwargs.get("target_format") in VALID_FORMATS:
+            self.target_format = kwargs["target_format"]
+
+        max_bpc = max(FORMAT_CHANNEL_DEPTHS[self.target_format])
+        unpack_bpc = PIXEL_ENCODING_SIZES[self._UNPACK_ARRAY_CODE]
+        if max_bpc > 8*unpack_bpc:
+            raise TypeError(
+                "Target format channel depth is larger than unpack " +
+                "channel depth. Change the unpack format to convert.")
+        
+        if self.target_format in DDS_FORMATS and swizzler is None:
+            print("ERROR: SWIZZLER MODULE NOT LOADED. CANNOT COMPRESS " +
+                  "TO DXT WITHOUT SWIZZLER. SWITCHING TO A8R8G8B8.")
+            self.target_format = self._UNPACK_FORMAT
             
-            if kwargs.get("target_format") in VALID_FORMATS:
-                self.target_format = kwargs["target_format"]
+        self.one_bit_bias = kwargs.get("one_bit_bias", self.one_bit_bias)
 
-            max_bpc = max(FORMAT_CHANNEL_DEPTHS[self.target_format])
-            unpack_bpc = PIXEL_ENCODING_SIZES[self._UNPACK_ARRAY_CODE]
-            if max_bpc > 8*unpack_bpc:
-                raise TypeError(
-                    "Target format channel depth is larger than unpack " +
-                    "channel depth. Change the unpack format to convert.")
+        # The number of times to cut the resolution in half
+        self.downres_amount = abs(kwargs.get(
+            "downres_amount", self.downres_amount))
+
+        # The number of mipmaps to make
+        self.generate_mipmaps = kwargs.get(
+            "generate_mipmaps", self.generate_mipmaps)
             
-            if self.target_format in DDS_FORMATS and swizzler is None:
-                print("ERROR: SWIZZLER MODULE NOT LOADED. CANNOT COMPRESS " +
-                      "TO DXT WITHOUT SWIZZLER. SWITCHING TO A8R8G8B8.")
-                self.target_format = self._UNPACK_FORMAT
-                
-            self.one_bit_bias = kwargs.get("one_bit_bias", self.one_bit_bias)
+        # Whether to swizzle or deswizzle when the swizzler is run
+        # False == Deswizzle    True == Swizzle
+        self.swizzler_mode = kwargs.get("swizzler_mode", self.swizzler_mode)
 
-            # The number of times to cut the resolution in half
-            self.downres_amount = abs(kwargs.get(
-                "downres_amount", self.downres_amount))
+        self.gamma = kwargs.get("gamma", self.gamma)
+        self.repack = kwargs.get("repack", self.repack)
+        self.color_key_transparency = kwargs.get(
+            "color_key_transparency", self.color_key_transparency)
 
-            # The number of mipmaps to make
-            self.generate_mipmaps = kwargs.get(
-                "generate_mipmaps", self.generate_mipmaps)
-                
-            # Whether to swizzle or deswizzle when the swizzler is run
-            # False == Deswizzle    True == Swizzle
-            self.swizzler_mode = kwargs.get("swizzler_mode", self.swizzler_mode)
+        if "reswizzler" not in kwargs:
+            pass
+        elif swizzler is not None:
+            self.reswizzler = swizzler.Swizzler(
+                texture_converter = self, mask_type=kwargs["reswizzler"])
+        else:
+            print("ERROR: SWIZZLER MODULE NOT LOADED. " +
+                  "CANNOT SWIZZLE/UNSWIZZLE WITHOUT SWIZZLER.")
 
-            self.gamma = kwargs.get("gamma", self.gamma)
-            self.repack = kwargs.get("repack", self.repack)
-            self.color_key_transparency = kwargs.get(
-                "color_key_transparency", self.color_key_transparency)
-
-            if "reswizzler" not in kwargs:
-                pass
-            elif swizzler is not None:
-                self.reswizzler = swizzler.Swizzler(
-                    texture_converter = self, mask_type=kwargs["reswizzler"])
-            else:
-                print("ERROR: SWIZZLER MODULE NOT LOADED. " +
-                      "CANNOT SWIZZLE/UNSWIZZLE WITHOUT SWIZZLER.")
-
-            self.palettize = kwargs.get("palettize", self.palettize)
-            self.palette_picker = kwargs.get(
-                "palette_picker", self.palette_picker)
-            self.target_indexing_size = kwargs.get(
-                "target_indexing_size", self.target_indexing_size)
-            
-            #set up all the channel mappings and such
-            self._set_all_channel_mappings(**kwargs)
-
-        except:
-            print("ERROR OCCURED WHILE TRYING TO LOAD CONVERSION SETTINGS " +
-                  "INTO BITMAP CONVERTOR.\nDEREFERENCING TEXTURE BLOCK FROM " +
-                  "BITMAP CONVERTER TO PREVENT UNSTABLE CONVERSION.")
-            print(format_exc())
-            self.texture_block = None
+        self.palettize = kwargs.get("palettize", self.palettize)
+        self.palette_picker = kwargs.get(
+            "palette_picker", self.palette_picker)
+        self.target_indexing_size = kwargs.get(
+            "target_indexing_size", self.target_indexing_size)
+        
+        #set up all the channel mappings and such
+        self._set_all_channel_mappings(**kwargs)
 
 
     def print_info(self, tex_info=True, conv_settings=False,
@@ -434,63 +420,54 @@ class Arbytmap():
 
     def _set_all_channel_mappings(self, **kwargs):
         """Sets(or defaults) all the different channel mappings"""
-        try:
-            self.source_channel_count = FORMAT_CHANNEL_COUNTS[self.format]
-            self.unpacked_channel_count = FORMAT_CHANNEL_COUNTS[self.format]
-            self.target_channel_count = FORMAT_CHANNEL_COUNTS[
-                self.target_format]
+        self.source_channel_count = self.unpacked_channel_count =\
+                                    FORMAT_CHANNEL_COUNTS[self.format]
+        self.target_channel_count = FORMAT_CHANNEL_COUNTS[self.target_format]
 
-            #CREATE THE CHANNEL LOAD MAPPING
-            self._set_channel_load_mapping(**kwargs)
-            
-            #If the format is DXT then the merge mapping
-            #will have JUST BEEN padded and set
-            if self.channel_merge_mapping is not None:
-                kwargs["channel_merge_mapping"] = self.channel_merge_mapping
-
-            #CREATE THE CHANNEL MERGE MAPPING
-            self._set_channel_merge_mapping(**kwargs)
-
-            #CREATE THE CHANNEL UP AND DOWN SCALER LISTS
-            self._set_upscalers_and_downscalers(**kwargs)
-            
-            #CREATE THE CHANNEL GAMMA SCALER LISTS
-            self._set_gamma_scaler(**kwargs)
-        except:
-            print("Error occurred while trying to create " +
-                  "channel mappings and scalars.")
-            print(format_exc())
+        #CREATE THE CHANNEL LOAD MAPPING
+        self._set_channel_load_mapping(**kwargs)
         
+        #If the format is DXT then the merge mapping
+        #will have JUST BEEN padded and set
+        if self.channel_merge_mapping is not None:
+            kwargs["channel_merge_mapping"] = self.channel_merge_mapping
+
+        #CREATE THE CHANNEL MERGE MAPPING
+        self._set_channel_merge_mapping(**kwargs)
+
+        #CREATE THE CHANNEL UP AND DOWN SCALER LISTS
+        self._set_upscalers_and_downscalers(**kwargs)
+        
+        #CREATE THE CHANNEL GAMMA SCALER LISTS
+        self._set_gamma_scaler(**kwargs)
+    
     def is_palettized(self, palette_index=0):
         '''returns whether or not there is a valid palette
         for the bitmap at the index provided'''
-        return( self.palette is not None and
+        return(self.palette is not None and
                 ((hasattr(self.palette, '__iter__') and
                   len(self.palette) > palette_index)
                  and self.palette[palette_index] is not None) )
 
-    
     def _set_gamma_scaler(self, **kwargs):
         '''creates the list per channel for the gamma scaling'''
+        ucc = self.unpacked_channel_count
         if isinstance(self.gamma,(int,float)):
-            self.gamma = [self.gamma]*self.unpacked_channel_count
-        elif len(self.gamma) < self.unpacked_channel_count:
+            self.gamma = [self.gamma]*ucc
+        elif len(self.gamma) < ucc:
             #if there aren't enough indexes in the gamma scalar we repeat
             #the last element in the scalar list for each missign channel
             old_gamma_len = len(self.gamma)
-            for i in range(self.unpacked_channel_count-old_gamma_len):
+            for i in range(ucc-old_gamma_len):
                 self.gamma.append(self.gamma[old_gamma_len-1])
-        
-        self.gamma_scaler = [0]*self.unpacked_channel_count
+
+        self.gamma_scaler = [0]*ucc
         #this array will be used to quickly convert a color
         #channel value from a linear value to a gamma scaled value
-        for channel in range(self.unpacked_channel_count):
-            self.gamma_scaler[channel] = array(
-                "f",[0.0]*self.unpacked_channel_count)
+        for channel in range(ucc):
+            self.gamma_scaler[channel] = g = array("f", [0.0]*ucc)
             for val in range(256):
-                self.gamma_scaler[channel].append(
-                    ((float(val)/255)**self.gamma[channel])*255)
-
+                g[channel].append(((float(val)/255)**self.gamma[channel])*255)
 
     def _set_upscalers_and_downscalers(self, **kwargs):
         '''NEED TO ADD A DESCRIPTION'''
@@ -519,8 +496,7 @@ class Arbytmap():
         #figure out how large the entries in the arrays need to be
         #In order for the fast unpackers to work well with these,
         #we make sure all the upscale arrays use the same encoding.
-        array_enc = INVERSE_PIXEL_ENCODING_SIZES[
-            int(max(self.unpacked_depths)/8.0)]
+        array_enc = INVERSE_PIXEL_ENCODING_SIZES[max(self.unpacked_depths)//8]
         for i in range(len(self.unpacked_depths)):
             #make a new array to map the source values to their upscaled values
             self.channel_upscalers.append(array(array_enc, []))
@@ -587,16 +563,16 @@ class Arbytmap():
             return
 
         #create the default offset, mask, and depth arrays
-        self.channel_masks = array("Q", FORMAT_CHANNEL_MASKS[self.format])
+        self.channel_masks   = array("Q", FORMAT_CHANNEL_MASKS[self.format])
         self.channel_offsets = array("B", FORMAT_CHANNEL_OFFSETS[self.format])
-        self.channel_depths = array("B", FORMAT_CHANNEL_DEPTHS[self.format])
+        self.channel_depths  = array("B", FORMAT_CHANNEL_DEPTHS[self.format])
 
         if "channel_mapping" in kwargs:
             #set the number of channels to how many are in the channel mapping
             self.unpacked_channel_count = len(kwargs["channel_mapping"])
-            self.channel_masks = array("L", [])
+            self.channel_masks   = array("L", [])
             self.channel_offsets = array("B", [])
-            self.channel_depths = array("B", [])
+            self.channel_depths  = array("B", [])
 
         """THE BELOW CODE WILL SWAP AROUND THE OFFSETS, MASKS, AND
         CHANNEL DEPTHS PER CHANNEL. THIS WILL ALLOW US TO SWITCH
@@ -628,35 +604,6 @@ class Arbytmap():
                 self.channel_depths.append(
                     FORMAT_CHANNEL_DEPTHS[self.format][channel])
 
-
-        '''if this is a DDS format we need to unpack it to 4
-        channels no matter what. in order for that to work we
-        need to pad the channel mapping and the merge mapping
-        if self.format in DDS_FORMATS and self.unpacked_channel_count < 4:
-            # pad the channel mapping
-            for i in range(self.unpacked_channel_count, 4):
-                self.channel_mapping.append(i)
-                
-            # check if there is a merge mapping
-            if kwargs.get("channel_merge_mapping"):
-                # pad the merge mapping
-                self.channel_merge_mapping = array(
-                    "b", kwargs["channel_merge_mapping"])
-                
-                for i in range(self.unpacked_channel_count, 4):
-                    self.channel_merge_mapping.append(-1)
-            else:
-                # create a merge mapping if none exists
-                self.channel_merge_mapping = array("b", [0,1,2,3])
-                for i in range(4):
-                    if (self.channel_mapping[i] == -1 or
-                        self.channel_mapping[i] >= self.target_channel_count):
-                        self.channel_merge_mapping[i] = -1
-
-            self.unpacked_channel_count = 4
-        '''
-
-
     def _set_channel_merge_mapping(self, **kwargs):
         """THIS FUNCTION ALLOWS US TO SPECIFY HOW CHANNELS
         ARE MERGED WHEN CONVERTING TO A DIFFERENT FORMAT"""
@@ -673,13 +620,15 @@ class Arbytmap():
         INTO THIS CHANNEL. THE PURPOSE OF THIS ARRAY WILL BE TO QUICKLY
         DIVIDE THE SUMMED CHANNELS TO GET A RANGE WITHIN THE CHANNEL'S DEPTH.
         """
+        scc = self.source_channel_count
         ucc = self.unpacked_channel_count
+        tcc = self.target_channel_count
         cmm = self.channel_merge_mapping
         cmd = self.channel_merge_divisors
 
         # if the unpacked number of channels is more than
         # the target format then we need to merge some
-        if ucc <= self.target_channel_count:
+        if ucc <= tcc:
             self.channel_merge_mapping = cmm = None
             self.channel_merge_divisors = cmd = None
         elif "channel_merge_mapping" not in kwargs:
@@ -689,8 +638,7 @@ class Arbytmap():
                 "FORMAT WITH %s CHANNELS.\nA MAPPING IS NEEDED TO " +
                 "SPECIFY WHAT SHOULD BE MERGED WITH WHAT.\n" +
                 "DEREFERENCING TEXTURE BLOCK FROM BITMAP " +
-                "CONVERTER TO PREVENT UNSTABLE CONVERSION.") % (
-                    self.source_channel_count, self.target_channel_count))
+                "CONVERTER TO PREVENT UNSTABLE CONVERSION.") % (scc, tcc))
         elif len(kwargs["channel_merge_mapping"]) != ucc:
             self.texture_block = None
             raise TypeError((
@@ -702,8 +650,7 @@ class Arbytmap():
         elif cmm is None:
             self.channel_merge_mapping = cmm = array(
                 "b", kwargs["channel_merge_mapping"])
-            self.channel_merge_divisors = cmd = array(
-                "l", [0]*self.target_channel_count)
+            self.channel_merge_divisors = cmd = array("l", [0]*tcc)
 
         if cmd is not None:
             # loop through the length of the convert channel mapping
@@ -721,66 +668,56 @@ class Arbytmap():
                 cmd.append(CHANNEL_ERASE_DIVISOR)
 
     def save_to_file(self, **kwargs):
-        try:
-            """saves the loaded bitmap to a file"""
-            output_path = kwargs.pop('output_path', self.filepath)
-            ext = kwargs.pop('ext', None)
-            
-            if output_path is None:
-                raise TypeError("Cannot save bitmap without output path.")
-            elif self.texture_block is None:
-                raise TypeError("No bitmap loaded to save to file.")
-            elif bitmap_io is None:
-                raise TypeError(
-                    "Bitmap io module isnt loaded. Cant save bitmap to file.")
-            
-            # if the extension isnt provided in the
-            # kwargs we try to get it from the filepath
-            if ext is None:
-                splitpath = path.splitext(output_path)
-                output_path = splitpath[0]
-                ext = splitpath[1][1:].lower()
+        """saves the loaded bitmap to a file"""
+        output_path = kwargs.pop('output_path', self.filepath)
+        ext = kwargs.pop('ext', None)
+        
+        if output_path is None:
+            raise TypeError("Cannot save bitmap without output path.")
+        elif self.texture_block is None:
+            raise TypeError("No bitmap loaded to save to file.")
+        elif bitmap_io is None:
+            raise TypeError(
+                "Bitmap io module isnt loaded. Cant save bitmap to file.")
+        
+        # if the extension isnt provided in the
+        # kwargs we try to get it from the filepath
+        if ext is None:
+            splitpath = path.splitext(output_path)
+            output_path = splitpath[0]
+            ext = splitpath[1][1:].lower()
 
-            ext = ext.lower()
+        ext = ext.lower()
 
-            if ext not in bitmap_io.file_writers:
-                raise TypeError("Unknown bitmap file export format '%s'" % ext)
+        if ext not in bitmap_io.file_writers:
+            raise TypeError("Unknown bitmap file export format '%s'" % ext)
 
-            bitmap_io.file_writers[ext](self, output_path, ext.lower(), *kwargs)
-        except:
-            print("ERROR OCCURRED WHILE TRYING TO SAVE BITMAP TO FILE.")
-            print(format_exc())
-
+        bitmap_io.file_writers[ext](self, output_path, ext.lower(), *kwargs)
 
     def load_from_file(self, **kwargs):
-        try:
-            """loads the current bitmap from a file"""
-            input_path = kwargs.pop('input_path', self.filepath)
-            ext = kwargs.pop('ext', None)
+        """loads the current bitmap from a file"""
+        input_path = kwargs.pop('input_path', self.filepath)
+        ext = kwargs.pop('ext', None)
 
-            if input_path is None:
-                raise TypeError("Cannot save bitmap without input path.")
-            elif bitmap_io is None:
-                raise TypeError(
-                    "Bitmap io module isnt loaded. Cant load bitmap from file.")
+        if input_path is None:
+            raise TypeError("Cannot save bitmap without input path.")
+        elif bitmap_io is None:
+            raise TypeError(
+                "Bitmap io module isnt loaded. Cant load bitmap from file.")
 
-            # if the extension isnt provided in the
-            # kwargs we try to get it from the filepath
-            if ext is None:
-                splitpath = path.splitext(input_path)
-                input_path = splitpath[0]
-                ext = splitpath[1][1:].lower()
+        # if the extension isnt provided in the
+        # kwargs we try to get it from the filepath
+        if ext is None:
+            splitpath = path.splitext(input_path)
+            input_path = splitpath[0]
+            ext = splitpath[1][1:].lower()
 
-            ext = ext.lower()
-            
-            if ext not in bitmap_io.file_readers:
-                raise TypeError("Unknown bitmap file import format '%s'" % ext)
-            
-            bitmap_io.file_readers[ext](self, input_path, ext.lower(), *kwargs)
-        except:
-            print("ERROR OCCURRED WHILE TRYING TO LOAD BITMAP FROM FILE.")
-            print(format_exc())
-
+        ext = ext.lower()
+        
+        if ext not in bitmap_io.file_readers:
+            raise TypeError("Unknown bitmap file import format '%s'" % ext)
+        
+        bitmap_io.file_readers[ext](self, input_path, ext.lower(), *kwargs)
 
     def convert_texture(self):
         """Runs all the conversions routines for the parameters specified"""
@@ -1072,7 +1009,6 @@ class Arbytmap():
             return depalettized_bitmap
 
         i = 0
-        
         if ucc == 4:
             for index in unpacked_indexing:
                 depalettized_bitmap[i] = unpacked_palette[index*4]
@@ -1255,8 +1191,8 @@ class Arbytmap():
             return(unpacked_palette, unpacked_indexing)
         
         # if the bitmap isn't going to stay palettized, we depalettize it
-        return(None, self.depalettize_bitmap(
-            unpacked_palette, unpacked_indexing))
+        return(
+            None, self.depalettize_bitmap(unpacked_palette, unpacked_indexing))
 
     def _unpack_palette(self, packed_palette):
         """Just a redirect to the _Unpack_Raw function"""
@@ -1286,7 +1222,6 @@ class Arbytmap():
             return unpacked_indexing
         
         i = 0
-
         if self.indexing_size == 4:
             for indexing_chunk in packed_indexing:
                 unpacked_indexing[i] = indexing_chunk&15
@@ -1499,19 +1434,19 @@ class Arbytmap():
         # The indexing will be packed in little endian mode
         if self.target_indexing_size == 1:
             for i in range(0, len(packed_indexing)*8, 8):
-                packed_indexing[i//8] = (
+                packed_indexing[i>>3] = (
                     upi[i]+        (upi[i+1]<<1) +
                    (upi[i+2]<<2) + (upi[i+3]<<3) +
                    (upi[i+4]<<4) + (upi[i+5]<<5) +
                    (upi[i+6]<<6) + (upi[i+7]<<7) )                    
         elif self.target_indexing_size == 2:
             for i in range(0, len(packed_indexing)*4, 4):
-                packed_indexing[i//4] = (
+                packed_indexing[i>>2] = (
                     upi[i]       + (upi[i+1]<<2) +
                    (upi[i+2]<<4) + (upi[i+3]<<6)) 
         elif self.target_indexing_size == 4:
             for i in range(0, len(packed_indexing)*2, 2):
-                packed_indexing[i//2] = upi[i]+ (upi[i+1]<<4)
+                packed_indexing[i>>1] = upi[i]+ (upi[i+1]<<4)
 
         return packed_indexing
 
@@ -1574,7 +1509,7 @@ class Arbytmap():
     def _pack_raw_4_channel(self, upa, downscale, ucc, off):        
         # create the array to hold the pixel data after
         # it's been repacked in the target format
-        typecode = FORMAT_DATA_SIZES[self.target_format]
+        typecode = FORMAT_PACKED_TYPECODES[self.target_format]
         packed_array = array(
             typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
         
@@ -1589,7 +1524,7 @@ class Arbytmap():
                 a_shift, r_shift, g_shift, b_shift)
         else:
             for i in range(0, len(packed_array)*4, 4):
-                packed_array[i//4] = ((a_scale[upa[i]]<<a_shift) +
+                packed_array[i>>2] = ((a_scale[upa[i]]<<a_shift) +
                                       (r_scale[upa[i+1]]<<r_shift) +
                                       (g_scale[upa[i+2]]<<g_shift) +
                                       (b_scale[upa[i+3]]<<b_shift) )
@@ -1600,7 +1535,7 @@ class Arbytmap():
     def _pack_raw_2_channel(self, upa, downscale, ucc, off):
         # create the array to hold the pixel data after
         # it's been repacked in the target format
-        typecode = FORMAT_DATA_SIZES[self.target_format]
+        typecode = FORMAT_PACKED_TYPECODES[self.target_format]
         packed_array = array(
             typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
             
@@ -1612,7 +1547,7 @@ class Arbytmap():
                 packed_array, upa, a_scale, i_scale, a_shift, i_shift)
         else:
             for i in range(0, len(packed_array)*2, 2):
-                packed_array[i//2] = ((a_scale[upa[i]]<<a_shift) +
+                packed_array[i>>1] = ((a_scale[upa[i]]<<a_shift) +
                                       (i_scale[upa[i+1]]<<i_shift))
 
         return packed_array
@@ -1621,7 +1556,7 @@ class Arbytmap():
     def _pack_raw_1_channel(self, upa, downscale, ucc, off):
         # create the array to hold the pixel data after
         # it's been repacked in the target format
-        typecode = FORMAT_DATA_SIZES[self.target_format]
+        typecode = FORMAT_PACKED_TYPECODES[self.target_format]
         packed_array = array(
             typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
         
@@ -1640,7 +1575,7 @@ class Arbytmap():
     def _pack_raw_4_channel_merge(self, upa, downscale, ucc, cmm, off, cmd):
         # create the array to hold the pixel data
         # after it's been repacked in the target format
-        typecode = FORMAT_DATA_SIZES[self.target_format]
+        typecode = FORMAT_PACKED_TYPECODES[self.target_format]
         packed_array = array(
             typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
         
@@ -1666,7 +1601,7 @@ class Arbytmap():
                 a_shift, r_shift, g_shift, b_shift)
         else:
             for i in range(0, len(packed_array)*4, 4):
-                packed_array[i//4] = (
+                packed_array[i>>2] = (
                     (a_scale[((upa[i]+a_rnd)//a_div)]<<a_shift) +
                     (r_scale[((upa[i+1]+r_rnd)//r_div)]<<r_shift) +
                     (g_scale[((upa[i+2]+g_rnd)//g_div)]<<g_shift) +
@@ -1677,7 +1612,7 @@ class Arbytmap():
     def _pack_raw_2_channel_merge(self, upa, downscale, ucc, cmm, off, cmd):
         # create the array to hold the pixel data after
         # it's been repacked in the target format
-        typecode = FORMAT_DATA_SIZES[self.target_format]
+        typecode = FORMAT_PACKED_TYPECODES[self.target_format]
         packed_array = array(
             typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
         
@@ -1698,7 +1633,7 @@ class Arbytmap():
                 a_div, i_div, a_shift, i_shift)
         else:
             for i in range(0, len(packed_array)*2, 2):
-                packed_array[i//2] = (
+                packed_array[i>>1] = (
                     (a_scale[((upa[i]+a_rnd)//i_div)]<<a_shift) +
                     (i_scale[((upa[i+1]+i_rnd)//i_div)]<<i_shift))
 
