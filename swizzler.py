@@ -18,10 +18,10 @@ class Swizzler():
     converter = None
 
     def __init__(self, **kwargs):
-        if "texture_converter" not in kwargs or "mask_type" not in kwargs:
+        if "converter" not in kwargs or "mask_type" not in kwargs:
             return
 
-        self.converter = kwargs["texture_converter"]
+        self.converter = kwargs["converter"]
         self.swizzler_mask = SwizzlerMask(**kwargs)
 
     def swizzle_texture(self, force=False, delete_old=True):

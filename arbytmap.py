@@ -201,10 +201,10 @@ class Arbytmap():
 
         if "deswizzler" not in texture_info:
             self.deswizzler = swizzler.Swizzler(
-                texture_converter=self, mask_type="DEFAULT")
+                converter=self, mask_type="DEFAULT")
         elif swizzler is not None:
             self.deswizzler = swizzler.Swizzler(
-                texture_converter=self,
+                converter=self,
                 mask_type=texture_info["deswizzler"])
         else:
             print("ERROR: SWIZZLER MODULE NOT LOADED. "+
@@ -314,7 +314,7 @@ class Arbytmap():
             pass
         elif swizzler is not None:
             self.reswizzler = swizzler.Swizzler(
-                texture_converter = self, mask_type=kwargs["reswizzler"])
+                converter = self, mask_type=kwargs["reswizzler"])
         else:
             print("ERROR: SWIZZLER MODULE NOT LOADED. " +
                   "CANNOT SWIZZLE/UNSWIZZLE WITHOUT SWIZZLER.")
@@ -467,7 +467,7 @@ class Arbytmap():
         for channel in range(ucc):
             self.gamma_scaler[channel] = g = array("f", [0.0]*ucc)
             for val in range(256):
-                g[channel].append(((float(val)/255)**self.gamma[channel])*255)
+                g.append(((float(val)/255)**self.gamma[channel])*255)
 
     def _set_upscalers_and_downscalers(self, **kwargs):
         '''NEED TO ADD A DESCRIPTION'''
@@ -491,7 +491,6 @@ class Arbytmap():
                     FORMAT_CHANNEL_DEPTHS[self.target_format]
                     [self.channel_merge_mapping[i]])
 
-        
         """BUILD THE UPSCALER ARRAYS"""
         #figure out how large the entries in the arrays need to be
         #In order for the fast unpackers to work well with these,
@@ -1087,7 +1086,7 @@ class Arbytmap():
         px1B|px2B|px3B|px4B
         """
         pixel_merge_swizzler = swizzler.Swizzler(
-            texture_converter = self, mask_type = "DOWNSAMPLER",
+            converter = self, mask_type = "DOWNSAMPLER",
             new_width=new_width, new_height=new_height, new_depth=new_depth)
         
         swizzled = pixel_merge_swizzler.swizzle_single_array(
