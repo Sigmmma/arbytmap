@@ -282,9 +282,9 @@ ALL_FORMAT_COLLECTIONS = {
 """these channel mappings are used to swap ALPHA AND
 INTENSITY, but ONLY if the source bitmap is A8Y8"""
 #                ( A, Y )
-AY_TO_YA       = ( 1, 0 )
-A_TO_AY        = ( 0,-1 )
-Y_TO_AY        = (-1, 0 )
+AY_TO_YA = ( 1, 0 )
+A_TO_AY  = ( 0,-1 )
+Y_TO_AY  = (-1, 0 )
 
 """these channel mappings are used to convert different
 formats to Y8 and A8. these are also used for converting to AY8.
@@ -297,11 +297,11 @@ AY_TO_Y = (1,)
 """these channel mappings are to convert
 A8, Y8, AY, and YA to A8R8G8B8 and X8R8G8B8"""
 #                  ( A,  R,  G,  B)
-A_TO_ARGB        = ( 0, -1, -1, -1)
-Y_TO_ARGB        = (-1,  0,  0,  0)
+A_TO_ARGB = ( 0, -1, -1, -1)
+Y_TO_ARGB = (-1,  0,  0,  0)
 
-AY_TO_ARGB       = ( 0,  1,  1,  1)
-YA_TO_ARGB       = ( 1,  0,  0,  0)
+AY_TO_ARGB = ( 0,  1,  1,  1)
+YA_TO_ARGB = ( 1,  0,  0,  0)
 
 
 """########################"""
