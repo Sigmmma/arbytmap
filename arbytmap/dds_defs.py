@@ -556,7 +556,7 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
             x = r = red[(red_idx >> (k*3))&7]
             y = g = green[(green_idx >> (k*3))&7]
 
-            k *= channel_count
+            k *= ucc
 
             # we're normalizing the coordinates here, not just unpacking them
             x = r&127 if r&128 else 127 - r
@@ -703,6 +703,8 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
 
 
 def unpack_u8v8(self, bitmap_index, width, height, depth=1):
+    #APPARENTLY THIS CODE IS INCORRECT, AND U8V8 IS ACTUALLY
+    #ONES SIGNED RATHER THAN THAT WEIRD DXN SIGNING
     packed = self.texture_block[bitmap_index]
         
     #create a new array to hold the pixels after we unpack them
@@ -793,7 +795,7 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
         c_2 = [0,0,0,0]
         c_3 = [0,0,0,0]
 
-        pxl_i = (txl_i//2)*texel_channel_count
+        pxl_i = (txl_i//2)*channels_per_texel
 
         # compare distance between all pixels and find the two furthest apart
         # (we are actually comparing the area of the distance as it's faster)
@@ -809,8 +811,8 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
                     c_1i = pxl_i+j
 
         # store furthest apart colors for use
-        c_0 = upa[1+c_0i: 4+c_0i]
-        c_1 = upa[1+c_1i: 4+c_1i]
+        c_0 = upa[c_0i: 4+c_0i]
+        c_1 = upa[c_1i: 4+c_1i]
 
         # quantize the colors down to 16 bit color and repack
         color0 = (r_scale[c_0[1]]<<11)+(g_scale[c_0[2]]<<5)+b_scale[c_0[3]]
@@ -831,8 +833,8 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
             continue
 
         # if the current color selection doesn't match what we want then
-        #we reverse which color is which (if we are using transparency then
-        #the first color as an integer must be smaller or equal to the second)
+        # we reverse which color is which (if we are using transparency then
+        # the first color as an integer must be smaller or equal to the second)
         if make_alpha == (color0 > color1):
             c_0, c_1 = c_1, c_0
             rpa[txl_i] = (color0<<16) + color1
@@ -858,26 +860,12 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
             # and assign it the proper index
             for i in pixel_indices:
                 r, g, b = upa[pxl_i+1+i: pxl_i+4+i]
-                dist0 = (r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2
-                dist1 = (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2
-                dist2 = (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2
-                dist3 = (r-c_3[1])**2 + (g-c_3[2])**2 + (b-c_3[3])**2
-                
-                #add appropriate indexing value to array
-                if dist0 <= dist1:
-                    #closer to color 0
-                    if dist0 > dist2:
-                        #closest to color 2
-                        idx += 2<<(i>>1)
-                    elif dist3 > dist2:
-                        #closest to color 3
-                        idx += 3<<(i>>1)
-                elif dist3 < dist1:
-                    #closest to color 3
-                    idx += 3<<(i>>1)
-                else:
-                    #closest to color 1
-                    idx += 1<<(i>>1)
+                dists = ((r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2,
+                         (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2,
+                         (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2,
+                         (r-c_3[1])**2 + (g-c_3[2])**2 + (b-c_3[3])**2)
+
+                idx += dists.index(min(dists))<<(i>>1)
 
             rpa[txl_i+1] = idx
             continue
@@ -892,19 +880,12 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
             if upa[pxl_i+i] < a_cutoff:
                 idx += 3<<(i>>1)
                 continue
-
             r, g, b = upa[pxl_i+1+i: pxl_i+4+i]
-            dist0 = (r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2
-            dist1 = (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2
-            dist2 = (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2
+            dists = ((r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2,
+                     (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2,
+                     (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2)
 
-            #add appropriate indexing value to array
-            if dist1 < dist0 and dist1 < dist2:
-                #closest to color 1
-                idx += 1<<(i>>1)
-            elif dist2 < dist0:
-                #closest to color 2
-                idx += 2<<(i>>1)
+            idx += dists.index(min(dists))<<(i>>1)
 
         rpa[txl_i+1] = idx
             
@@ -969,8 +950,8 @@ def pack_dxt2_3(self, unpacked, width, height, depth=1):
                     c_1i = pxl_i+j
 
         # store furthest apart colors for use
-        c_0 = upa[1+c_0i: 4+c_0i]
-        c_1 = upa[1+c_1i: 4+c_1i]
+        c_0 = upa[c_0i: 4+c_0i]
+        c_1 = upa[c_1i: 4+c_1i]
 
         # quantize the colors down to 16 bit color and repack
         color0 = (r_scale[c_0[1]]<<11)+(g_scale[c_0[2]]<<5)+b_scale[c_0[3]]
@@ -982,7 +963,7 @@ def pack_dxt2_3(self, unpacked, width, height, depth=1):
         else:
             # if the current color selection doesn't match what
             # we want then we reverse which color is which
-            if color0 > color1:
+            if color0 < color1:
                 c_0, c_1 = c_1, c_0
                 color0, color1 = color1, color0
 
@@ -999,26 +980,12 @@ def pack_dxt2_3(self, unpacked, width, height, depth=1):
             # and assign it the proper index
             for i in pixel_indices:
                 r, g, b = upa[pxl_i+1+i: pxl_i+4+i]
-                dist0 = (r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2
-                dist1 = (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2
-                dist2 = (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2
-                dist3 = (r-c_3[1])**2 + (g-c_3[2])**2 + (b-c_3[3])**2
+                dists = ((r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2,
+                         (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2,
+                         (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2,
+                         (r-c_3[1])**2 + (g-c_3[2])**2 + (b-c_3[3])**2)
 
-                #add appropriate indexing value to array
-                if dist0 <= dist1:
-                    #closer to color 0
-                    if dist0 > dist2:
-                        #closest to color 2
-                        idx += 2<<(i>>1)
-                    elif dist3 > dist2:
-                        #closest to color 3
-                        idx += 3<<(i>>1)
-                elif dist3 < dist1:
-                    #closest to color 3
-                    idx += 3<<(i>>1)
-                else:
-                    #closest to color 1
-                    idx += 1<<(i>>1)
+                idx += dists.index(min(dists))<<(i>>1)
 
             rpa[txl_i+2] = (color1<<16) + color0
             rpa[txl_i+3] = idx
@@ -1050,11 +1017,11 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
     a_scale, r_scale, g_scale, b_scale = self.channel_downscalers
 
     #calculate for the unpacked channels
-    texel_channel_count = ucc*get_texel_pixel_count(width, height)
+    channels_per_texel = ucc*get_texel_pixel_count(width, height)
 
     #this is the indexing for each pixel in each texel
     #values are multiplied by 4 to account for the channels
-    range_pixels = range(0, texel_channel_count, ucc)
+    pixel_indices = range(0, channels_per_texel, ucc)
 
     #loop for each texel
     for txl_i in range(0, len(repacked), 4):
@@ -1066,12 +1033,12 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
         c_3 = [0,0,0,0]
         
         #cache so it doesn't have to keep being calculated
-        pxl_i = (txl_i//4)*texel_channel_count
+        pxl_i = (txl_i//4)*channels_per_texel
 
         '''CALCULATE THE ALPHA'''
         #find the most extreme values
-        alpha0 = max(map(lambda i: upa[pxl_i+i], range_pixels))
-        alpha1 = min(map(lambda i: upa[pxl_i+i], range_pixels))
+        alpha0 = max(map(lambda i: upa[pxl_i+i], pixel_indices))
+        alpha1 = min(map(lambda i: upa[pxl_i+i], pixel_indices))
 
         #if the most extreme values are NOT 0 and
         #255, use them as the interpolation values
@@ -1083,7 +1050,7 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
                 alpha_dif = alpha0-alpha1
                 #calculate and store which interpolated
                 #index each alpha value is closest to
-                for i in range_pixels:
+                for i in pixel_indices:
                     #0 = c_0                 1 = c_1
                     #2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
                     #4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
@@ -1093,16 +1060,16 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
                     #that the value is as a 0 to 7 int
                     tmp = ((upa[pxl_i+i]-alpha1)*7 + alpha_dif//2)//alpha_dif
                     if tmp == 0:
-                        alpha_idx += 1<<((j*3)//ucc)
+                        alpha_idx += 1<<(i*3//ucc)
                     elif tmp < 7:
                         #Because the colors are stored in opposite
                         #order, we need to invert the index
-                        alpha_idx += (8-tmp)<<((j*3)//ucc)
+                        alpha_idx += (8-tmp)<<(i*3//ucc)
         else:
             """In this mode, value_0 must be less than or equal to value_1"""
             #if the most extreme values ARE 0 and 255 though, then
             #we need to calculate the second most extreme values
-            for i in range_pixels:
+            for i in pixel_indices:
                 tmp = upa[pxl_i+i]
                 #store if lowest int so far
                 if alpha0 > tmp and tmp > 0: alpha0 = tmp
@@ -1116,27 +1083,27 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
                 #index each alpha value is closest to
 
                 alpha_dif = alpha1-alpha0
-                for i in range_pixels:
+                for i in pixel_indices:
                     #there are 4 interpolated colors in this mode
                     #0 =  c_0                1 = c_1
                     #2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
                     #4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
                     #6 =  0                  7 = 255
-                    comp = upa[pxl_i+j]
+                    comp = upa[pxl_i+i]
                     if comp == 0:
                         #if the value is 0 we set it to index 6
-                        alpha_idx += 6<<((j*3)//ucc)
+                        alpha_idx += 6<<(i*3//ucc)
                     elif comp == 255:
                         #if the value is 255 we set it to index 7
-                        alpha_idx += 7<<((j*3)//ucc)
+                        alpha_idx += 7<<(i*3//ucc)
                     else:
                         #calculate how far between both colors
                         #that the value is as a 0 to 5 int
                         tmp = ((comp-alpha0)*5 + alpha_dif//2)//alpha_dif
                         if tmp == 5:
-                            alpha_idx += 1<<((j*3)//ucc)
+                            alpha_idx += 1<<(i*3//ucc)
                         elif tmp > 0:
-                            alpha_idx += (tmp+1)<<((j*3)//ucc)
+                            alpha_idx += (tmp+1)<<(i*3//ucc)
 
         rpa[txl_i] = ((alpha_idx<<16) + (alpha1<<8) + alpha0)&0xFFffFFff
         rpa[txl_i+1] = alpha_idx>>16
@@ -1156,8 +1123,8 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
                     c_1i = pxl_i+j
 
         # store furthest apart colors for use
-        c_0 = upa[1+c_0i: 4+c_0i]
-        c_1 = upa[1+c_1i: 4+c_1i]
+        c_0 = upa[c_0i: 4+c_0i]
+        c_1 = upa[c_1i: 4+c_1i]
 
         # quantize the colors down to 16 bit color and repack
         color0 = (r_scale[c_0[1]]<<11)+(g_scale[c_0[2]]<<5)+b_scale[c_0[3]]
@@ -1169,7 +1136,7 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
         else:
             # if the current color selection doesn't match what
             # we want then we reverse which color is which
-            if color0 > color1:
+            if color0 < color1:
                 c_0, c_1 = c_1, c_0
                 color0, color1 = color1, color0
 
@@ -1186,26 +1153,12 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
             # and assign it the proper index
             for i in pixel_indices:
                 r, g, b = upa[pxl_i+1+i: pxl_i+4+i]
-                dist0 = (r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2
-                dist1 = (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2
-                dist2 = (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2
-                dist3 = (r-c_3[1])**2 + (g-c_3[2])**2 + (b-c_3[3])**2
+                dists = ((r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2,
+                         (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2,
+                         (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2,
+                         (r-c_3[1])**2 + (g-c_3[2])**2 + (b-c_3[3])**2)
 
-                #add appropriate indexing value to array
-                if dist0 <= dist1:
-                    #closer to color 0
-                    if dist0 > dist2:
-                        #closest to color 2
-                        idx += 2<<(i>>1)
-                    elif dist3 > dist2:
-                        #closest to color 3
-                        idx += 3<<(i>>1)
-                elif dist3 < dist1:
-                    #closest to color 3
-                    idx += 3<<(i>>1)
-                else:
-                    #closest to color 1
-                    idx += 1<<(i>>1)
+                idx += dists.index(min(dists))<<(i>>1)
 
             rpa[txl_i+2] = (color1<<16) + color0
             rpa[txl_i+3] = idx
@@ -1234,19 +1187,19 @@ def pack_dxt5_a(self, unpacked, width, height, depth=1):
 
     scale = self.channel_downscalers[0]
 
-    texel_channel_count = ucc*get_texel_pixel_count(width, height)
-    range_pixels = range(0, texel_channel_count, ucc)
+    channels_per_texel = ucc*get_texel_pixel_count(width, height)
+    pixel_indices = range(0, channels_per_texel, ucc)
 
     #loop for each texel
-    for i in range(0, len(repacked), 2):
+    for txl_i in range(0, len(repacked), 2):
         #cache so it doesn't have to keep being calculated
-        pxl_i = (i//2)*texel_channel_count
+        pxl_i = (txl_i//2)*channels_per_texel
         val0 = idx = 0
         val1 = 255
 
         #find the most extreme vals
-        for j in range_pixels:
-            val = upa[pxl_i+j]
+        for i in pixel_indices:
+            val = upa[pxl_i+i]
             val0 = max(val0, val)
             val1 = min(val1, val)
 
@@ -1261,20 +1214,20 @@ def pack_dxt5_a(self, unpacked, width, height, depth=1):
                 val_dif = val0-val1
                 # calculate and store which interpolated
                 # index each alpha value is closest to
-                for j in range_pixels:
-                    tmp = ((upa[pxl_i+j]-val1)*7 + val_dif//2)//val_dif
+                for i in pixel_indices:
+                    tmp = ((upa[pxl_i+i]-val1)*7 + val_dif//2)//val_dif
                     """Because the colors are stored in reverse
                     order, we need to invert the index"""
                     if tmp == 0:
-                        idx += 1<<((j*3)//ucc)
+                        idx += 1<<(i*3//ucc)
                     elif tmp < 7:
-                        idx += (8-tmp)<<((j*3)//ucc)
+                        idx += (8-tmp)<<(i*3//ucc)
         else:
             """In this mode, val0 must be less than or equal to val1"""
             #if the most extreme vals ARE 0 and 255 though, then
             #we need to calculate the second most extreme vals
-            for j in range_pixels:
-                comp = upa[pxl_i+j]
+            for i in pixel_indices:
+                comp = upa[pxl_i+i]
                 if val0 > comp and comp > 0: val0 = comp
                 if val1 < comp and comp < 255: val1 = comp
 
@@ -1284,21 +1237,21 @@ def pack_dxt5_a(self, unpacked, width, height, depth=1):
                 val_dif = val0-val1
                 # calculate and store which interpolated
                 # index each alpha value is closest to
-                for j in range_pixels:
-                    comp = upa[pxl_i+j]
+                for i in pixel_indices:
+                    comp = upa[pxl_i+i]
                     if comp == 0:
-                        idx += 6<<((j*3)//ucc)
+                        idx += 6<<(i*3//ucc)
                     elif comp == 255:
-                        idx += 7<<((j*3)//ucc)
+                        idx += 7<<(i*3//ucc)
                     else:
                         tmp = ((comp-val0)*5 + val_dif//2)//val_dif
                         if tmp == 5:
-                            idx += 1<<((j*3)//ucc)
+                            idx += 1<<(i*3//ucc)
                         elif tmp > 0:
-                            idx += (tmp+1)<<((j*3)//ucc)
+                            idx += (tmp+1)<<(i*3//ucc)
 
-        rpa[i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
-        rpa[i+1] = idx>>16
+        rpa[txl_i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
+        rpa[txl_i+1] = idx>>16
             
     return repacked
 
@@ -1323,22 +1276,22 @@ def pack_dxn(self, unpacked, width, height, depth=1):
 
     scale = self.channel_downscalers[0]
 
-    texel_channel_count = ucc*get_texel_pixel_count(width, height)
-    range_pixels = range(0, texel_channel_count, ucc)
+    channels_per_texel = ucc*get_texel_pixel_count(width, height)
+    pixel_indices = range(0, channels_per_texel, ucc)
 
     #loop for each texel
-    for i in range(0, len(repacked), 2):
+    for txl_i in range(0, len(repacked), 2):
         #cache so it doesn't have to keep being calculated
-        pxl_i = (i//4)*texel_channel_count
+        pxl_i = (txl_i>>2)*channels_per_texel
         val0 = idx = 0
         val1 = 255
 
         # figure out if we're packing red or green(1=red, 2=green)
-        chan = ((i>>1)%2)+1
+        chan = ((txl_i>>1)%2)+1
 
         #8: find the most extreme vals
-        for j in range_pixels:
-            val = upa[pxl_i+j+chan]
+        for i in pixel_indices:
+            val = upa[pxl_i+i+chan]
             val0 = max(val0, val)
             val1 = min(val1, val)
 
@@ -1353,21 +1306,21 @@ def pack_dxn(self, unpacked, width, height, depth=1):
                 val_dif = val0-val1
                 # calculate and store which interpolated
                 # index each alpha value is closest to
-                for j in range_pixels:
-                    tmp = ((upa[pxl_i+j+chan]-val1)*7 + val_dif//2)//val_dif
+                for i in pixel_indices:
+                    tmp = ((upa[pxl_i+i+chan]-val1)*7 + val_dif//2)//val_dif
                     """Because the colors are stored in reverse
                     order, we need to invert the index"""
                     if tmp == 0:
-                        idx += 1<<((j//4)*3 + 16)
+                        idx += 1<<(i*3//ucc)
                     elif tmp < 7:
-                        idx += (8-tmp)<<((j//4)*3 + 16)
+                        idx += (8-tmp)<<(i*3//ucc)
                 
         else:
             """In this mode, value_0 must be less than or equal to value_1"""
             #if the most extreme vals ARE 0 and 255 though, then
             #we need to calculate the second most extreme vals
-            for j in range_pixels:
-                comp = upa[pxl_i+j+chan]
+            for i in pixel_indices:
+                comp = upa[pxl_i+i+chan]
                 if val0 > comp and comp > 0: val0 = comp
                 if val1 < comp and comp < 255: val1 = comp
 
@@ -1377,21 +1330,21 @@ def pack_dxn(self, unpacked, width, height, depth=1):
                 val_dif = val1-val0
                 # calculate and store which interpolated
                 # index each alpha value is closest to
-                for j in range_pixels:
-                    comp = upa[pxl_i+j+chan]
+                for i in pixel_indices:
+                    comp = upa[pxl_i+i+chan]
                     if comp == 0:
-                        idx += 6<<((j//4)*3 + 16)
+                        idx += 6<<(i*3//ucc)
                     elif comp == 255:
-                        idx += 7<<((j//4)*3 + 16)
+                        idx += 7<<(i*3//ucc)
                     else:
                         tmp = ((comp-val0)*5 + (val_dif//2))//val_dif
                         if tmp == 5:
-                            idx += 1<<((j//4)*3 + 16)
+                            idx += 1<<(i*3//ucc)
                         elif tmp > 0:
-                            idx += (tmp+1)<<((j//4)*3 + 16)
+                            idx += (tmp+1)<<(i*3//ucc)
 
-        rpa[i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
-        rpa[i+1] = idx>>16
+        rpa[txl_i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
+        rpa[txl_i+1] = idx>>16
             
     return repacked
 
@@ -1417,9 +1370,9 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
     upa = unpacked
 
     _, r_scale, g_scale, __ = self.channel_downscalers
-    texel_channel_count = 4*get_texel_pixel_count(width, height)
+    channels_per_texel = 4*get_texel_pixel_count(width, height)
 
-    range_pixels = range(0, texel_channel_count, 4)
+    pixel_indices = range(0, channels_per_texel, 4)
 
     #loop for each texel
     for txl_i in range(0, len(repacked), 2):
@@ -1432,12 +1385,12 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
         xy_3 = [0,0,0,0]
 
         #cache so it doesn't have to keep being calculated
-        pxl_i = (txl_i//2)*texel_channel_count
+        pxl_i = (txl_i//2)*channels_per_texel
 
         # compare distance between all pixels and find the two furthest apart
         #(we are actually comparing the area of the distance as it's faster)
-        for i in range_pixels:
-            for j in range_pixels:
+        for i in pixel_indices:
+            for j in pixel_indices:
                 dist1 = ((upa[pxl_i+1+i]-upa[pxl_i+1+j])**2+
                          (upa[pxl_i+2+i]-upa[pxl_i+2+j])**2)
                 if dist1 > dist0:
@@ -1470,7 +1423,7 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
             
             # calculate each pixel's closest match
             # and assign it the proper index
-            for i in range_pixels:
+            for i in pixel_indices:
                 x = upa[pxl_i+1+i]
                 y = upa[pxl_i+2+i]
                 dist0 = (x-xy_0[0])**2 + (y-xy_0[1])**2
