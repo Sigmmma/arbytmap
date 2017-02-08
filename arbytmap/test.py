@@ -12,7 +12,7 @@ try:
     #    bc.print_format(f)
     
     bitmap_test.load_from_file(input_path="convert_test.tga")
-    bitmap_test.load_new_conversion_settings(target_format=ab.FORMAT_U8V8)
+    bitmap_test.load_new_conversion_settings(target_format=ab.FORMAT_CTX1)
     bitmap_test.print_info(1,1,1,0,0)
     print('Press "Enter" to continue conversion'); input()
     start = time.time()

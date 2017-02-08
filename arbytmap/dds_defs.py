@@ -492,9 +492,8 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
 
     red   = [0,0,0,0,0,0,0,0]
     green = [0,0,0,0,0,0,0,0]
-    r_scale, g_scale, b_scale = DXT_R_SCALE_16, DXT_G_SCALE_16, DXT_B_SCALE_16
-    if unpack_code == "B":
-        r_scale, g_scale, b_scale = DXT_R_SCALE, DXT_G_SCALE, DXT_B_SCALE
+    r_scale = self.channel_upscalers[1]
+    g_scale = self.channel_upscalers[2]
 
     try:
         chan1 = self.channel_mapping.index(1)
@@ -616,9 +615,8 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    r_scale, g_scale, b_scale = DXT_R_SCALE_16, DXT_G_SCALE_16, DXT_B_SCALE_16
-    if unpack_code == "B":
-        r_scale, g_scale, b_scale = DXT_R_SCALE, DXT_G_SCALE, DXT_B_SCALE
+    r_scale = self.channel_upscalers[1]
+    g_scale = self.channel_upscalers[2]
 
     try:
         chan1 = self.channel_mapping.index(1)
