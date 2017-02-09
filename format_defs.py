@@ -75,7 +75,7 @@ swizzled - whether or not the texture is swizzled
 swizzler - the type of swizzler method to use to swizzle or deswizzle texture
 '''
 
-PIXEL_ENCODING_SIZES = {"B":1, "H":2, "L":4, "Q":8}
+PIXEL_ENCODING_SIZES = {"B":1, "H":2, "L":4, "Q":8, "b":1, "h":2, "l":4, "q":8}
 INVERSE_PIXEL_ENCODING_SIZES = {
     0:"B", 1:"B",
     2:"H",

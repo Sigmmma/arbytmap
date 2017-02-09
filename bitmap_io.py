@@ -729,12 +729,14 @@ def bitmap_indexing_to_array(rawdata, offset, indexing_block,
 
 
 def pad_24bit_array(unpadded):
-    if (not hasattr(unpadded, 'typecode')) or unpadded.typecode != 'B':
+    if not hasattr(unpadded, 'typecode'):
+        unpadded = array("B", unpadded)
+    elif unpadded.typecode != 'B':
         raise TypeError(
             "Bad typecode for unpadded 24bit array. Expected B, got %s" %
             unpadded.typecode)
+
     if fast_bitmap_io:
-        print("fast pad 24")
         padded = array("L", bytearray(len(unpadded)//3) )
         bitmap_io_ext.pad_24bit_array(padded, unpadded)
     else:
@@ -746,12 +748,14 @@ def pad_24bit_array(unpadded):
 
 
 def pad_48bit_array(unpadded):
-    if (not hasattr(unpadded, 'typecode')) or unpadded.typecode != 'H':
+    if not hasattr(unpadded, 'typecode'):
+        unpadded = array("B", unpadded)
+    elif unpadded.typecode != 'B':
         raise TypeError(
-            "Bad typecode for unpadded 48bit array. Expected H, got %s" %
+            "Bad typecode for unpadded 24bit array. Expected B, got %s" %
             unpadded.typecode)
+
     if fast_bitmap_io:
-        print("fast pad 48")
         padded = array("Q", bytearray(len(unpadded)//3) )
         bitmap_io_ext.pad_48bit_array(padded, unpadded)
     else:
@@ -1091,13 +1095,12 @@ def write_dds_header(dds_file, **kwargs):
         elif kwargs["channel_count"] == 3:
             if kwargs["format"] == ab.FORMAT_Y8U8V8:
                 kwargs["pixel_format_flags"] = 512
+            elif kwargs["format"] == ab.FORMAT_U8V8:
+                kwargs["pixel_format_flags"] = 524288
             else:
                 kwargs["pixel_format_flags"] = 64
         elif kwargs["channel_count"] == 4:
-            if kwargs["format"] == ab.FORMAT_U8V8:
-                kwargs["pixel_format_flags"] = 524288
-            else:
-                kwargs["pixel_format_flags"] = 65
+            kwargs["pixel_format_flags"] = 65
                 
         if not kwargs["compressed"]:
             kwargs["pitch_or_linear_size"] = kwargs["width"]*(kwargs["bpp"]//8)\
