@@ -11,13 +11,13 @@ try:
     #for f in sorted(bc.VALID_FORMATS):
     #    bc.print_format(f)
     
-    bitmap_test.load_from_file(input_path="convert_test.tga")
-    bitmap_test.load_new_conversion_settings(target_format=ab.FORMAT_CTX1)
+    bitmap_test.load_from_file(input_path="test.tga")
+    bitmap_test.load_new_conversion_settings(target_format=ab.FORMAT_U8V8)
     bitmap_test.print_info(1,1,1,0,0)
     print('Press "Enter" to continue conversion'); input()
     start = time.time()
     bitmap_test.convert_texture()
-    bitmap_test.save_to_file(output_path = curr_dir + "\\u8v8.dds")
+    bitmap_test.save_to_file(output_path = curr_dir + "\\test.dds")
 except:
     print(format_exc())
 

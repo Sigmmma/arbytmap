@@ -7,28 +7,14 @@ from math import sqrt
 ab = None
 
 
-#used to scale DXT pixel values to 8-bit
-DXT_R_SCALE = array("B", [])
-DXT_G_SCALE = array("B", [])
-DXT_B_SCALE = array("B", [])
-DXT_R_SCALE_16 = array("H", [])
-DXT_G_SCALE_16 = array("H", [])
-DXT_B_SCALE_16 = array("H", [])
-
-for i in range(32):
-    DXT_R_SCALE.append(int( i*(255/31)+0.5 ))
-    DXT_B_SCALE.append(int( i*(255/31)+0.5 ))
-    DXT_R_SCALE_16.append(int( i*(65535/31)+0.5 ))
-    DXT_B_SCALE_16.append(int( i*(65535/31)+0.5 ))
-for i in range(64):
-    DXT_G_SCALE.append(int( i*(255/63)+0.5 ))
-    DXT_G_SCALE_16.append(int( i*(65535/63)+0.5 ))
-
-
 def combine(base, **main):
     for k, v in [(k, base[k]) for k in base if k not in main]:
         main[k] = v
     return main
+
+
+def get_texel_pixel_count(width, height):
+    return min(width, 4) * min(height, 4)
 
 
 def initialize():
@@ -42,18 +28,19 @@ def initialize():
     ab.FORMAT_DXT4 = "DXT4"
     ab.FORMAT_DXT5 = "DXT5"
 
-    # uses onl the alpha channel of dxt3
+    # uses only the alpha channel of dxt3
     ab.FORMAT_DXT3A = "DXT3A"           #NOT YET IMPLEMENTED
 
     # uses only the alpha channel of dxt3, and each bit is
-    # used as an on/off mask for each of the ARGB channels
+    # used as an on/off mask for each of the ARGB channels.
+    # this format is basically A1R1G1B1 with a dxt texel swizzle
     ab.FORMAT_DXT3A1111 = "DXT3A1111"   #NOT YET IMPLEMENTED
     
     ab.FORMAT_DXT5NM = "DXT5NM"         #NOT YET IMPLEMENTED
     ab.FORMAT_DXN = "DXN"
     ab.FORMAT_DXT5A = "DXT5A"
-    ab.FORMAT_DXT5Y = "DXT5Y"           #NOT YET IMPLEMENTED
-    ab.FORMAT_DXT5AY = "DXT5AY"         #NOT YET IMPLEMENTED
+    ab.FORMAT_DXT5Y = "DXT5Y"
+    ab.FORMAT_DXT5AY = "DXT5AY"
     
     ab.FORMAT_CTX1 = "CTX1"
     ab.FORMAT_U8V8 = "U8V8"
@@ -97,7 +84,7 @@ def initialize():
         masks=(0,16711680,65280,255)))
 
     ab.define_format(**combine(dxt_specs,
-        format_id=ab.FORMAT_CTX1, bpp=4,
+        format_id=ab.FORMAT_CTX1, bpp=4, three_channels=True,
         unpacker=unpack_ctx1, packer=pack_ctx1,
         depths=(0,8,8,8), offsets=(0,16,8,0),
         masks=(0,16711680,65280,255)))
@@ -116,14 +103,13 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
-    unpack_max = (1<<unpack_size) - 1
+    unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = self.unpacked_channel_count
     bpp = unpack_size*ucc
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    bytes_per_pixel    = ucc*unpack_size
     channels_per_texel = ucc*pixels_per_texel
 
     pixel_indices = range(pixels_per_texel)
@@ -141,9 +127,10 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    r_scale, g_scale, b_scale = DXT_R_SCALE_16, DXT_G_SCALE_16, DXT_B_SCALE_16
-    if unpack_code == "B":
-        r_scale, g_scale, b_scale = DXT_R_SCALE, DXT_G_SCALE, DXT_B_SCALE
+    a_scale = self.channel_upscalers[0]
+    r_scale = self.channel_upscalers[1]
+    g_scale = self.channel_upscalers[2]
+    b_scale = self.channel_upscalers[3]
 
     try:
         chan0 = self.channel_mapping.index(0)
@@ -193,7 +180,7 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
             
         for j in pixel_indices:
             color = colors[(color_idx >> (j*2))&3]
-            off = j*bytes_per_pixel + pxl_i
+            off = j*ucc + pxl_i
             unpacked[off + chan0] = color[0]
             unpacked[off + chan1] = color[1]
             unpacked[off + chan2] = color[2]
@@ -214,14 +201,13 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
-    unpack_max = (1<<unpack_size) - 1
+    unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = self.unpacked_channel_count
     bpp = unpack_size*ucc
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    bytes_per_pixel    = ucc*unpack_size
     channels_per_texel = ucc*pixels_per_texel
 
     pixel_indices = range(pixels_per_texel)
@@ -239,9 +225,9 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
     colors = [c_0, c_1, c_2, c_3]
 
     a_scale = self.channel_upscalers[0]
-    r_scale, g_scale, b_scale = DXT_R_SCALE_16, DXT_G_SCALE_16, DXT_B_SCALE_16
-    if unpack_code == "B":
-        r_scale, g_scale, b_scale = DXT_R_SCALE, DXT_G_SCALE, DXT_B_SCALE
+    r_scale = self.channel_upscalers[1]
+    g_scale = self.channel_upscalers[2]
+    b_scale = self.channel_upscalers[3]
 
     try:
         chan0 = self.channel_mapping.index(0)
@@ -271,10 +257,21 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
         c_1[1] = r_scale[(color1>>11) & 31]
         c_1[2] = g_scale[(color1>>5) & 63]
         c_1[3] = b_scale[(color1) & 31]
+
+        if color0 < color1:
+            color0, color1 = color1, color0
+
+        c_2[1] = (c_0[1]*2 + c_1[1])//3
+        c_2[2] = (c_0[2]*2 + c_1[2])//3
+        c_2[3] = (c_0[3]*2 + c_1[3])//3
+
+        c_3[1] = (c_0[1] + c_1[1]*2)//3
+        c_3[2] = (c_0[2] + c_1[2]*2)//3
+        c_3[3] = (c_0[3] + c_1[3]*2)//3
             
         for j in pixel_indices:
             color = colors[(color_idx >> (j*2))&3]
-            off = j*bytes_per_pixel + pxl_i
+            off = j*ucc + pxl_i
 
             unpacked[off + chan0] = a_scale[(alpha >> (j*4))&15]
             unpacked[off + chan1] = color[1]
@@ -296,14 +293,13 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
-    unpack_max = (1<<unpack_size) - 1
+    unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = self.unpacked_channel_count
     bpp = unpack_size*ucc
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    bytes_per_pixel    = ucc*unpack_size
     channels_per_texel = ucc*pixels_per_texel
 
     pixel_indices = range(pixels_per_texel)
@@ -321,9 +317,10 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     colors = [c_0, c_1, c_2, c_3]
 
     a_lookup = [0,0,0,0,0,0,0,0]
-    r_scale, g_scale, b_scale = DXT_R_SCALE_16, DXT_G_SCALE_16, DXT_B_SCALE_16
-    if unpack_code == "B":
-        r_scale, g_scale, b_scale = DXT_R_SCALE, DXT_G_SCALE, DXT_B_SCALE
+    a_scale = self.channel_upscalers[0]
+    r_scale = self.channel_upscalers[1]
+    g_scale = self.channel_upscalers[2]
+    b_scale = self.channel_upscalers[3]
 
     try:
         chan0 = self.channel_mapping.index(0)
@@ -363,28 +360,32 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
         #half of the first array entry in DXT4/5 format is both
         #alpha values and the first third of the indexing
         color0 = packed[j+2] & 65535
-        color1 = (packed[j+2] >> 8) & 255
+        color1 = (packed[j+2]>>16) & 65535
         color_idx = packed[j+3]
 
         """unpack the colors"""
-        c_0[1] = r_scale[(color0 & 63488) >> 11]
-        c_0[2] = g_scale[(color0 & 2016) >> 5]
-        c_0[3] = b_scale[color0 & 31]
-        
-        c_1[1] = r_scale[(color1 & 63488) >> 11]
-        c_1[2] = g_scale[(color1 & 2016) >> 5]
-        c_1[3] = b_scale[color1 & 31]
+        c_0[1] = r_scale[(color0>>11) & 31]
+        c_0[2] = g_scale[(color0>>5) & 63]
+        c_0[3] = b_scale[(color0) & 31]
+
+        c_1[1] = r_scale[(color1>>11) & 31]
+        c_1[2] = g_scale[(color1>>5) & 63]
+        c_1[3] = b_scale[(color1) & 31]
+
+        if color0 < color1:
+            color0, color1 = color1, color0
 
         c_2[1] = (c_0[1]*2 + c_1[1])//3
         c_2[2] = (c_0[2]*2 + c_1[2])//3
         c_2[3] = (c_0[3]*2 + c_1[3])//3
-        colors[3] = [255,(c_0[1] + 2*c_1[1])//3,
-                     (c_0[2] + 2*c_1[2])//3,
-                     (c_0[3] + 2*c_1[3])//3]
+
+        c_3[1] = (c_0[1] + c_1[1]*2)//3
+        c_3[2] = (c_0[2] + c_1[2]*2)//3
+        c_3[3] = (c_0[3] + c_1[3]*2)//3
             
         for j in pixel_indices:
             color = colors[(color_idx >> (j*2))&3]
-            off = j*bytes_per_pixel + pxl_i
+            off = j*ucc + pxl_i
 
             unpacked[off + chan0] = a_lookup[(alpha_idx >> (j*3))&7]
             unpacked[off + chan1] = color[1]
@@ -406,7 +407,7 @@ def unpack_dxt5_a(self, bitmap_index, width, height, depth=1):
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
-    unpack_max = (1<<unpack_size) - 1
+    unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = self.unpacked_channel_count
     scc = self.source_channel_count
@@ -414,7 +415,6 @@ def unpack_dxt5_a(self, bitmap_index, width, height, depth=1):
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    bytes_per_pixel    = ucc*unpack_size
     channels_per_texel = ucc*pixels_per_texel
 
     pixel_indices = range(pixels_per_texel)
@@ -458,7 +458,7 @@ def unpack_dxt5_a(self, bitmap_index, width, height, depth=1):
             lookup[7] = 255
             
         for k in pixel_indices:
-            unpacked[k*bytes_per_pixel+pxl_i] = lookup[(idx >> (k*3))&7]
+            unpacked[k*ucc+pxl_i] = lookup[(idx >> (k*3))&7]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -475,14 +475,13 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
-    unpack_max = (1<<unpack_size) - 1
+    unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = self.unpacked_channel_count
     bpp = unpack_size*ucc
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    bytes_per_pixel    = ucc*unpack_size
     channels_per_texel = ucc*pixels_per_texel
 
     pixel_indices = range(pixels_per_texel)
@@ -591,14 +590,13 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
-    unpack_max = (1<<unpack_size) - 1
+    unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = self.unpacked_channel_count
     bpp = unpack_size*ucc
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    bytes_per_pixel    = ucc*unpack_size
     channels_per_texel = ucc*pixels_per_texel
 
     pixel_indices = range(pixels_per_texel)
@@ -687,7 +685,7 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
 
         for k in pixel_indices:
             color = colors[(idx >> (k*2))&3]
-            off = k*bytes_per_pixel + pxl_i
+            off = k*ucc + pxl_i
             unpacked[off + chan1] = color[1]
             unpacked[off + chan2] = color[2]
             unpacked[off + chan3] = color[3]
@@ -725,37 +723,40 @@ def unpack_u8v8(self, bitmap_index, width, height, depth=1):
 
     for i in range(0, len(packed)):
         j = ucc*i
-        x = r = r_scale[packed[i]&255]
-        y = g = g_scale[(packed[i]>>8)&255]
+        r = packed[i]&255
+        g = (packed[i]>>8)&255
+        '''
+        So an RGB normal map is [0, 255] and maps linearly to [-1, 1],
+        and U8V8 is [-127, 127] and does NOT map linearly to [-1, 1].
+        If read as unsigned, U8V8 maps [0, 127] to [-127, 0] and
+        [128, 255] to [0, 127]. Because of this, we may need to
+        subtract 255 from the r and g values. This is complicated
+        even more by the fact that the packed array isnt signed in
+        the form we are reading from it, so we need account for that.
+        '''
+        r = r-255 if r&128 else r
+        g = g-255 if g&128 else g
 
         # we're normalizing the coordinates here, not just unpacking them
-        x = x&127 if x&128 else 127 - x
-        y = y&127 if y&128 else 127 - y
-
-        d = 16129 - x**2 - y**2  # 16129 == 127**2
+        d = 16129 - r**2 - g**2  # 16129 == 127**2
         if d > 0:
-            b = int(sqrt(d)) + 128
+            b = int(sqrt(d))
         else:
             n_len = sqrt(16129 - d)/127
-            x = int(x/n_len)
-            y = int(y/n_len)
+            r = int(r/n_len)
+            g = int(g/n_len)
+            b = 0
 
-            r = x+128 if r&128 else 127 - x
-            g = y+128 if g&128 else 127 - y
-            b = 128
-
-        unpacked[j + chan1] = r
-        unpacked[j + chan2] = g
-        unpacked[j + chan3] = b
+        unpacked[j + chan1] = r_scale[r+128]
+        unpacked[j + chan2] = g_scale[g+128]
+        unpacked[j + chan3] = b_scale[b+128]
 
     return unpacked
-
 
 
 ########################################
 '''######## PACKING ROUTINES ########'''
 ########################################
-
 
 
 def pack_dxt1(self, unpacked, width, height, depth=1):
@@ -1035,8 +1036,8 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
 
         '''CALCULATE THE ALPHA'''
         #find the most extreme values
-        alpha0 = max(map(lambda i: upa[pxl_i+i], pixel_indices))
-        alpha1 = min(map(lambda i: upa[pxl_i+i], pixel_indices))
+        alpha0 = max(map(lambda i: a_scale[upa[pxl_i+i]], pixel_indices))
+        alpha1 = min(map(lambda i: a_scale[upa[pxl_i+i]], pixel_indices))
 
         #if the most extreme values are NOT 0 and
         #255, use them as the interpolation values
@@ -1056,7 +1057,8 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
 
                     #calculate how far between both colors
                     #that the value is as a 0 to 7 int
-                    tmp = ((upa[pxl_i+i]-alpha1)*7 + alpha_dif//2)//alpha_dif
+                    tmp = ((a_scale[upa[pxl_i+i]]-alpha1
+                            )*7+alpha_dif//2)//alpha_dif
                     if tmp == 0:
                         alpha_idx += 1<<(i*3//ucc)
                     elif tmp < 7:
@@ -1068,7 +1070,7 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
             #if the most extreme values ARE 0 and 255 though, then
             #we need to calculate the second most extreme values
             for i in pixel_indices:
-                tmp = upa[pxl_i+i]
+                tmp = a_scale[upa[pxl_i+i]]
                 #store if lowest int so far
                 if alpha0 > tmp and tmp > 0: alpha0 = tmp
                 #store if greatest int so far
@@ -1087,7 +1089,7 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
                     #2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
                     #4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
                     #6 =  0                  7 = 255
-                    comp = upa[pxl_i+i]
+                    comp = a_scale[upa[pxl_i+i]]
                     if comp == 0:
                         #if the value is 0 we set it to index 6
                         alpha_idx += 6<<(i*3//ucc)
@@ -1448,17 +1450,22 @@ def pack_u8v8(self, unpacked, width, height, depth=1):
             "Cannot convert image with less than 2 channels to U8V8.")
 
     packed = array("H", bytearray(2*len(unpacked)//ucc))
+    _, r_scale, g_scale, __ = self.channel_downscalers
     if ucc == 2:
-        for i in range(0, len(unpacked), ucc):
-            # packing channels 0 and 1
-            packed[i//ucc] = (unpacked[i+1]<<8) + unpacked[i]
+        chan0, chan1 = 0, 1
     else:
-        for i in range(0, len(unpacked), ucc):
-            # packing channels 1 and 2
-            packed[i//ucc] = (unpacked[i+2]<<8) + unpacked[i+1]
+        chan0, chan1 = 1, 2
+
+    for i in range(0, len(unpacked), ucc):
+        # packing channels 1 and 2
+        r = r_scale[unpacked[i+chan0]]
+        g = g_scale[unpacked[i+chan1]]
+        '''
+        So an RGB normal map is [0, 255] and maps linearly to [-1, 1],
+        and U8V8 is [-127, 127] and does NOT map linearly to [-1, 1].
+        '''
+        r = r-128 if r&128 else r+128
+        g = g-128 if g&128 else g+128
+        packed[i//ucc] = (g<<8) + r
 
     return packed
-
-
-def get_texel_pixel_count(width, height):
-    return min(width, 4) * min(height, 4)
