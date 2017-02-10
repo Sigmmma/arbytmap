@@ -1,7 +1,7 @@
 [Project]
 FileName=arbytmap.dev
 Name=Arbytmap
-UnitCount=5
+UnitCount=6
 Type=1
 Ver=1
 ObjFiles=
@@ -91,6 +91,16 @@ BuildCmd=
 FileName=src\swizzler_ext.c
 CompileCpp=0
 Folder=Arbytmap
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit6]
+FileName=src\dds_defs_ext.c
+CompileCpp=0
+Folder=
 Compile=1
 Link=1
 Priority=1000

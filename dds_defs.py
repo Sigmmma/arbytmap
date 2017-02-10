@@ -6,6 +6,12 @@ from math import sqrt
 #once the module loads this will become the reference to it.
 ab = None
 
+try:
+    from .ext import dds_defs_ext 
+    fast_dds_defs = True
+except Exception:
+    fast_dds_defs = False
+
 
 def combine(base, **main):
     for k, v in [(k, base[k]) for k in base if k not in main]:
@@ -110,22 +116,9 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    channels_per_texel = ucc*pixels_per_texel
-
-    pixel_indices = range(pixels_per_texel)
 
     #create a new array to hold the pixels after we unpack them
     unpacked = array(unpack_code, bytearray(width*height*bpp))
-
-    #create the arrays to hold the color channel data
-    c_0 = [unpack_max,0,0,0]
-    c_1 = [unpack_max,0,0,0]
-    c_2 = [unpack_max,0,0,0]
-    c_3 = [unpack_max,0,0,0]
-    transparent = [0,0,0,0]
-
-    #stores the colors in a way we can easily access them
-    colors = [c_0, c_1, c_2, c_3]
 
     a_scale = self.channel_upscalers[0]
     r_scale = self.channel_upscalers[1]
@@ -140,51 +133,69 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     except Exception:
         print("Cannot unpack DXT texture. Channel mapping must include " +
               "channels 0, 1, 2, and 3, not %s" % self.channel_mapping)
-    
-    #loop through each texel
-    for i in range(len(packed)//2):
-        pxl_i = i*channels_per_texel
-        j = i*2
-        
-        """if the format DXT1 then the two entries in the array
-        are the colors and the color indexing in that order."""
-        color0 = packed[j] & 65535
-        color1 = (packed[j] >> 16) & 65535
-        color_idx = packed[j+1]
 
-        """unpack the colors"""
-        c_0[1] = r_scale[(color0>>11) & 31]
-        c_0[2] = g_scale[(color0>>5) & 63]
-        c_0[3] = b_scale[(color0) & 31]
+    if fast_dds_defs:
+        dds_defs_ext.unpack_dxt1(
+            unpacked, packed, r_scale, g_scale, b_scale,
+            pixels_per_texel, chan0, chan1, chan2, chan3, unpack_max)
+    else:
+        channels_per_texel = ucc*pixels_per_texel
+        pixel_indices = range(pixels_per_texel)
 
-        c_1[1] = r_scale[(color1>>11) & 31]
-        c_1[2] = g_scale[(color1>>5) & 63]
-        c_1[3] = b_scale[(color1) & 31]
+        #create the arrays to hold the color channel data
+        c_0 = [unpack_max,0,0,0]
+        c_1 = [unpack_max,0,0,0]
+        c_2 = [unpack_max,0,0,0]
+        c_3 = [unpack_max,0,0,0]
+        transparent = [0,0,0,0]
 
-        #if the first color is a larger integer
-        #then color key transparency is NOT used
-        if color0 > color1:
-            c_2[1] = (c_0[1]*2 + c_1[1])//3
-            c_2[2] = (c_0[2]*2 + c_1[2])//3
-            c_2[3] = (c_0[3]*2 + c_1[3])//3
-            colors[3] = [
-                unpack_max,
-                (c_0[1] + 2*c_1[1])//3,
-                (c_0[2] + 2*c_1[2])//3,
-                (c_0[3] + 2*c_1[3])//3]
-        else:
-            c_2[1] = (c_0[1]+c_1[1])//2
-            c_2[2] = (c_0[2]+c_1[2])//2
-            c_2[3] = (c_0[3]+c_1[3])//2
-            colors[3] = transparent
+        #stores the colors in a way we can easily access them
+        colors = [c_0, c_1, c_2, c_3]
+
+        #loop through each texel
+        for i in range(len(packed)//2):
+            pxl_i = i*channels_per_texel
+            j = i*2
             
-        for j in pixel_indices:
-            color = colors[(color_idx >> (j*2))&3]
-            off = j*ucc + pxl_i
-            unpacked[off + chan0] = color[0]
-            unpacked[off + chan1] = color[1]
-            unpacked[off + chan2] = color[2]
-            unpacked[off + chan3] = color[3]
+            """if the format DXT1 then the two entries in the array
+            are the colors and the color indexing in that order."""
+            color0 = packed[j] & 65535
+            color1 = (packed[j] >> 16) & 65535
+            color_idx = packed[j+1]
+
+            """unpack the colors"""
+            c_0[1] = r_scale[(color0>>11) & 31]
+            c_0[2] = g_scale[(color0>>5) & 63]
+            c_0[3] = b_scale[(color0) & 31]
+
+            c_1[1] = r_scale[(color1>>11) & 31]
+            c_1[2] = g_scale[(color1>>5) & 63]
+            c_1[3] = b_scale[(color1) & 31]
+
+            #if the first color is a larger integer
+            #then color key transparency is NOT used
+            if color0 > color1:
+                c_2[1] = (c_0[1]*2 + c_1[1])//3
+                c_2[2] = (c_0[2]*2 + c_1[2])//3
+                c_2[3] = (c_0[3]*2 + c_1[3])//3
+                colors[3] = [
+                    unpack_max,
+                    (c_0[1] + 2*c_1[1])//3,
+                    (c_0[2] + 2*c_1[2])//3,
+                    (c_0[3] + 2*c_1[3])//3]
+            else:
+                c_2[1] = (c_0[1]+c_1[1])//2
+                c_2[2] = (c_0[2]+c_1[2])//2
+                c_2[3] = (c_0[3]+c_1[3])//2
+                colors[3] = transparent
+                
+            for j in pixel_indices:
+                color = colors[(color_idx >> (j*2))&3]
+                off = j*ucc + pxl_i
+                unpacked[off + chan0] = color[0]
+                unpacked[off + chan1] = color[1]
+                unpacked[off + chan2] = color[2]
+                unpacked[off + chan3] = color[3]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
