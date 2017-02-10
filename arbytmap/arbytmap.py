@@ -456,7 +456,7 @@ class Arbytmap():
             self.gamma = [self.gamma]*ucc
         elif len(self.gamma) < ucc:
             #if there aren't enough indexes in the gamma scalar we repeat
-            #the last element in the scalar list for each missign channel
+            #the last element in the scalar list for each missing channel
             old_gamma_len = len(self.gamma)
             for i in range(ucc-old_gamma_len):
                 self.gamma.append(self.gamma[old_gamma_len-1])
@@ -465,9 +465,9 @@ class Arbytmap():
         #this array will be used to quickly convert a color
         #channel value from a linear value to a gamma scaled value
         for channel in range(ucc):
-            self.gamma_scaler[channel] = g = array("f", [0.0]*ucc)
+            self.gamma_scaler[channel] = scaler = array("f")
             for val in range(256):
-                g.append(((float(val)/255)**self.gamma[channel])*255)
+                scaler.append(((float(val)/255)**self.gamma[channel])*255)
 
     def _set_upscalers_and_downscalers(self, **kwargs):
         '''NEED TO ADD A DESCRIPTION'''
@@ -1073,7 +1073,7 @@ class Arbytmap():
 
         # This is used in the gamma based merging to
         # scale the 0-255 or 0-65535 value to a 0-1 value
-        pmd = pmio * float(val_scale)
+        pmd = pmio * val_scale
         
         """THIS PART IS ABSOLUTELY CRUCIAL. In order to easily merge all
         the pixels together we will swizzle them around so that all the
@@ -1136,6 +1136,10 @@ class Arbytmap():
         if ucc > 2:
             g_exp_3 = 1.0/gamma[3]
             g_scale_3 = self.gamma_scaler[3]
+
+        if fast_arbytmap:
+            print("Fast downsampling with gamma is not implemented yet. " +
+                  "Defaulting to the slow python downsampler.")
 
         if ucc == 4:
             for i in range(0, len(downsamp), 4):
