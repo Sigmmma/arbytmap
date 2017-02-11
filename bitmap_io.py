@@ -7,7 +7,10 @@ from array import array
 from traceback import format_exc
 
 try:
-    from .ext import bitmap_io_ext 
+    try:
+        from .ext import bitmap_io_ext
+    except Exception:
+        from ext import bitmap_io_ext
     fast_bitmap_io = True
 except Exception:
     fast_bitmap_io = False
