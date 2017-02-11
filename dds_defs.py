@@ -349,7 +349,7 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     except Exception:
         print("Cannot unpack DXT texture. Channel mapping must include " +
               "channels 0, 1, 2, and 3, not %s" % self.channel_mapping)
-    
+
     if fast_dds_defs:
         dds_defs_ext.unpack_dxt4_5(
             unpacked, packed, a_scale, r_scale, g_scale, b_scale,
@@ -360,26 +360,26 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
             pxl_i = i*channels_per_texel
             j = i*4
 
-            alpha0 = a_lookup[0] = packed[j] & 255
-            alpha1 = a_lookup[1] = (packed[j] >> 8) & 255
-            alpha_idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
+            a_lookup[0] = alpha0 = a_scale[packed[j] & 255]
+            a_lookup[1] = alpha1 = a_scale[(packed[j] >> 8) & 255]
+            idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
 
-            """depending on which alpha value is larger
+            """depending on which value is larger
             the indexing is calculated differently"""
-            if alpha0 > alpha1:
-                a_lookup[2] = (alpha0*6 + alpha1)//7
-                a_lookup[3] = (alpha0*5 + alpha1*2)//7
-                a_lookup[4] = (alpha0*4 + alpha1*3)//7
-                a_lookup[5] = (alpha0*3 + alpha1*4)//7
-                a_lookup[6] = (alpha0*2 + alpha1*5)//7
-                a_lookup[7] = (alpha0   + alpha1*6)//7
+            if value0 > value1:
+                lookup[2] = (value0*6 + value1)//7
+                lookup[3] = (value0*5 + value1*2)//7
+                lookup[4] = (value0*4 + value1*3)//7
+                lookup[5] = (value0*3 + value1*4)//7
+                lookup[6] = (value0*2 + value1*5)//7
+                lookup[7] = (value0   + value1*6)//7
             else:
-                a_lookup[2] = (alpha0*4 + alpha1)//5
-                a_lookup[3] = (alpha0*3 + alpha1*2)//5
-                a_lookup[4] = (alpha0*2 + alpha1*3)//5
-                a_lookup[5] = (alpha0   + alpha1*4)//5
-                a_lookup[6] = 0
-                a_lookup[7] = 255
+                lookup[2] = (value0*4 + value1)//5
+                lookup[3] = (value0*3 + value1*2)//5
+                lookup[4] = (value0*2 + value1*3)//5
+                lookup[5] = (value0   + value1*4)//5
+                lookup[6] = 0
+                lookup[7] = 255
             
             #half of the first array entry in DXT4/5 format is both
             #alpha values and the first third of the indexing
@@ -455,34 +455,39 @@ def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
     for i in range(ucc):
         chans[channel_map[i]] = i
     
-    #loop through each texel
-    for i in range(len(packed)//2):
-        pxl_i = (i//scc)*channels_per_texel + chans[i%ucc]
-        j = i*2
+    if fast_dds_defs:
+        dds_defs_ext.unpack_dxta5(
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, array("b", chans))
+    else:
+        #loop through each texel
+        for i in range(len(packed)//2):
+            pxl_i = (i//scc)*channels_per_texel + chans[i%ucc]
+            j = i*2
 
-        value0 = lookup[0] = packed[j] & 255
-        value1 = lookup[1] = (packed[j] >> 8) & 255
-        idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
+            a_lookup[0] = alpha0 = a_scale[packed[j] & 255]
+            a_lookup[1] = alpha1 = a_scale[(packed[j] >> 8) & 255]
+            idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
 
-        """depending on which value is larger
-        the indexing is calculated differently"""
-        if value0 > value1:
-            lookup[2] = (value0*6 + value1)//7
-            lookup[3] = (value0*5 + value1*2)//7
-            lookup[4] = (value0*4 + value1*3)//7
-            lookup[5] = (value0*3 + value1*4)//7
-            lookup[6] = (value0*2 + value1*5)//7
-            lookup[7] = (value0   + value1*6)//7
-        else:
-            lookup[2] = (value0*4 + value1)//5
-            lookup[3] = (value0*3 + value1*2)//5
-            lookup[4] = (value0*2 + value1*3)//5
-            lookup[5] = (value0   + value1*4)//5
-            lookup[6] = 0
-            lookup[7] = 255
-            
-        for k in pixel_indices:
-            unpacked[k*ucc+pxl_i] = lookup[(idx >> (k*3))&7]
+            """depending on which value is larger
+            the indexing is calculated differently"""
+            if value0 > value1:
+                lookup[2] = (value0*6 + value1)//7
+                lookup[3] = (value0*5 + value1*2)//7
+                lookup[4] = (value0*4 + value1*3)//7
+                lookup[5] = (value0*3 + value1*4)//7
+                lookup[6] = (value0*2 + value1*5)//7
+                lookup[7] = (value0   + value1*6)//7
+            else:
+                lookup[2] = (value0*4 + value1)//5
+                lookup[3] = (value0*3 + value1*2)//5
+                lookup[4] = (value0*2 + value1*3)//5
+                lookup[5] = (value0   + value1*4)//5
+                lookup[6] = 0
+                lookup[7] = 255
+                
+            for k in pixel_indices:
+                unpacked[k*ucc+pxl_i] = lookup[(idx >> (k*3))&7]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -517,6 +522,7 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
     green = [0,0,0,0,0,0,0,0]
     r_scale = self.channel_upscalers[1]
     g_scale = self.channel_upscalers[2]
+    b_scale = self.channel_upscalers[3]
 
     try:
         chan1 = self.channel_mapping.index(1)
@@ -534,12 +540,12 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
         g_index = pxl_i + chan2
         b_index = pxl_i + chan3
 
-        red0 = red[0] = packed[j]&255
-        red1 = red[1] = (packed[j]>>8)&255
+        red0 = red[0] = r_scale[packed[j]&255]
+        red1 = red[1] = r_scale[(packed[j]>>8)&255]
         red_idx = ((packed[j]>>16)&65535) + (packed[j+1]<<16)
 
-        green0 = green[0] = packed[j+2]&255
-        green1 = green[1] = (packed[j+2]>>8)&255
+        green0 = green[0] = g_scale[packed[j+2]&255]
+        green1 = green[1] = g_scale[(packed[j+2]>>8)&255]
         green_idx = ((packed[j+2]>>16)&65535) + (packed[j+3]<<16)
 
         #depending on which alpha value is larger
