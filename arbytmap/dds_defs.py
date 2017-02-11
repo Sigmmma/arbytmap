@@ -7,7 +7,10 @@ from math import sqrt
 ab = None
 
 try:
-    from .ext import dds_defs_ext 
+    try:
+        from .ext import dds_defs_ext
+    except Exception:
+        from ext import dds_defs_ext
     fast_dds_defs = True
 except Exception:
     fast_dds_defs = False
@@ -74,12 +77,12 @@ def initialize():
 
     for fmt in (ab.FORMAT_DXT5A, ab.FORMAT_DXT5Y):
         ab.define_format(**combine(dxt_specs,
-            format_id=fmt, bpp=8, unpacker=unpack_dxt5_a, packer=pack_dxt5_a,
+            format_id=fmt, bpp=8, unpacker=unpack_dxt5a, packer=pack_dxt5a,
             depths=(8,), offsets=(0,), channel_count=1, masks=(255,)))
 
     ab.define_format(**combine(dxt_specs,
         format_id=ab.FORMAT_DXT5AY, bpp=8,
-        unpacker=unpack_dxt5_a, packer=pack_dxt5_a,
+        unpacker=unpack_dxt5a, packer=pack_dxt5a,
         depths=(8,8), offsets=(8,0),
         channel_count=2, masks=(65280,255)))
 
@@ -249,45 +252,50 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
         print("Cannot unpack DXT texture. Channel mapping must include " +
               "channels 0, 1, 2, and 3, not %s" % self.channel_mapping)
 
-    #loop through each texel
-    for i in range(len(packed)//4):
-        pxl_i = i*channels_per_texel
-        j = i*4
-        
-        #DXT2/3 is much simpler than DXT4/5
-        alpha = (packed[j+1]<<32) + packed[j]
-        color0 = packed[j+2] & 65535
-        color1 = (packed[j+2] >> 16) & 65535
-        color_idx = packed[j+3]
-
-        """unpack the colors"""
-        c_0[1] = r_scale[(color0>>11) & 31]
-        c_0[2] = g_scale[(color0>>5) & 63]
-        c_0[3] = b_scale[(color0) & 31]
-
-        c_1[1] = r_scale[(color1>>11) & 31]
-        c_1[2] = g_scale[(color1>>5) & 63]
-        c_1[3] = b_scale[(color1) & 31]
-
-        if color0 < color1:
-            color0, color1 = color1, color0
-
-        c_2[1] = (c_0[1]*2 + c_1[1])//3
-        c_2[2] = (c_0[2]*2 + c_1[2])//3
-        c_2[3] = (c_0[3]*2 + c_1[3])//3
-
-        c_3[1] = (c_0[1] + c_1[1]*2)//3
-        c_3[2] = (c_0[2] + c_1[2]*2)//3
-        c_3[3] = (c_0[3] + c_1[3]*2)//3
+    if fast_dds_defs:
+        dds_defs_ext.unpack_dxt2_3(
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, chan0, chan1, chan2, chan3)
+    else:
+        #loop through each texel
+        for i in range(len(packed)//4):
+            pxl_i = i*channels_per_texel
+            j = i*4
             
-        for j in pixel_indices:
-            color = colors[(color_idx >> (j*2))&3]
-            off = j*ucc + pxl_i
+            #DXT2/3 is much simpler than DXT4/5
+            alpha = (packed[j+1]<<32) + packed[j]
+            color0 = packed[j+2] & 65535
+            color1 = (packed[j+2] >> 16) & 65535
+            color_idx = packed[j+3]
 
-            unpacked[off + chan0] = a_scale[(alpha >> (j*4))&15]
-            unpacked[off + chan1] = color[1]
-            unpacked[off + chan2] = color[2]
-            unpacked[off + chan3] = color[3]
+            """unpack the colors"""
+            c_0[1] = r_scale[(color0>>11) & 31]
+            c_0[2] = g_scale[(color0>>5) & 63]
+            c_0[3] = b_scale[(color0) & 31]
+
+            c_1[1] = r_scale[(color1>>11) & 31]
+            c_1[2] = g_scale[(color1>>5) & 63]
+            c_1[3] = b_scale[(color1) & 31]
+
+            if color0 < color1:
+                color0, color1 = color1, color0
+
+            c_2[1] = (c_0[1]*2 + c_1[1])//3
+            c_2[2] = (c_0[2]*2 + c_1[2])//3
+            c_2[3] = (c_0[3]*2 + c_1[3])//3
+
+            c_3[1] = (c_0[1] + c_1[1]*2)//3
+            c_3[2] = (c_0[2] + c_1[2]*2)//3
+            c_3[3] = (c_0[3] + c_1[3]*2)//3
+                
+            for j in pixel_indices:
+                color = colors[(color_idx >> (j*2))&3]
+                off = j*ucc + pxl_i
+
+                unpacked[off + chan0] = a_scale[(alpha >> (j*4))&15]
+                unpacked[off + chan1] = color[1]
+                unpacked[off + chan2] = color[2]
+                unpacked[off + chan3] = color[3]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -342,66 +350,71 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
         print("Cannot unpack DXT texture. Channel mapping must include " +
               "channels 0, 1, 2, and 3, not %s" % self.channel_mapping)
     
-    #loop through each texel
-    for i in range(len(packed)//4):
-        pxl_i = i*channels_per_texel
-        j = i*4
+    if fast_dds_defs:
+        dds_defs_ext.unpack_dxt4_5(
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, chan0, chan1, chan2, chan3)
+    else:
+        #loop through each texel
+        for i in range(len(packed)//4):
+            pxl_i = i*channels_per_texel
+            j = i*4
 
-        alpha0 = a_lookup[0] = packed[j] & 255
-        alpha1 = a_lookup[1] = (packed[j] >> 8) & 255
-        alpha_idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
+            alpha0 = a_lookup[0] = packed[j] & 255
+            alpha1 = a_lookup[1] = (packed[j] >> 8) & 255
+            alpha_idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
 
-        """depending on which alpha value is larger
-        the indexing is calculated differently"""
-        if alpha0 > alpha1:
-            a_lookup[2] = (alpha0*6 + alpha1)//7
-            a_lookup[3] = (alpha0*5 + alpha1*2)//7
-            a_lookup[4] = (alpha0*4 + alpha1*3)//7
-            a_lookup[5] = (alpha0*3 + alpha1*4)//7
-            a_lookup[6] = (alpha0*2 + alpha1*5)//7
-            a_lookup[7] = (alpha0   + alpha1*6)//7
-        else:
-            a_lookup[2] = (alpha0*4 + alpha1)//5
-            a_lookup[3] = (alpha0*3 + alpha1*2)//5
-            a_lookup[4] = (alpha0*2 + alpha1*3)//5
-            a_lookup[5] = (alpha0   + alpha1*4)//5
-            a_lookup[6] = 0
-            a_lookup[7] = 255
-        
-        #half of the first array entry in DXT4/5 format is both
-        #alpha values and the first third of the indexing
-        color0 = packed[j+2] & 65535
-        color1 = (packed[j+2]>>16) & 65535
-        color_idx = packed[j+3]
-
-        """unpack the colors"""
-        c_0[1] = r_scale[(color0>>11) & 31]
-        c_0[2] = g_scale[(color0>>5) & 63]
-        c_0[3] = b_scale[(color0) & 31]
-
-        c_1[1] = r_scale[(color1>>11) & 31]
-        c_1[2] = g_scale[(color1>>5) & 63]
-        c_1[3] = b_scale[(color1) & 31]
-
-        if color0 < color1:
-            color0, color1 = color1, color0
-
-        c_2[1] = (c_0[1]*2 + c_1[1])//3
-        c_2[2] = (c_0[2]*2 + c_1[2])//3
-        c_2[3] = (c_0[3]*2 + c_1[3])//3
-
-        c_3[1] = (c_0[1] + c_1[1]*2)//3
-        c_3[2] = (c_0[2] + c_1[2]*2)//3
-        c_3[3] = (c_0[3] + c_1[3]*2)//3
+            """depending on which alpha value is larger
+            the indexing is calculated differently"""
+            if alpha0 > alpha1:
+                a_lookup[2] = (alpha0*6 + alpha1)//7
+                a_lookup[3] = (alpha0*5 + alpha1*2)//7
+                a_lookup[4] = (alpha0*4 + alpha1*3)//7
+                a_lookup[5] = (alpha0*3 + alpha1*4)//7
+                a_lookup[6] = (alpha0*2 + alpha1*5)//7
+                a_lookup[7] = (alpha0   + alpha1*6)//7
+            else:
+                a_lookup[2] = (alpha0*4 + alpha1)//5
+                a_lookup[3] = (alpha0*3 + alpha1*2)//5
+                a_lookup[4] = (alpha0*2 + alpha1*3)//5
+                a_lookup[5] = (alpha0   + alpha1*4)//5
+                a_lookup[6] = 0
+                a_lookup[7] = 255
             
-        for j in pixel_indices:
-            color = colors[(color_idx >> (j*2))&3]
-            off = j*ucc + pxl_i
+            #half of the first array entry in DXT4/5 format is both
+            #alpha values and the first third of the indexing
+            color0 = packed[j+2] & 65535
+            color1 = (packed[j+2]>>16) & 65535
+            color_idx = packed[j+3]
 
-            unpacked[off + chan0] = a_lookup[(alpha_idx >> (j*3))&7]
-            unpacked[off + chan1] = color[1]
-            unpacked[off + chan2] = color[2]
-            unpacked[off + chan3] = color[3]
+            """unpack the colors"""
+            c_0[1] = r_scale[(color0>>11) & 31]
+            c_0[2] = g_scale[(color0>>5) & 63]
+            c_0[3] = b_scale[(color0) & 31]
+
+            c_1[1] = r_scale[(color1>>11) & 31]
+            c_1[2] = g_scale[(color1>>5) & 63]
+            c_1[3] = b_scale[(color1) & 31]
+
+            if color0 < color1:
+                color0, color1 = color1, color0
+
+            c_2[1] = (c_0[1]*2 + c_1[1])//3
+            c_2[2] = (c_0[2]*2 + c_1[2])//3
+            c_2[3] = (c_0[3]*2 + c_1[3])//3
+
+            c_3[1] = (c_0[1] + c_1[1]*2)//3
+            c_3[2] = (c_0[2] + c_1[2]*2)//3
+            c_3[3] = (c_0[3] + c_1[3]*2)//3
+                
+            for j in pixel_indices:
+                color = colors[(color_idx >> (j*2))&3]
+                off = j*ucc + pxl_i
+
+                unpacked[off + chan0] = a_lookup[(alpha_idx >> (j*3))&7]
+                unpacked[off + chan1] = color[1]
+                unpacked[off + chan2] = color[2]
+                unpacked[off + chan3] = color[3]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -411,7 +424,7 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     return unpacked
 
 
-def unpack_dxt5_a(self, bitmap_index, width, height, depth=1):
+def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
     assert packed.typecode == 'L'
 
@@ -710,8 +723,6 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
 
 
 def unpack_u8v8(self, bitmap_index, width, height, depth=1):
-    #APPARENTLY THIS CODE IS INCORRECT, AND U8V8 IS ACTUALLY
-    #ONES SIGNED RATHER THAN THAT WEIRD DXN SIGNING
     packed = self.texture_block[bitmap_index]
         
     #create a new array to hold the pixels after we unpack them
@@ -1177,7 +1188,7 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
     return repacked
 
 
-def pack_dxt5_a(self, unpacked, width, height, depth=1):        
+def pack_dxt5a(self, unpacked, width, height, depth=1):        
     #this is how many texels wide/tall the texture is
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
         

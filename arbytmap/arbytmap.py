@@ -16,25 +16,37 @@ bitmap_io.ab = dds_defs.ab = sys.modules[__name__]
 dds_defs.initialize()
 
 try:
-    from .ext import raw_packer_ext
+    try:
+        from .ext import raw_packer_ext
+    except Exception:
+        from ext import raw_packer_ext
     fast_raw_packer = True
 except:
     fast_raw_packer = False
 
 try:
-    from .ext import raw_unpacker_ext
+    try:
+        from .ext import raw_unpacker_ext
+    except Exception:
+        from ext import raw_unpacker_ext
     fast_raw_unpacker = True
 except:
     fast_raw_unpacker = False
 
 try:
-    from .ext import arbytmap_ext
+    try:
+        from .ext import arbytmap_ext
+    except Exception:
+        from ext import arbytmap_ext
     fast_arbytmap = True
 except:
     fast_arbytmap = False
 
 try:
-    from .ext import bitmap_io_ext
+    try:
+        from .ext import bitmap_io_ext
+    except Exception:
+        from ext import bitmap_io_ext
     fast_bitmap_io = True
 except:
     fast_bitmap_io = False
