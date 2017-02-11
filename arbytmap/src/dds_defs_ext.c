@@ -46,8 +46,8 @@
 #define READ_DXT5_ALPHA()\
     alpha0 = (*packed_tex)[j]&0xFF;\
     alpha1 = ((*packed_tex)[j]>>8)&0xFF;\
-    a_lookup[0] = alpha0;\
-    a_lookup[1] = alpha1;\
+    a_lookup[0] = (*a_scale)[alpha0];\
+    a_lookup[1] = (*a_scale)[alpha1];\
     alpha_idx = (((unsigned long long)(*packed_tex)[j+1]<<16) +\
                  ((*packed_tex)[j]>>16));\
     if (alpha0 > alpha1) {\
@@ -248,7 +248,7 @@ static void unpack_dxt1_16(
 
     colors[0] = &c_0; colors[1] = &c_1; colors[2] = &c_2; colors[3] = &c_3;
     packed_tex = (unsigned long(*)[]) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/chans_per_tex;
+    max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
@@ -298,7 +298,7 @@ static void unpack_dxt2_3_16(
 
     colors[0] = &c_0; colors[1] = &c_1; colors[2] = &c_2; colors[3] = &c_3;
     packed_tex = (unsigned long(*)[]) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/chans_per_tex;
+    max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
@@ -347,7 +347,7 @@ static void unpack_dxt4_5_16(
 
     colors[0] = &c_0; colors[1] = &c_1; colors[2] = &c_2; colors[3] = &c_3;
     packed_tex = (unsigned long(*)[]) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/chans_per_tex;
+    max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
