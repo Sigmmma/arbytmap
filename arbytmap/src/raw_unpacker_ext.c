@@ -105,11 +105,11 @@ static void unpack_raw_2_channel_8bpp(
     if (packed_pix_size == 8) {
         UNPACK_AI(packed_pix_64)
     } else if (packed_pix_size == 4) {
-        UNPACK_AI(packed_pix_64)
+        UNPACK_AI(packed_pix_32)
     } else if (packed_pix_size == 2) {
-        UNPACK_AI(packed_pix_64)
+        UNPACK_AI(packed_pix_16)
     } else {
-        UNPACK_AI(packed_pix_64)
+        UNPACK_AI(packed_pix_8)
     }
 }
 
@@ -232,11 +232,11 @@ static void unpack_raw_2_channel_16bpp(
     if (packed_pix_size == 8) {
         UNPACK_AI(packed_pix_64)
     } else if (packed_pix_size == 4) {
-        UNPACK_AI(packed_pix_64)
+        UNPACK_AI(packed_pix_32)
     } else if (packed_pix_size == 2) {
-        UNPACK_AI(packed_pix_64)
+        UNPACK_AI(packed_pix_16)
     } else {
-        UNPACK_AI(packed_pix_64)
+        UNPACK_AI(packed_pix_8)
     }
 }
 

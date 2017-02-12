@@ -9,8 +9,25 @@ from os import path
 from copy import deepcopy
 from decimal import Decimal
 
-from format_defs import *
-import swizzler, bitmap_io, dds_defs
+try:
+    from .format_defs import *
+except Exception:
+    from format_defs import *
+    
+try:
+    from . import swizzler
+except Exception:
+    import swizzler
+    
+try:
+    from . import bitmap_io
+except Exception:
+    import bitmap_io
+    
+try:
+    from . import dds_defs
+except Exception:
+    import dds_defs
 
 bitmap_io.ab = dds_defs.ab = sys.modules[__name__]
 dds_defs.initialize()
@@ -52,7 +69,7 @@ except:
     fast_bitmap_io = False
 
 
-'''when constructing this class you must provide the
+'''When constructing this class you must provide the
 nested list containing the textures and a dictionary which
 contains the texture's height, width, type, and format.
 
@@ -1009,9 +1026,8 @@ class Arbytmap():
 
         # create a new array to hold the pixels after we unpack them
         channel_size = 2 if self._UNPACK_ARRAY_CODE == 'H' else 1
-        depalettized_bitmap = array(
-            self._UNPACK_ARRAY_CODE,
-            bytearray(ucc*channel_size*len(unpacked_indexing) ))
+        depalettized_bitmap = bitmap_io.make_array(
+            self._UNPACK_ARRAY_CODE, ucc*channel_size*len(unpacked_indexing) )
 
         if fast_arbytmap:
             arbytmap_ext.depalettize_bitmap(
@@ -1073,9 +1089,9 @@ class Arbytmap():
 
         # The new array to place the downsampled pixels into
         channel_size = 2 if self._UNPACK_ARRAY_CODE == 'H' else 1
-        downsamp = array(
+        downsamp = bitmap_io.make_array(
             self._UNPACK_ARRAY_CODE,
-            bytearray(channel_size*new_width*new_height*new_depth*ucc ))
+            channel_size*new_width*new_height*new_depth*ucc)
         
         # The number of pixels from are being merged into one
         pmio = merge_x * merge_y * merge_z
@@ -1227,7 +1243,7 @@ class Arbytmap():
             return array("B", packed_indexing)
 
         pixel_count = (len(packed_indexing)*8) // self.indexing_size
-        unpacked_indexing = array('B', bytearray(pixel_count))
+        unpacked_indexing = bitmap_io.make_array('B', pixel_count)
 
         if fast_raw_unpacker:
             raw_unpacker_ext.unpack_indexing(
@@ -1437,7 +1453,7 @@ class Arbytmap():
 
         upi = unpacked_indexing
         packed_count = (len(upi) * self.target_indexing_size)//8
-        packed_indexing = array("B", bytearray(packed_count))
+        packed_indexing = bitmap_io.make_array("B", packed_count)
         
         if fast_raw_packer:
             raw_packer_ext.pack_indexing(
@@ -1525,8 +1541,8 @@ class Arbytmap():
         # create the array to hold the pixel data after
         # it's been repacked in the target format
         typecode = FORMAT_PACKED_TYPECODES[self.target_format]
-        packed_array = array(
-            typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
+        packed_array = bitmap_io.make_array(
+            typecode, PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc )
         
         a_shift, r_shift, g_shift, b_shift = (off[0], off[1], off[2], off[3])
         a_scale, r_scale, g_scale, b_scale = (downscale[0], downscale[1],
@@ -1551,8 +1567,8 @@ class Arbytmap():
         # create the array to hold the pixel data after
         # it's been repacked in the target format
         typecode = FORMAT_PACKED_TYPECODES[self.target_format]
-        packed_array = array(
-            typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
+        packed_array = bitmap_io.make_array(
+            typecode, PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc)
             
         a_shift, i_shift = off[0], off[1]
         a_scale, i_scale = downscale[0], downscale[1]
@@ -1572,8 +1588,8 @@ class Arbytmap():
         # create the array to hold the pixel data after
         # it's been repacked in the target format
         typecode = FORMAT_PACKED_TYPECODES[self.target_format]
-        packed_array = array(
-            typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
+        packed_array = bitmap_io.make_array(
+            typecode, PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc)
         
         scale = downscale[0]
         shift = off[0]
@@ -1591,8 +1607,8 @@ class Arbytmap():
         # create the array to hold the pixel data
         # after it's been repacked in the target format
         typecode = FORMAT_PACKED_TYPECODES[self.target_format]
-        packed_array = array(
-            typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
+        packed_array = bitmap_io.make_array(
+            typecode, PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc)
         
         a_t, r_t, g_t, b_t = cmm[0], cmm[1], cmm[2], cmm[3]
         a_shift, r_shift, g_shift, b_shift = (off[a_t], off[r_t],
@@ -1628,8 +1644,8 @@ class Arbytmap():
         # create the array to hold the pixel data after
         # it's been repacked in the target format
         typecode = FORMAT_PACKED_TYPECODES[self.target_format]
-        packed_array = array(
-            typecode, bytearray(PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc ))
+        packed_array = bitmap_io.make_array(
+            typecode, PIXEL_ENCODING_SIZES[typecode]*len(upa)//ucc)
         
         a_target, i_target = cmm[0], cmm[1]
         a_shift, i_shift = off[a_target], off[i_target]
