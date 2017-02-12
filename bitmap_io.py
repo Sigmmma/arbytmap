@@ -639,7 +639,7 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
         print(format_exc())
 
 
-def get_size_of_pixel_bytes(format, width, height, depth=1):
+def get_pixel_bytes_size(format, width, height, depth=1):
     pixel_size = ab.PIXEL_ENCODING_SIZES[ab.FORMAT_PACKED_TYPECODES[format]]
 
     #make sure the dimensions for the format are correct
@@ -649,6 +649,17 @@ def get_size_of_pixel_bytes(format, width, height, depth=1):
         height*width*depth, pixel_size, format)*pixel_size
 
     return bitmap_size
+
+def make_array(typecode, size):
+    # TEMPORARY UNTIL I WRITE THE C FUNCTION
+    return array(typecode, bytearray(size))
+
+    if fast_bitmap_io:
+        # this will be faster, as it wont need to create a nulled bytearray
+        # in order to make an array from it and then throw away the bytearray
+        return bitmap_io_ext.make_array(typecode, size)
+    else:
+        return array(typecode, bytearray(size))
 
 
 def bitmap_bytes_to_array(rawdata, offset, texture_block, format,
@@ -664,7 +675,7 @@ def bitmap_bytes_to_array(rawdata, offset, texture_block, format,
 
     #get how many bytes the texture is going to be if it wasnt provided
     if bitmap_size is None:
-        bitmap_size = bitmap_data_end = get_size_of_pixel_bytes(
+        bitmap_size = bitmap_data_end = get_pixel_bytes_size(
             format, width, height, depth)
     bitmap_data_end = bitmap_size
 
@@ -706,8 +717,8 @@ def bitmap_bytes_to_array(rawdata, offset, texture_block, format,
         print("WARNING: PIXEL DATA SUPPLIED DID NOT MEET "+
               "THE SIZE EXPECTED. PADDING WITH ZEROS.")
         pixel_array.extend(
-            array(pixel_array.typecode,
-                  bytearray((bitmap_size//pixel_size) - len(pixel_array))))
+            make_array(pixel_array.typecode,
+                       (bitmap_size//pixel_size) - len(pixel_array)))
     
     #add the pixel array to the current texture block
     texture_block.append(pixel_array)
@@ -740,7 +751,7 @@ def pad_24bit_array(unpadded):
             unpadded.typecode)
 
     if fast_bitmap_io:
-        padded = array("L", bytearray(len(unpadded)//3) )
+        padded = make_array("L", len(unpadded)//3)
         bitmap_io_ext.pad_24bit_array(padded, unpadded)
     else:
         padded = array(
@@ -759,7 +770,7 @@ def pad_48bit_array(unpadded):
             unpadded.typecode)
 
     if fast_bitmap_io:
-        padded = array("Q", bytearray(len(unpadded)//3) )
+        padded = make_array("Q", len(unpadded)//3)
         bitmap_io_ext.pad_48bit_array(padded, unpadded)
     else:
         padded = array(
@@ -776,7 +787,7 @@ def unpad_24bit_array(padded):
     
     if padded.typecode == "L":
         # pixels have been packed
-        unpadded = array("B", bytearray(len(padded)*3) )
+        unpadded = make_array("B", len(padded)*3)
         if fast_bitmap_io:
             bitmap_io_ext.unpad_24bit_array(unpadded, padded)
         else:
@@ -791,7 +802,7 @@ def unpad_24bit_array(padded):
         # the channel order is the default one, namely ARGB.
         # Since we are removing the alpha channel, remove
         # the first byte from each pixel
-        unpadded = array("B", bytearray((len(padded)//4)*3) )
+        unpadded = make_array("B", (len(padded)//4)*3)
         if fast_bitmap_io:
             bitmap_io_ext.unpad_24bit_array(unpadded, padded)
         else:
@@ -814,7 +825,7 @@ def unpad_48bit_array(padded):
     
     if padded.typecode == "Q":
         # pixels have been packed
-        unpadded = array("H", bytearray(len(padded)*6))
+        unpadded = make_array("H", len(padded)*6)
         if fast_bitmap_io:
             bitmap_io_ext.unpad_48bit_array(unpadded, padded)
         else:
@@ -830,7 +841,7 @@ def unpad_48bit_array(padded):
         # the channel order is the default one, namely ARGB.
         # Since we are removing the alpha channel, remove
         # the first two bytes from each pixel
-        unpadded = array("H", bytearray((len(padded)//4)*6) )
+        unpadded = make_array("H", (len(padded)//4)*6)
         if fast_bitmap_io:
             bitmap_io_ext.unpad_48bit_array(unpadded, padded)
         else:
@@ -860,7 +871,7 @@ def uncompress_rle(comp_bytes, format, width, height, depth=1):
     w, h, d = ab.clip_dimensions(width, height, depth, format)
 
     #get how many bytes the texture is going to be
-    uncomp = bytearray(get_size_of_pixel_bytes(format, w, h, d))
+    uncomp = bytearray(get_pixel_bytes_size(format, w, h, d))
 
     pix_byte_count = w*h*d*(bpp//8)
     i = 0
