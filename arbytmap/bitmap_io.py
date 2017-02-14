@@ -651,15 +651,7 @@ def get_pixel_bytes_size(format, width, height, depth=1):
     return bitmap_size
 
 def make_array(typecode, size):
-    # TEMPORARY UNTIL I WRITE THE C FUNCTION
     return array(typecode, bytearray(size))
-
-    if fast_bitmap_io:
-        # this will be faster, as it wont need to create a nulled bytearray
-        # in order to make an array from it and then throw away the bytearray
-        return bitmap_io_ext.make_array(typecode, size)
-    else:
-        return array(typecode, bytearray(size))
 
 
 def bitmap_bytes_to_array(rawdata, offset, texture_block, format,
