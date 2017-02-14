@@ -188,7 +188,64 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
 
     return Py_None;
 }
+// This was GOING to be a function to quickly make an array object and
+// return it to the caller without having to copy it. Guess I cant do that.
+/*
+static PyObject *py_make_array(PyObject *self, PyObject *args) {
+    PyObject *obj;
+    Py_buffer array_buffer;
+    Py_ssize_t len, itemsize;
+    int format_len;
+    char *format;
+    char *buf = calloc(len, 1);
 
+    // Get the pointers to each of the array objects
+    if (!PyArg_ParseTuple(args, "u#k:make_array", format, &format_len, &len))
+        return Py_None;
+
+    if (format_len != 1) {
+        return Py_None;
+    }
+
+    switch (*format) {
+        case 'b': case 'B':
+            itemsize = sizeof(char);
+            break;
+        case 'h': case 'H':
+            itemsize = sizeof(short);
+            break;
+        case 'u':
+            itemsize = sizeof(Py_UNICODE);
+            break;
+        case 'i': case 'I':
+            itemsize = sizeof(int);
+            break;
+        case 'l': case 'L':
+            itemsize = sizeof(long);
+            break;
+        case 'q': case 'Q':
+            itemsize = sizeof(long long);
+            break;
+        case 'f':
+            itemsize = sizeof(float);
+            break;
+        case 'd':
+            itemsize = sizeof(double);
+            break;
+    }
+
+    array_buffer.buf = buf;
+    array_buffer.obj = obj;
+    array_buffer.len = len;
+    array_buffer.readonly = (int)0;
+    array_buffer.itemsize = itemsize;
+    array_buffer.format = format;
+
+    // need to somehow turn obj into a valid PyObject
+
+    return obj;
+}
+*/
 /* A list of all the methods defined by this module.
 "METH_VARGS" tells Python how to call the handler.
 The {NULL, NULL} entry indicates the end of the method definitions */
@@ -197,6 +254,7 @@ static PyMethodDef bitmap_io_ext_methods[] = {
     {"pad_48bit_array", py_pad_48bit_array, METH_VARARGS, ""},
     {"unpad_24bit_array", py_unpad_24bit_array, METH_VARARGS, ""},
     {"unpad_48bit_array", py_unpad_48bit_array, METH_VARARGS, ""},
+    //{"make_array", py_make_array, METH_VARARGS, ""},
     //{"uncompress_rle", py_uncompress_rle, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}      /* sentinel */
 };
