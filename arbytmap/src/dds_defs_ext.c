@@ -48,7 +48,7 @@
 #define READ_DXT5_A(scale, lookup, idx, j, val0, val1)\
     lookup[0] = val0 = (*scale)[(*packed_tex)[j]&0xFF];\
     lookup[1] = val1 = (*scale)[((*packed_tex)[j]>>8)&0xFF];\
-    idx = (((unsigned long long)(*packed_tex)[j+1]<<16) + ((*packed_tex)[j]>>16));\
+    idx = ((unsigned long long)(*packed_tex)[j+1]<<16) + ((*packed_tex)[j]>>16);\
     \
     if (val0 > val1) {\
         lookup[2] = (val0*6 + val1)/7;\
@@ -85,14 +85,14 @@
 
 #define PICK_DXT_PALETTE_DIST()\
     for (j=0; j<chans_per_tex; j+=ucc) {\
-        r = (*r_scale)[(*unpacked)[r_pxl_i+j]];\
-        g = (*g_scale)[(*unpacked)[g_pxl_i+j]];\
-        b = (*b_scale)[(*unpacked)[b_pxl_i+j]];\
+        r = (*unpacked)[r_pxl_i+j];\
+        g = (*unpacked)[g_pxl_i+j];\
+        b = (*unpacked)[b_pxl_i+j];\
         for (k=0; k<chans_per_tex; k+=ucc) {\
             if (j != k) {\
-                dist1 = (SQ(r-(*r_scale)[(*unpacked)[r_pxl_i+k]])+\
-                         SQ(g-(*g_scale)[(*unpacked)[g_pxl_i+k]])+\
-                         SQ(b-(*b_scale)[(*unpacked)[b_pxl_i+k]]));\
+                dist1 = (SQ(r-(*unpacked)[r_pxl_i+k])+\
+                         SQ(g-(*unpacked)[g_pxl_i+k])+\
+                         SQ(b-(*unpacked)[b_pxl_i+k]));\
                 if (dist1 > dist0) {\
                     dist0 = dist1;\
                     c_0i = j;\
@@ -102,11 +102,11 @@
         }\
     }
 
-#define PACK_DXT_COLOR(color, c_i, packed_color)\
-    color[1] = (*r_scale)[(*unpacked)[r_pxl_i+c_i]];\
-    color[2] = (*g_scale)[(*unpacked)[g_pxl_i+c_i]];\
-    color[3] = (*b_scale)[(*unpacked)[b_pxl_i+c_i]];\
-    packed_color = (color[1]<<11) + (color[2]<<5) + color[3];
+#define PACK_DXT_COLOR(c, c_i, packed_c)\
+    c[1] = (*unpacked)[r_pxl_i+c_i];\
+    c[2] = (*unpacked)[g_pxl_i+c_i];\
+    c[3] = (*unpacked)[b_pxl_i+c_i];\
+    packed_c = ((*r_scale)[c[1]]<<11) + ((*g_scale)[c[2]]<<5) + (*b_scale)[c[3]];
 
 #define SWAP_COLORS()\
     tmp[1] = c_0[1]; tmp[2] = c_0[2]; tmp[3] = c_0[3];\
@@ -119,9 +119,9 @@
     c_2[2] = (c_0[2]*2 + c_1[2])/3; c_3[2] = (c_0[2] + c_1[2]*2)/3;\
     c_2[3] = (c_0[3]*2 + c_1[3])/3; c_3[3] = (c_0[3] + c_1[3]*2)/3;\
     for (j=0; j<chans_per_tex; j+=ucc) {\
-        r = (*r_scale)[(*unpacked)[r_pxl_i+j]];\
-        g = (*g_scale)[(*unpacked)[g_pxl_i+j]];\
-        b = (*b_scale)[(*unpacked)[b_pxl_i+j]];\
+        r = (*unpacked)[r_pxl_i+j];\
+        g = (*unpacked)[g_pxl_i+j];\
+        b = (*unpacked)[b_pxl_i+j];\
         dist0 = SQ(r-c_0[1]) + SQ(g-c_0[2]) + SQ(b-c_0[3]);\
         dist2 = SQ(r-c_2[1]) + SQ(g-c_2[2]) + SQ(b-c_2[3]);\
         dist3 = SQ(r-c_3[1]) + SQ(g-c_3[2]) + SQ(b-c_3[3]);\
@@ -146,9 +146,9 @@
             idx += 3<<(j>>1);\
             continue;\
         }\
-        r = (*r_scale)[(*unpacked)[r_pxl_i+j]];\
-        g = (*g_scale)[(*unpacked)[g_pxl_i+j]];\
-        b = (*b_scale)[(*unpacked)[b_pxl_i+j]];\
+        r = (*unpacked)[r_pxl_i+j];\
+        g = (*unpacked)[g_pxl_i+j];\
+        b = (*unpacked)[b_pxl_i+j];\
         dist0 = SQ(r-c_0[1]) + SQ(g-c_0[2]) + SQ(b-c_0[3]);\
         dist2 = SQ(r-c_2[1]) + SQ(g-c_2[2]) + SQ(b-c_2[3]);\
         dist1 = SQ(r-c_1[1]) + SQ(g-c_1[2]) + SQ(b-c_1[3]);\
@@ -352,7 +352,7 @@ static void unpack_dxt4_5_8(
 
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
-            (*unpacked_pix)[off + chan0] = a_lookup[(alpha_idx>>(j<<3))&7];
+            (*unpacked_pix)[off + chan0] = a_lookup[(alpha_idx>>(3*j))&7];
         }
     }
 }
@@ -801,7 +801,7 @@ static void unpack_dxt4_5_16(
 
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
-            (*unpacked_pix)[off + chan0] = a_lookup[(alpha_idx>>(j<<3))&7];
+            (*unpacked_pix)[off + chan0] = a_lookup[(alpha_idx>>(3*j))&7];
         }
     }
 }
@@ -906,9 +906,10 @@ static void pack_dxt1_16(
     char chans_per_tex=ucc*pix_per_tex, make_alpha=0;
     unsigned long long c_0i=0, c_1i=0, i=0, j=0, k=0, max_i=0;
     unsigned long long pxl_i=0, r_pxl_i=0, g_pxl_i=0, b_pxl_i=0;
-    unsigned char c_0[4], c_1[4], c_2[4], c_3[4], tmp[4], r=0, g=0, b=0;
+    unsigned short c_0[4], c_1[4], c_2[4], c_3[4], tmp[4], r=0, g=0, b=0;
     unsigned short color0=0, color1=0, tmp_color=0;
-    unsigned long idx=0, dist0=0, dist1=0, dist2=0, dist3=0;
+    unsigned long idx=0;
+    unsigned long long dist0=0, dist1=0, dist2=0, dist3=0;
 
     packed = (unsigned long(*)[]) packed_tex_buf->buf;
     unpacked = (unsigned short(*)[])unpacked_pix_buf->buf;
@@ -920,7 +921,7 @@ static void pack_dxt1_16(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        c_0i = c_1i = idx = dist0 = 0;
+        dist0 = c_0i = c_1i = idx = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -984,9 +985,10 @@ static void pack_dxt2_3_16(
     char chans_per_tex=ucc*pix_per_tex;
     unsigned long long c_0i=0, c_1i=0, i=0, j=0, k=0, max_i=0, alpha=0;
     unsigned long long pxl_i=0, r_pxl_i=0, g_pxl_i=0, b_pxl_i=0;
-    unsigned char c_0[4], c_1[4], c_2[4], c_3[4], tmp[4], r=0, g=0, b=0;
+    unsigned short c_0[4], c_1[4], c_2[4], c_3[4], tmp[4], r=0, g=0, b=0;
     unsigned short color0=0, color1=0, tmp_color=0;
-    unsigned long idx=0, dist0=0, dist1=0, dist2=0, dist3=0;
+    unsigned long idx=0;
+    unsigned long long dist0=0, dist1=0, dist2=0, dist3=0;
 
     packed = (unsigned long(*)[]) packed_tex_buf->buf;
     unpacked = (unsigned short(*)[])unpacked_pix_buf->buf;
@@ -999,7 +1001,7 @@ static void pack_dxt2_3_16(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        alpha = c_0i = c_1i = idx = dist0 = 0;
+        dist0 = alpha = c_0i = c_1i = idx = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -1048,10 +1050,11 @@ static void pack_dxt4_5_16(
     char chans_per_tex=ucc*pix_per_tex;
     unsigned long long c_0i=0, c_1i=0, i=0, j=0, k=0, max_i=0;
     unsigned long long a_idx=0, pxl_i=0, r_pxl_i=0, g_pxl_i=0, b_pxl_i=0;
-    unsigned char c_0[4], c_1[4], c_2[4], c_3[4], tmp[4];
-    unsigned char a0=0, a1=0, a_tmp=0, a_dif=0, r=0, g=0, b=0;
+    unsigned short c_0[4], c_1[4], c_2[4], c_3[4], tmp[4], r=0, g=0, b=0;
+    unsigned short a0=0, a1=0, a_tmp=0, a_dif=0;
     unsigned short color0=0, color1=0, tmp_color=0;
-    unsigned long idx=0, dist0=0, dist1=0, dist2=0, dist3=0;
+    unsigned long idx=0;
+    unsigned long long dist0=0, dist1=0, dist2=0, dist3=0;
 
     packed = (unsigned long(*)[]) packed_tex_buf->buf;
     unpacked = (unsigned short(*)[])unpacked_pix_buf->buf;
@@ -1064,7 +1067,7 @@ static void pack_dxt4_5_16(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        c_0i = c_1i = a_idx = idx = dist0 = a0 = a1 = 0;
+        dist0 = c_0i = c_1i = a_idx = idx = a0 = a1 = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;

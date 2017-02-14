@@ -115,7 +115,7 @@ class Arbytmap():
         self.target_format = ""
         self.one_bit_bias = 127
         self.downres_amount = 0
-        self.generate_mipmaps = self.swizzler_mode = False
+        self.generate_mipmaps = self.swizzle_mode = False
         self.gamma = [1.0]*4  # this is only meant to handle up to 4 channels
         self.color_key_transparency = False
         self.reswizzler = self.deswizzler = None
@@ -294,7 +294,7 @@ class Arbytmap():
         self.one_bit_bias = 127
         self.downres_amount = 0
         self.generate_mipmaps = False
-        self.swizzler_mode = self.swizzled
+        self.swizzle_mode = self.swizzled
         self.gamma = 1.0
         self.color_key_transparency = False
         self.reswizzler = self.deswizzler
@@ -332,7 +332,7 @@ class Arbytmap():
             
         # Whether to swizzle or deswizzle when the swizzler is run
         # False == Deswizzle    True == Swizzle
-        self.swizzler_mode = kwargs.get("swizzler_mode", self.swizzler_mode)
+        self.swizzle_mode = kwargs.get("swizzle_mode", self.swizzle_mode)
 
         self.gamma = kwargs.get("gamma", self.gamma)
         self.repack = kwargs.get("repack", self.repack)
@@ -389,7 +389,7 @@ class Arbytmap():
             print()
             print("   one_bit_bias:", self.one_bit_bias)
             print("   gamma:", self.gamma)
-            print("   swizzler_mode:", self.swizzler_mode)
+            print("   swizzle_mode:", self.swizzle_mode)
             print("   downres_amount:", self.downres_amount)
             print("   generate_mipmaps:", self.generate_mipmaps)
             print()

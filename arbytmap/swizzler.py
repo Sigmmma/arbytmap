@@ -44,7 +44,7 @@ class Swizzler():
         '''if we are forcing the texture to be swizzled or
         deswizzled then we set the swizzle mode to the
         inverse of whether or not it is swizzled'''
-        mode = conv.swizzled
+        mode = conv.swizzle_mode
         if force:
             mode = not(conv.swizzled)
 
