@@ -1,5 +1,5 @@
 syntax: glob
-ext/__pycache__
 v7.1.lnk
-__pycache__/
-Thumbs.db
+arbytmap/ext/__pycache__/
+ext/__pycache__/
+tests/
