@@ -3,3 +3,4 @@ v7.1.lnk
 arbytmap/ext/__pycache__/
 ext/__pycache__/
 tests/
+__pycache__
