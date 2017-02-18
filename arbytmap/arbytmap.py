@@ -7,7 +7,6 @@ from array import array
 from math import ceil, log
 from os import path
 from copy import deepcopy
-from decimal import Decimal
 
 try:
     from .format_defs import *
