@@ -28,4 +28,4 @@
 
 ## Who do I talk to?
 
-* [Devin Bobadilla](mosesbobadilla@gmail.com)(Author of arbytmap)
+* Devin Bobadilla (Author of binilla) mosesbobadilla@gmail.com
