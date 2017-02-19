@@ -22,7 +22,7 @@
 
 * Clean up and standardize the interface for loading bitmaps and conversion settings into the Arbytmap class.
 
-* Clean/redo up pretty much everything that looks/functions bad.
+* Cleanup/redo pretty much everything that looks/functions bad.
 
 * Anything else I can think of(I have the flu right now, so I'm having a hard time writing this).
 
