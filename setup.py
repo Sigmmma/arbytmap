@@ -1,15 +1,49 @@
 #!/usr/bin/env python
+import sys
 from os.path import dirname, join
+from traceback import format_exc
+    
 try:
-    from setuptools import setup, Extension
+    from setuptools import setup, Extension, Command
 except ImportError:
-    from distutils.core import setup, Extension
+    from distutils.core import setup, Extension, Command
+from distutils.command.build_ext import build_ext
+from distutils.errors import CCompilerError, DistutilsExecError, \
+     DistutilsPlatformError
 
 curr_dir = dirname(__file__)
-
 #               YYYY.MM.DD
-release_date = "2017.02.15"
-version = (0, 6, 0)
+release_date = "2017.03.08"
+version = (0, 6, 1)
+
+
+# Below here was copied from the setup file of simplejson.
+# I could rewrite it, but it is too simple to justify reinterpreting
+is_pypy = hasattr(sys, 'pypy_translation_info')
+if sys.platform == 'win32':
+   ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError,
+                 IOError, ValueError)
+
+class BuildFailed(Exception):
+    pass
+
+class ve_build_ext(build_ext):
+    # This class allows C extension building to fail.
+
+    def run(self):
+        try:
+            build_ext.run(self)
+        except DistutilsPlatformError:
+            raise BuildFailed()
+
+    def build_extension(self, ext):
+        try:
+            build_ext.build_extension(self, ext)
+        except ext_errors:
+            raise BuildFailed()
+# Above here was copied from the setup file of simplejson.
+# I could rewrite it, but it is too simple to justify reinterpreting
+
 
 try:
     try:
@@ -19,11 +53,11 @@ try:
 except Exception:
     long_desc = 'Could not read long description from readme.'
 
-setup(
+setup_kwargs = dict(
     name="arbytmap",
     description='A power-of-2 texture manipulation module for python 3.',
     long_description=long_desc,
-    version="0.6.0",
+    version='%s.%s.%s' % version,
     url='http://bitbucket.org/Moses_of_Egypt/arbytmap',
     author='Devin Bobadilla',
     author_email='MosesBobadilla@gmail.com',
@@ -53,4 +87,24 @@ setup(
         "Programming Language :: Python :: 3",
         ],
     zip_safe=False,
+    cmdclass=dict(build_ext=ve_build_ext)
     )
+
+success = False
+kwargs = dict(setup_kwargs)
+if not is_pypy:
+    try:
+        setup(**kwargs)
+        success = True
+    except BuildFailed:
+        print(format_exc())
+        print('*' * 80)
+        print("WARNING: The C accelerator modules could not be compiled.\n" +
+              "Attempting to install without accelerators now.\n" +
+              "Any errors that occurred are printed above.")
+        print('*' * 80)
+
+if not success:
+    kwargs.pop('ext_modules')
+    setup(**kwargs)
+    print("Installation successful.")
