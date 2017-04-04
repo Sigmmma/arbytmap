@@ -13,8 +13,8 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 curr_dir = dirname(__file__)
 #               YYYY.MM.DD
-release_date = "2017.03.08"
-version = (0, 6, 1)
+release_date = "2017.04.03"
+version = (0, 6, 2)
 
 
 # Below here was copied from the setup file of simplejson.
@@ -74,6 +74,9 @@ setup_kwargs = dict(
         Extension("arbytmap.ext.raw_unpacker_ext", ["arbytmap\\src\\raw_unpacker_ext.c"]),
         Extension("arbytmap.ext.swizzler_ext", ["arbytmap\\src\\swizzler_ext.c"])
         ],
+    package_data={
+        '': ['*.txt', '*.md', '*.rst'],
+        },
     platforms=["POSIX", "Windows"],
     keywords="arbytmap, texture, bitmap, converter, image, editing",
     install_requires=[],
