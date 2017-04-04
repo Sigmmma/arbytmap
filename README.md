@@ -2,8 +2,6 @@
 
 ## What is this repository for?
 
-* Current Version: 0.6.0
-
 * Arbytmap is a power-of-2 bitmap conversion and manipulation module. Arbytmap is intended for use in converting bitmaps from one format to another, half-rezzing and generating mipmaps, swizzling bitmaps, and writing converted bitmaps to files. Arbytmap is currently undergoing a large scale cleanup, as much of it was written years ago when I was a much worse programmer.
 
 * Many of the conversion functions have accelerator modules written in C, so this module(if properly compiled and installed) can reach speeds seen in lower level languages.
