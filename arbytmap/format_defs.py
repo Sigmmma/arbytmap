@@ -1,4 +1,5 @@
 from array import array
+from trackback import format_exc
 
 
 """TEXTURE TYPES"""
@@ -338,11 +339,11 @@ def define_format(**kwargs):
         elif f_id in VALID_FORMATS:
             raise TypeError((
                 "Cannot add '%s' format definition to Arbytmap as " +
-                "that format identifier is already in use.") % fid)
+                "that format identifier is already in use.") % f_id)
         elif not bpp:
             raise TypeError((
                 "Cannot define '%s' format without a given bits per " +
-                "pixel or specifying each channels bit depths.") % fid)
+                "pixel or specifying each channels bit depths.") % f_id)
 
         VALID_FORMATS.add(f_id)
 
