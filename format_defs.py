@@ -1,5 +1,5 @@
 from array import array
-from trackback import format_exc
+from traceback import format_exc
 
 
 """TEXTURE TYPES"""
