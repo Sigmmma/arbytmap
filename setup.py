@@ -13,8 +13,8 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 curr_dir = dirname(__file__)
 #               YYYY.MM.DD
-release_date = "2017.04.03"
-version = (0, 6, 2)
+release_date = "2017.09.22"
+version = (0, 6, 3)
 
 
 # Below here was copied from the setup file of simplejson.

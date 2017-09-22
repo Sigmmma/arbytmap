@@ -205,8 +205,13 @@ class Arbytmap():
 
         #if provided with just a pixel data array
         #we will need to put it inside a list
-        if isinstance(texture_block, array):
+        if not isinstance(texture_block, list):
             texture_block = [texture_block]
+
+        # convert all bytes and bytearrays into arrays
+        for i in range(len(texture_block)):
+            if isinstance(texture_block[i], (bytearray, bytes)):
+                texture_block[i] = array("B", texture_block[i])
         
         #initialize the optional bitmap description variables
         self.palette = None
@@ -710,9 +715,8 @@ class Arbytmap():
         # if the extension isnt provided in the
         # kwargs we try to get it from the filepath
         if ext is None:
-            splitpath = path.splitext(output_path)
-            output_path = splitpath[0]
-            ext = splitpath[1][1:].lower()
+            output_path, ext = path.splitext(output_path)
+            ext = ext[1:]
 
         ext = ext.lower()
 
@@ -735,9 +739,8 @@ class Arbytmap():
         # if the extension isnt provided in the
         # kwargs we try to get it from the filepath
         if ext is None:
-            splitpath = path.splitext(input_path)
-            input_path = splitpath[0]
-            ext = splitpath[1][1:].lower()
+            input_path, ext = path.splitext(input_path)
+            ext = ext[1:]
 
         ext = ext.lower()
         

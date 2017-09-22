@@ -115,15 +115,20 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
     pals = conv.palette
     tex_block = conv.texture_block
     mip_count = convertor.mipmap_count+1
+    overwrite = kwargs.get("overwrite", True)
 
-    for sb in range(conv.sub_bitmap_count):                
+    for sb in range(conv.sub_bitmap_count):
         if not os.path.exists(os.path.dirname(output_path)):
             os.makedirs(os.path.dirname(output_path))
-            
+
         if conv.sub_bitmap_count > 1:
             final_output_path = "%s_tex%s" % (output_path, sb)
-        
-        with open("%s.%s" % (final_output_path, ext), 'w+b') as tga_file:
+
+        final_output_path = "%s.%s" % (final_output_path, ext)
+        if not overwrite and os.path.exists(final_output_path):
+            continue
+
+        with open(final_output_path, 'w+b') as tga_file:
             #write the header and get the offset
             #to start writing the pixel data
             pix_off = write_tga_header(tga_file, **tex_desc)
@@ -223,7 +228,11 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
 
-    with open("%s.%s" % (final_output_path, ext), 'w+b') as dds_file:
+    final_output_path = "%s.%s" % (final_output_path, ext)
+    if not kwargs.get("overwrite", True) and os.path.exists(final_output_path):
+        return
+
+    with open(final_output_path, 'w+b') as dds_file:
         #write the header and get the offset
         #to start writing the pixel data
         off = write_dds_header(dds_file, **tex_desc)
