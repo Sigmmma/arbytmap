@@ -1,9 +1,8 @@
-#include <stdio.h>
+//#include <stdio.h>
 #include "Python.h"
-#include "abstract.h"
-#include "longobject.h"
-#include "modsupport.h"
-#include "object.h"
+#include "abstract.h"    // contains PyBuffer_Release
+#include "modsupport.h"  // contains PyArg_ParseTuple
+#include "object.h"      // contains Py_buffer
 
 static void swizzle_char_array(
     Py_ssize_t c_size, char *c_offs_chars,
@@ -17,12 +16,12 @@ static void swizzle_char_array(
     int i=0, zi=0, yi=0, xi=0, ci=0;
     unsigned long z=0, y=0, x=0, c=0, yz=0, xyz=0, cxyz=0;
     unsigned long max_i=0;
-    unsigned long (*c_offs)[] = (unsigned long(*)[])c_offs_chars;
-    unsigned long (*x_offs)[] = (unsigned long(*)[])x_offs_chars;
-    unsigned long (*y_offs)[] = (unsigned long(*)[])y_offs_chars;
-    unsigned long (*z_offs)[] = (unsigned long(*)[])z_offs_chars;
-    unsigned char (*swizz_arr)[] = (unsigned char(*)[])swizz_arr_chars;
-    unsigned char (*unswizz_arr)[] = (unsigned char(*)[])unswizz_arr_chars;
+    unsigned long *c_offs = (unsigned long(*)[])c_offs_chars;
+    unsigned long *x_offs = (unsigned long(*)[])x_offs_chars;
+    unsigned long *y_offs = (unsigned long(*)[])y_offs_chars;
+    unsigned long *z_offs = (unsigned long(*)[])z_offs_chars;
+    unsigned char *swizz_arr = (unsigned char*)swizz_arr_chars;
+    unsigned char *unswizz_arr = (unsigned char*)unswizz_arr_chars;
     c_size /= 4; x_size /= 4; y_size /= 4; z_size /= 4;
     swizz_size /= stride; unswizz_size /= stride;
     max_i = c_size * x_size * y_size * z_size;
@@ -36,66 +35,66 @@ static void swizzle_char_array(
     if (swizz) {
         if (stride == 8) {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            cxyz = (xyz + (*c_offs)[ci])<<3;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++;
+                            cxyz = (xyz + c_offs[ci])<<3;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++;
                         }
                     }
                 }
             }
         } else if (stride == 4) {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            cxyz = (xyz + (*c_offs)[ci])<<2;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++;
+                            cxyz = (xyz + c_offs[ci])<<2;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++;
                         }
                     }
                 }
             }
         } else if (stride == 2) {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            cxyz = (xyz + (*c_offs)[ci])<<1;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++; cxyz++;
-                            (*swizz_arr)[cxyz] = (*unswizz_arr)[i]; i++;
+                            cxyz = (xyz + c_offs[ci])<<1;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++; cxyz++;
+                            swizz_arr[cxyz] = unswizz_arr[i]; i++;
                         }
                     }
                 }
             }
         } else {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            (*swizz_arr)[xyz + (*c_offs)[ci]] = (*unswizz_arr)[i];
+                            swizz_arr[xyz + c_offs[ci]] = unswizz_arr[i];
                             i++;
                         }
                     }
@@ -105,66 +104,66 @@ static void swizzle_char_array(
     } else {
         if (stride == 8) {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            cxyz = (xyz + (*c_offs)[ci])<<3;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++;
+                            cxyz = (xyz + c_offs[ci])<<3;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++;
                         }
                     }
                 }
             }
         } else if (stride == 4) {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            cxyz = (xyz + (*c_offs)[ci])<<2;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++;
+                            cxyz = (xyz + c_offs[ci])<<2;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++;
                         }
                     }
                 }
             }
         } else if (stride == 2) {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            cxyz = (xyz + (*c_offs)[ci])<<1;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++; cxyz++;
-                            (*swizz_arr)[i] = (*unswizz_arr)[cxyz]; i++;
+                            cxyz = (xyz + c_offs[ci])<<1;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++; cxyz++;
+                            swizz_arr[i] = unswizz_arr[cxyz]; i++;
                         }
                     }
                 }
             }
         } else {
             for (zi=0; zi < z_size; zi++) {
-                z = (*z_offs)[zi];
+                z = z_offs[zi];
                 for (yi=0; yi < y_size; yi++) {
-                    yz = z + (*y_offs)[yi];
+                    yz = z + y_offs[yi];
                     for (xi=0; xi < x_size; xi++) {
-                        xyz = yz + (*x_offs)[xi];
+                        xyz = yz + x_offs[xi];
                         for (ci=0; ci < c_size; ci++) {
-                            (*swizz_arr)[i] = (*unswizz_arr)[xyz + (*c_offs)[ci]];
+                            swizz_arr[i] = unswizz_arr[xyz + c_offs[ci]];
                             i++;
                         }
                     }

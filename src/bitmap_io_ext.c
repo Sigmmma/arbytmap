@@ -1,9 +1,8 @@
-#include <stdio.h>
+//#include <stdio.h>
 #include "Python.h"
-#include "abstract.h"
-#include "longobject.h"
-#include "modsupport.h"
-#include "object.h"
+#include "abstract.h"    // contains PyBuffer_Release
+#include "modsupport.h"  // contains PyArg_ParseTuple
+#include "object.h"      // contains Py_buffer
 
 
 static void pad_24bit_array(
@@ -11,19 +10,17 @@ static void pad_24bit_array(
 {
     unsigned long long i=0, j=0, max_i=0;
 
-    unsigned long (*padded_pix)[];
-    unsigned char (*unpadded_pix)[];
+    unsigned long *padded_pix;
+    unsigned char *unpadded_pix;
 
-    padded_pix   = (unsigned long(*)[]) padded_pix_buf->buf;
-    unpadded_pix = (unsigned char(*)[]) unpadded_pix_buf->buf;
+    padded_pix   = (unsigned long*) padded_pix_buf->buf;
+    unpadded_pix = (unsigned char*) unpadded_pix_buf->buf;
 
     max_i = (padded_pix_buf->len)/4;
 
     for (i=0; i < max_i; i++) {
         j = i*3;
-        (*padded_pix)[i] = ((*unpadded_pix)[j] +
-                           ((*unpadded_pix)[j+1]<<8) +
-                           ((*unpadded_pix)[j+2]<<16));
+        padded_pix[i] = (unpadded_pix[j] + (unpadded_pix[j+1]<<8) + (unpadded_pix[j+2]<<16));
     }
 }
 
@@ -33,23 +30,23 @@ static void unpad_24bit_array(
     unsigned long long i=0, j=0, k=0, max_i=0;
     unsigned long pixel=0;
 
-    unsigned char (*unpadded_pix)[];
-    unsigned char (*padded_pix_8)[];
-    unsigned long (*padded_pix_32)[];
+    unsigned char *unpadded_pix;
+    unsigned char *padded_pix_8;
+    unsigned long *padded_pix_32;
 
-    unpadded_pix  = (unsigned char(*)[]) unpadded_pix_buf->buf;
-    padded_pix_8  = (unsigned char(*)[]) padded_pix_buf->buf;
-    padded_pix_32 = (unsigned long(*)[]) padded_pix_buf->buf;
+    unpadded_pix  = (unsigned char*) unpadded_pix_buf->buf;
+    padded_pix_8  = (unsigned char*) padded_pix_buf->buf;
+    padded_pix_32 = (unsigned long*) padded_pix_buf->buf;
 
     max_i = (unpadded_pix_buf->len)/3;
 
     if ( padded_pix_buf->itemsize == 4) {
         for (i=0; i < max_i; i++) {
             j=i*3;
-            pixel = (*padded_pix_32)[i];
-            (*unpadded_pix)[j] = pixel&0xFF; j++;
-            (*unpadded_pix)[j] = (pixel>>8)&0xFF; j++;
-            (*unpadded_pix)[j] = (pixel>>16)&0xFF;
+            pixel = padded_pix_32[i];
+            unpadded_pix[j] = pixel&0xFF; j++;
+            unpadded_pix[j] = (pixel>>8)&0xFF; j++;
+            unpadded_pix[j] = (pixel>>16)&0xFF;
         }
     } else {
         for (i=0; i < max_i; i++) {
@@ -59,9 +56,9 @@ static void unpad_24bit_array(
             is ARGB, we need to skip each pixels first byte
             */
             j=i*3; k=i*4 + 1;
-            (*unpadded_pix)[j] = (*padded_pix_8)[k]; j++; k++;
-            (*unpadded_pix)[j] = (*padded_pix_8)[k]; j++; k++;
-            (*unpadded_pix)[j] = (*padded_pix_8)[k];
+            unpadded_pix[j] = padded_pix_8[k]; j++; k++;
+            unpadded_pix[j] = padded_pix_8[k]; j++; k++;
+            unpadded_pix[j] = padded_pix_8[k];
         }
     }
 }
@@ -71,19 +68,19 @@ static void pad_48bit_array(
 {
     unsigned long long i=0, j=0, max_i=0;
 
-    unsigned long long (*padded_pix)[];
-    unsigned short (*unpadded_pix)[];
+    unsigned long long *padded_pix;
+    unsigned short *unpadded_pix;
 
-    padded_pix   = (unsigned long long(*)[]) padded_pix_buf->buf;
-    unpadded_pix = (unsigned short(*)[]) unpadded_pix_buf->buf;
+    padded_pix   = (unsigned long long*) padded_pix_buf->buf;
+    unpadded_pix = (unsigned short*) unpadded_pix_buf->buf;
 
     max_i = (padded_pix_buf->len)/8;
 
     for (i=0; i < max_i; i++) {
         j = i*3;
-        (*padded_pix)[i] = ((unsigned long long)(*unpadded_pix)[j] +
-                           ((unsigned long long)(*unpadded_pix)[j+1]<<16) +
-                           ((unsigned long long)(*unpadded_pix)[j+2]<<32));
+        padded_pix[i] = ((unsigned long long)unpadded_pix[j] +
+                        ((unsigned long long)unpadded_pix[j+1]<<16) +
+                        ((unsigned long long)unpadded_pix[j+2]<<32));
     }
 }
 
@@ -92,23 +89,23 @@ static void unpad_48bit_array(
 {
     unsigned long long i=0, j=0, k=0, max_i=0, pixel=0;
 
-    unsigned short (*unpadded_pix)[];
-    unsigned short (*padded_pix_16)[];
-    unsigned long long(*padded_pix_64)[];
+    unsigned short *unpadded_pix;
+    unsigned short *padded_pix_16;
+    unsigned long long *padded_pix_64;
 
-    unpadded_pix  = (unsigned short(*)[]) unpadded_pix_buf->buf;
-    padded_pix_16 = (unsigned short(*)[]) padded_pix_buf->buf;
-    padded_pix_64 = (unsigned long long(*)[]) padded_pix_buf->buf;
+    unpadded_pix  = (unsigned short*) unpadded_pix_buf->buf;
+    padded_pix_16 = (unsigned short*) padded_pix_buf->buf;
+    padded_pix_64 = (unsigned long long*) padded_pix_buf->buf;
 
     max_i = (unpadded_pix_buf->len)/6;
 
     if ( padded_pix_buf->itemsize == 8) {
         for (i=0; i < max_i; i++) {
             j=i*3;
-            pixel = (*padded_pix_64)[i];
-            (*unpadded_pix)[j] = pixel&0xFFff; j++;
-            (*unpadded_pix)[j] = (pixel>>16)&0xFFff; j++;
-            (*unpadded_pix)[j] = (pixel>>32)&0xFFff;
+            pixel = padded_pix_64[i];
+            unpadded_pix[j] = pixel&0xFFff; j++;
+            unpadded_pix[j] = (pixel>>16)&0xFFff; j++;
+            unpadded_pix[j] = (pixel>>32)&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
@@ -118,9 +115,9 @@ static void unpad_48bit_array(
             is ARGB, we need to skip each pixels first 2 bytes
             */
             j=i*3; k=i*4 + 1;
-            (*unpadded_pix)[j] = (*padded_pix_16)[k]; j++; k++;
-            (*unpadded_pix)[j] = (*padded_pix_16)[k]; j++; k++;
-            (*unpadded_pix)[j] = (*padded_pix_16)[k];
+            unpadded_pix[j] = padded_pix_16[k]; j++; k++;
+            unpadded_pix[j] = padded_pix_16[k]; j++; k++;
+            unpadded_pix[j] = padded_pix_16[k];
         }
     }
 }
