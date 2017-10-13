@@ -4,3 +4,7 @@ arbytmap/ext/__pycache__/
 ext/__pycache__/
 tests/
 __pycache__
+*/v15/*
+*Release\*
+Debug\*
+test_files/bitmaps/

@@ -131,7 +131,7 @@ class Swizzler():
         except Exception:
             print("ERROR OCCURRED WHILE TRYING TO SWIZZLE ARRAY")
             print(format_exc())
-            return False
+            raise
 
     def _swizzle_block(self, mode, pixels, swizzled,
                        channels, width, height, depth):
