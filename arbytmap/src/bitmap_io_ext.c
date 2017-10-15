@@ -185,6 +185,39 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
 
     return Py_None;
 }
+
+static PyObject *py_swap_channels(PyObject *self, PyObject *args) {
+    Py_buffer bufs[2];
+    unsigned char  *pixels, *temp_pix;
+    unsigned short *chan_map, step;
+    unsigned long long max_i, i, j;
+
+    // Get the pointers to each of the array objects
+    if (!PyArg_ParseTuple(args, "w*w*:swap_channels", &bufs[0], &bufs[1]))
+        return Py_None;
+
+    pixels   = (unsigned char  *)bufs[0].buf;
+    chan_map = (unsigned short *)bufs[1].buf;
+    max_i = bufs[0].len;
+    step  = bufs[1].len / 2;
+    temp_pix = malloc(step);
+    if (temp_pix == NULL) return Py_None;
+
+    for (i = 0; i < max_i; i += step) {
+        memcpy(temp_pix, &(pixels[i]), step);
+        for (j = 0; j < step; j++) {
+            pixels[i + j] = temp_pix[chan_map[j]];
+        }
+    }
+
+    // Release the buffer objects
+    PyBuffer_Release(&bufs[0]);
+    PyBuffer_Release(&bufs[1]);
+    free(temp_pix);
+
+    return Py_None;
+}
+
 // This was GOING to be a function to quickly make an array object and
 // return it to the caller without having to copy it. Guess I cant do that.
 /*
@@ -251,6 +284,7 @@ static PyMethodDef bitmap_io_ext_methods[] = {
     {"pad_48bit_array", py_pad_48bit_array, METH_VARARGS, ""},
     {"unpad_24bit_array", py_unpad_24bit_array, METH_VARARGS, ""},
     {"unpad_48bit_array", py_unpad_48bit_array, METH_VARARGS, ""},
+    {"swap_channels", py_swap_channels, METH_VARARGS, ""},
     //{"make_array", py_make_array, METH_VARARGS, ""},
     //{"uncompress_rle", py_uncompress_rle, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}      /* sentinel */

@@ -7,55 +7,51 @@
 //short-hand macros for packer routines
 
 //unpacking individual components
-#define PACK_ARGB_A_MERGE (a_scale[(unpacked_pix[i<<2]+a_rnd)/a_div]<<a_shift)
-#define PACK_ARGB_R_MERGE (r_scale[(unpacked_pix[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
-#define PACK_ARGB_G_MERGE (g_scale[(unpacked_pix[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
-#define PACK_ARGB_B_MERGE (b_scale[(unpacked_pix[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
-#define PACK_AI_A_MERGE   (a_scale[(unpacked_pix[i<<1]+a_rnd)/a_div]<<a_shift)
-#define PACK_AI_I_MERGE   (i_scale[(unpacked_pix[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
+#define PACK_ARGB_A_MERGE(typ) ((typ)a_scale[(unpacked_pix[i<<2]+a_rnd)/a_div]<<a_shift)
+#define PACK_ARGB_R_MERGE(typ) ((typ)r_scale[(unpacked_pix[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
+#define PACK_ARGB_G_MERGE(typ) ((typ)g_scale[(unpacked_pix[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
+#define PACK_ARGB_B_MERGE(typ) ((typ)b_scale[(unpacked_pix[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
+#define PACK_AI_A_MERGE(typ)   ((typ)a_scale[(unpacked_pix[i<<1]+a_rnd)/a_div]<<a_shift)
+#define PACK_AI_I_MERGE(typ)   ((typ)i_scale[(unpacked_pix[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
 
-#define PACK_ARGB_A (a_scale[unpacked_pix[(i<<2)]]<<a_shift)
-#define PACK_ARGB_R (r_scale[unpacked_pix[(i<<2)+1]]<<r_shift)
-#define PACK_ARGB_G (g_scale[unpacked_pix[(i<<2)+2]]<<g_shift)
-#define PACK_ARGB_B (b_scale[unpacked_pix[(i<<2)+3]]<<b_shift)
-#define PACK_AI_A   (a_scale[unpacked_pix[(i<<1)]]<<a_shift)
-#define PACK_AI_I   (i_scale[unpacked_pix[(i<<1)+1]]<<i_shift)
+#define PACK_ARGB_A(typ) ((typ)a_scale[unpacked_pix[(i<<2)]]<<a_shift)
+#define PACK_ARGB_R(typ) ((typ)r_scale[unpacked_pix[(i<<2)+1]]<<r_shift)
+#define PACK_ARGB_G(typ) ((typ)g_scale[unpacked_pix[(i<<2)+2]]<<g_shift)
+#define PACK_ARGB_B(typ) ((typ)b_scale[unpacked_pix[(i<<2)+3]]<<b_shift)
+#define PACK_AI_A(typ)   ((typ)a_scale[unpacked_pix[(i<<1)]]<<a_shift)
+#define PACK_AI_I(typ)   ((typ)i_scale[unpacked_pix[(i<<1)+1]]<<i_shift)
 
-#define PACK_ARGB_A_MERGE_16 (a_scale[(unpacked_pix[i<<2]+a_rnd)/a_div]<<a_shift)
-#define PACK_ARGB_R_MERGE_16 (r_scale[(unpacked_pix[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
-#define PACK_ARGB_G_MERGE_16 (g_scale[(unpacked_pix[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
-#define PACK_ARGB_B_MERGE_16 (b_scale[(unpacked_pix[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
-#define PACK_AI_A_MERGE_16   (a_scale[(unpacked_pix[i<<1]+a_rnd)/a_div]<<a_shift)
-#define PACK_AI_I_MERGE_16   (i_scale[(unpacked_pix[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
+#define PACK_ARGB_A_MERGE_16(typ) ((typ)a_scale[(unpacked_pix[i<<2]+a_rnd)/a_div]<<a_shift)
+#define PACK_ARGB_R_MERGE_16(typ) ((typ)r_scale[(unpacked_pix[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
+#define PACK_ARGB_G_MERGE_16(typ) ((typ)g_scale[(unpacked_pix[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
+#define PACK_ARGB_B_MERGE_16(typ) ((typ)b_scale[(unpacked_pix[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
+#define PACK_AI_A_MERGE_16(typ)   ((typ)a_scale[(unpacked_pix[i<<1]+a_rnd)/a_div]<<a_shift)
+#define PACK_AI_I_MERGE_16(typ)   ((typ)i_scale[(unpacked_pix[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
 
-#define PACK_ARGB_A_16 (a_scale_16[unpacked_pix[(i<<2)]]<<a_shift)
-#define PACK_ARGB_R_16 (r_scale_16[unpacked_pix[(i<<2)+1]]<<r_shift)
-#define PACK_ARGB_G_16 (g_scale_16[unpacked_pix[(i<<2)+2]]<<g_shift)
-#define PACK_ARGB_B_16 (b_scale_16[unpacked_pix[(i<<2)+3]]<<b_shift)
-#define PACK_AI_A_16   (a_scale_16[unpacked_pix[(i<<1)]]<<a_shift)
-#define PACK_AI_I_16   (i_scale_16[unpacked_pix[(i<<1)+1]]<<i_shift)
+#define PACK_ARGB_A_16(typ) ((typ)a_scale_16[unpacked_pix[(i<<2)]]<<a_shift)
+#define PACK_ARGB_R_16(typ) ((typ)r_scale_16[unpacked_pix[(i<<2)+1]]<<r_shift)
+#define PACK_ARGB_G_16(typ) ((typ)g_scale_16[unpacked_pix[(i<<2)+2]]<<g_shift)
+#define PACK_ARGB_B_16(typ) ((typ)b_scale_16[unpacked_pix[(i<<2)+3]]<<b_shift)
+#define PACK_AI_A_16(typ)   ((typ)a_scale_16[unpacked_pix[(i<<1)]]<<a_shift)
+#define PACK_AI_I_16(typ)   ((typ)i_scale_16[unpacked_pix[(i<<1)+1]]<<i_shift)
 
 //unpacking ARGB and AI in different ways
-#define PACK_ARGB_MERGE (\
-    PACK_ARGB_A_MERGE + PACK_ARGB_R_MERGE +\
-    PACK_ARGB_G_MERGE + PACK_ARGB_B_MERGE)
-#define PACK_AI_MERGE (PACK_AI_A_MERGE + PACK_AI_I_MERGE)
+#define PACK_ARGB_MERGE(typ) (\
+PACK_ARGB_A_MERGE(typ) + PACK_ARGB_R_MERGE(typ) + PACK_ARGB_G_MERGE(typ) + PACK_ARGB_B_MERGE(typ))
+#define PACK_AI_MERGE(typ) (PACK_AI_A_MERGE(typ) + PACK_AI_I_MERGE(typ))
 
-#define PACK_ARGB (\
-    PACK_ARGB_A + PACK_ARGB_R +\
-    PACK_ARGB_G + PACK_ARGB_B)
-#define PACK_AI (PACK_AI_A + PACK_AI_I)
+#define PACK_ARGB(typ) (PACK_ARGB_A(typ) + PACK_ARGB_R(typ) + PACK_ARGB_G(typ) + PACK_ARGB_B(typ))
+#define PACK_AI(typ) (PACK_AI_A(typ) + PACK_AI_I(typ))
 
 //deep color versions of the above
-#define PACK_ARGB_MERGE_16 (\
-    PACK_ARGB_A_MERGE_16 + PACK_ARGB_R_MERGE_16 +\
-    PACK_ARGB_G_MERGE_16 + PACK_ARGB_B_MERGE_16)
-#define PACK_AI_MERGE_16 (PACK_AI_A_MERGE_16 + PACK_AI_I_MERGE_16)
+#define PACK_ARGB_MERGE_16(typ) (\
+PACK_ARGB_A_MERGE_16(typ) + PACK_ARGB_R_MERGE_16(typ) +\
+PACK_ARGB_G_MERGE_16(typ) + PACK_ARGB_B_MERGE_16(typ))
+#define PACK_AI_MERGE_16(typ) (PACK_AI_A_MERGE_16(typ) + PACK_AI_I_MERGE_16(typ))
 
-#define PACK_ARGB_16 (\
-    PACK_ARGB_A_16 + PACK_ARGB_R_16 +\
-    PACK_ARGB_G_16 + PACK_ARGB_B_16)
-#define PACK_AI_16 (PACK_AI_A_16 + PACK_AI_I_16)
+#define PACK_ARGB_16(typ) (\
+PACK_ARGB_A_16(typ) + PACK_ARGB_R_16(typ) + PACK_ARGB_G_16(typ) + PACK_ARGB_B_16(typ))
+#define PACK_AI_16(typ) (PACK_AI_A_16(typ) + PACK_AI_I_16(typ))
 
 
 static void pack_raw_4_channel_merge_8bpp(
@@ -94,23 +90,19 @@ static void pack_raw_4_channel_merge_8bpp(
 
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_64)[i] = (
-                (unsigned long long)PACK_ARGB_A_MERGE +
-                (unsigned long long)PACK_ARGB_R_MERGE +
-                (unsigned long long)PACK_ARGB_G_MERGE +
-                (unsigned long long)PACK_ARGB_B_MERGE)&0xFFffFFffFFffFFffULL;
+            (*packed_pix_64)[i] = PACK_ARGB_MERGE(unsigned long long)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_32)[i] = PACK_ARGB_MERGE&0xFFffFFffUL;
+            (*packed_pix_32)[i] = PACK_ARGB_MERGE(unsigned long)&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_16)[i] = PACK_ARGB_MERGE&0xFFff;
+            (*packed_pix_16)[i] = PACK_ARGB_MERGE(unsigned short)&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_8)[i] = PACK_ARGB_MERGE&0xFF;
+            (*packed_pix_8)[i] = PACK_ARGB_MERGE(unsigned char)&0xFF;
         }
     }
 }
@@ -146,21 +138,19 @@ static void pack_raw_2_channel_merge_8bpp(
 
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
-            packed_pix_64[i] = (
-                (unsigned long long)PACK_AI_A_MERGE +
-                (unsigned long long)PACK_AI_I_MERGE)&0xFFffFFffFFffFFffULL;
+            packed_pix_64[i] = PACK_AI_MERGE(unsigned long long)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            packed_pix_32[i] = PACK_AI_MERGE&0xFFffFFffUL;
+            packed_pix_32[i] = PACK_AI_MERGE(unsigned long)&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            packed_pix_16[i] = PACK_AI_MERGE&0xFFff;
+            packed_pix_16[i] = PACK_AI_MERGE(unsigned short)&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            packed_pix_8[i] = PACK_AI_MERGE&0xFF;
+            packed_pix_8[i] = PACK_AI_MERGE(unsigned char)&0xFF;
         }
     }
 }
@@ -198,23 +188,19 @@ static void pack_raw_4_channel_8bpp(
 
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
-            packed_pix_64[i] = (
-                (unsigned long long)PACK_ARGB_A +
-                (unsigned long long)PACK_ARGB_R +
-                (unsigned long long)PACK_ARGB_G +
-                (unsigned long long)PACK_ARGB_B)&0xFFffFFffFFffFFffULL;
+            packed_pix_64[i] = PACK_ARGB(unsigned long long)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            packed_pix_32[i] = PACK_ARGB&0xFFffFFffUL;
+            packed_pix_32[i] = PACK_ARGB(unsigned long)&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            packed_pix_16[i] = PACK_ARGB&0xFFff;
+            packed_pix_16[i] = PACK_ARGB(unsigned short)&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            packed_pix_8[i] = PACK_ARGB&0xFF;
+            packed_pix_8[i] = PACK_ARGB(unsigned char)&0xFF;
         }
     }
 }
@@ -249,21 +235,19 @@ static void pack_raw_2_channel_8bpp(
 
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
-            packed_pix_64[i] = (
-                (unsigned long long)PACK_AI_A  +
-                (unsigned long long)PACK_AI_I)&0xFFffFFffFFffFFffULL;
+            packed_pix_64[i] = PACK_AI(unsigned long long)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            packed_pix_32[i] = PACK_AI&0xFFffFFffUL;
+            packed_pix_32[i] = PACK_AI(unsigned long)&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            packed_pix_16[i] = PACK_AI&0xFFff;
+            packed_pix_16[i] = PACK_AI(unsigned short)&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            packed_pix_8[i] = PACK_AI&0xFF;
+            packed_pix_8[i] = PACK_AI(unsigned char)&0xFF;
         }
     }
 }
@@ -359,53 +343,44 @@ static void pack_raw_4_channel_merge_16bpp(
     b_scale_16 = (unsigned short*)b_scale_buf->buf;
 
     max_i = (packed_pix_buf->len)/packed_pix_size;
-
     if (packed_pix_size == 8) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (
-                    (unsigned long long)PACK_ARGB_A_MERGE_16 +
-                    (unsigned long long)PACK_ARGB_R_MERGE_16 +
-                    (unsigned long long)PACK_ARGB_G_MERGE_16 +
-                    (unsigned long long)PACK_ARGB_B_MERGE_16)&0xFFffFFffFFffFFffULL;
+                packed_pix_64[i] = PACK_ARGB_MERGE_16(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (
-                    (unsigned long long)PACK_ARGB_A_MERGE +
-                    (unsigned long long)PACK_ARGB_R_MERGE +
-                    (unsigned long long)PACK_ARGB_G_MERGE +
-                    (unsigned long long)PACK_ARGB_B_MERGE)&0xFFffFFffFFffFFffULL;
+                packed_pix_64[i] = PACK_ARGB_MERGE(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_32[i] = PACK_ARGB_MERGE_16&0xFFffFFffUL;
+                packed_pix_32[i] = PACK_ARGB_MERGE_16(unsigned long)&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_32[i] = PACK_ARGB_MERGE&0xFFffFFffUL;
+                packed_pix_32[i] = PACK_ARGB_MERGE(unsigned long)&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_16[i] = PACK_ARGB_MERGE_16&0xFFff;
+                packed_pix_16[i] = PACK_ARGB_MERGE_16(unsigned short)&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_16[i] = PACK_ARGB_MERGE&0xFFff;
+                packed_pix_16[i] = PACK_ARGB_MERGE(unsigned short)&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_8[i] = PACK_ARGB_MERGE_16&0xFF;
+                packed_pix_8[i] = PACK_ARGB_MERGE_16(unsigned char)&0xFF;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_8[i] = PACK_ARGB_MERGE&0xFF;
+                packed_pix_8[i] = PACK_ARGB_MERGE(unsigned char)&0xFF;
             }
         }
     }
@@ -446,45 +421,41 @@ static void pack_raw_2_channel_merge_16bpp(
     if (packed_pix_size == 8) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (
-                    (unsigned long long)PACK_AI_A_MERGE_16 +
-                    (unsigned long long)PACK_AI_I_MERGE_16)&0xFFffFFffFFffFFffULL;
+                packed_pix_64[i] = PACK_AI_MERGE_16(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (
-                    (unsigned long long)PACK_AI_A_MERGE +
-                    (unsigned long long)PACK_AI_I_MERGE)&0xFFffFFffFFffFFffULL;
+                packed_pix_64[i] = PACK_AI_MERGE(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_32[i] = PACK_AI_MERGE_16&0xFFffFFffUL;
+                packed_pix_32[i] = PACK_AI_MERGE_16(unsigned long)&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_32[i] = PACK_AI_MERGE&0xFFffFFffUL;
+                packed_pix_32[i] = PACK_AI_MERGE(unsigned long)&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_16[i] = PACK_AI_MERGE_16&0xFFff;
+                packed_pix_16[i] = PACK_AI_MERGE_16(unsigned short)&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_16[i] = PACK_AI_MERGE&0xFFff;
+                packed_pix_16[i] = PACK_AI_MERGE(unsigned short)&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_8[i] = PACK_AI_MERGE_16&0xFF;
+                packed_pix_8[i] = PACK_AI_MERGE_16(unsigned char)&0xFF;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_8[i] = PACK_AI_MERGE&0xFF;
+                packed_pix_8[i] = PACK_AI_MERGE(unsigned char)&0xFF;
             }
         }
     }
@@ -530,49 +501,41 @@ static void pack_raw_4_channel_16bpp(
     if (packed_pix_size == 8) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (
-                    (unsigned long long)PACK_ARGB_A_16 +
-                    (unsigned long long)PACK_ARGB_R_16 +
-                    (unsigned long long)PACK_ARGB_G_16 +
-                    (unsigned long long)PACK_ARGB_B_16)&0xFFffFFffFFffFFffULL;
+                packed_pix_64[i] = PACK_ARGB_16(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (
-                    (unsigned long long)PACK_ARGB_A +
-                    (unsigned long long)PACK_ARGB_R +
-                    (unsigned long long)PACK_ARGB_G +
-                    (unsigned long long)PACK_ARGB_B)&0xFFffFFffFFffFFffULL;
+                packed_pix_64[i] = PACK_ARGB(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_32[i] = PACK_ARGB_16&0xFFffFFffUL;
+                packed_pix_32[i] = PACK_ARGB_16(unsigned long)&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_32[i] = PACK_ARGB&0xFFffFFffUL;
+                packed_pix_32[i] = PACK_ARGB(unsigned long)&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_16[i] = PACK_ARGB_16&0xFFff;
+                packed_pix_16[i] = PACK_ARGB_16(unsigned short)&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_16[i] = PACK_ARGB&0xFFff;
+                packed_pix_16[i] = PACK_ARGB(unsigned short)&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_8[i] = PACK_ARGB_16&0xFFff;
+                packed_pix_8[i] = PACK_ARGB_16(unsigned char)&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_8[i] = PACK_ARGB&0xFF;
+                packed_pix_8[i] = PACK_ARGB(unsigned char)&0xFF;
             }
         }
     }
@@ -612,45 +575,41 @@ static void pack_raw_2_channel_16bpp(
     if (packed_pix_size == 8) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-               packed_pix_64[i] = (
-                    (unsigned long long)PACK_AI_A_16 +
-                    (unsigned long long)PACK_AI_I_16)&0xFFffFFffFFffFFffULL;
+               packed_pix_64[i] = PACK_AI_16(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-               packed_pix_64[i] = (
-                    (unsigned long long)PACK_AI_A +
-                    (unsigned long long)PACK_AI_I)&0xFFffFFffFFffFFffULL;
+               packed_pix_64[i] = PACK_AI(unsigned long long)&0xFFffFFffFFffFFffULL;
             }
         }
     } else if (packed_pix_size == 4) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-               packed_pix_32[i] = PACK_AI_16&0xFFffFFffUL;
+               packed_pix_32[i] = PACK_AI_16(unsigned long)&0xFFffFFffUL;
             }
         } else {
             for (i=0; i < max_i; i++) {
-               packed_pix_32[i] = PACK_AI&0xFFffFFffUL;
+               packed_pix_32[i] = PACK_AI(unsigned long)&0xFFffFFffUL;
             }
         }
     } else if (packed_pix_size == 2) {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-               packed_pix_16[i] = PACK_AI_16&0xFFff;
+               packed_pix_16[i] = PACK_AI_16(unsigned short)&0xFFff;
             }
         } else {
             for (i=0; i < max_i; i++) {
-               packed_pix_16[i] = PACK_AI&0xFFff;
+               packed_pix_16[i] = PACK_AI(unsigned short)&0xFFff;
             }
         }
     } else {
         if (a_scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-               packed_pix_8[i] = PACK_AI_16&0xFF;
+               packed_pix_8[i] = PACK_AI_16(unsigned char)&0xFF;
             }
         } else {
             for (i=0; i < max_i; i++) {
-               packed_pix_8[i] = PACK_AI&0xFF;
+               packed_pix_8[i] = PACK_AI(unsigned char)&0xFF;
             }
         }
     }
@@ -665,12 +624,15 @@ static void pack_raw_1_channel_16bpp(
     unsigned char  *scale;
     unsigned short *scale_16;
     unsigned long long i=0, max_i=0;
+
+    unsigned char  *packed_pix_8;
     unsigned short *packed_pix_16;
     unsigned long  *packed_pix_32;
     unsigned long long *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
+    packed_pix_8  = (unsigned char*)packed_pix_buf->buf;
     packed_pix_16 = (unsigned short*)packed_pix_buf->buf;
     packed_pix_32 = (unsigned long*) packed_pix_buf->buf;
     packed_pix_64 = (unsigned long long*)packed_pix_buf->buf;
@@ -684,11 +646,11 @@ static void pack_raw_1_channel_16bpp(
     if (packed_pix_size == 8) {
         if (scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (unsigned long long)(scale_16[unpacked_pix[i]]<<shift);
+                packed_pix_64[i] = ((unsigned long long)scale_16[unpacked_pix[i]]<<shift);
             }
         } else {
             for (i=0; i < max_i; i++) {
-                packed_pix_64[i] = (unsigned long long)(scale[unpacked_pix[i]]<<shift);
+                packed_pix_64[i] = ((unsigned long long)scale[unpacked_pix[i]]<<shift);
             }
         }
     } else if (packed_pix_size == 4) {
@@ -701,7 +663,7 @@ static void pack_raw_1_channel_16bpp(
                 packed_pix_32[i] = scale[unpacked_pix[i]]<<shift;
             }
         }
-    } else {
+    } else if (packed_pix_size == 2) {
         if (scale_buf->itemsize == 2) {
             for (i=0; i < max_i; i++) {
                 packed_pix_16[i] = scale_16[unpacked_pix[i]]<<shift;
@@ -710,6 +672,10 @@ static void pack_raw_1_channel_16bpp(
             for (i=0; i < max_i; i++) {
                 packed_pix_16[i] = scale[unpacked_pix[i]]<<shift;
             }
+        }
+    } else {
+        for (i=0; i < max_i; i++) {
+            packed_pix_8[i] = scale[unpacked_pix[i]]<<shift;
         }
     }
 }
@@ -875,7 +841,7 @@ static PyObject *py_pack_raw_1_channel(PyObject *self, PyObject *args) {
     char shift;
 
     // Get the pointers to each of the arrays, mask, and shift
-    if (!PyArg_ParseTuple(args, "w*w*w*:pack_raw_1_channel",
+    if (!PyArg_ParseTuple(args, "w*w*w*b:pack_raw_1_channel",
         &bufs[0], &bufs[1], &bufs[2], &shift))
         return Py_None;
 

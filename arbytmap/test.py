@@ -1,5 +1,6 @@
 import os, time
 import cProfile
+from traceback import format_exc
 curr_dir = os.path.abspath(os.curdir)
 start = time.time()
 
@@ -35,17 +36,22 @@ def convert_chain(last_fmt, formats):
             else:
                 kw["channel_mapping"] = ab.AL_TO_L
 
-        bitmap_test.load_from_file(
-            input_path=curr_dir + "\\test_files\\disc_%s.dds" % last_fmt)
-        bitmap_test.load_new_conversion_settings(target_format=fmt,
-                                                 color_key_transparency=True,
-                                                 **kw)
-        start = time.time()
-        bitmap_test.convert_texture()
-        bitmap_test.save_to_file(
-            output_path=curr_dir + "\\test_files\\disc_%s.dds" % fmt)
-        last_fmt = fmt
-        print("Completed %s in %s seconds" % (fmt, time.time()-start))
+        try:
+            bitmap_test.load_from_file(
+                input_path=curr_dir + "\\test_files\\disc_%s.dds" % last_fmt)
+            bitmap_test.load_new_conversion_settings(target_format=fmt,
+                                                     #color_key_transparency=True,
+                                                     **kw)
+            start = time.time()
+            bitmap_test.convert_texture()
+            bitmap_test.save_to_file(
+                output_path=curr_dir + "\\test_files\\disc_%s.png" % fmt)
+            bitmap_test.save_to_file(
+                output_path=curr_dir + "\\test_files\\disc_%s.dds" % fmt)
+            last_fmt = fmt
+            print("Completed %s in %.4f seconds" % (fmt, time.time()-start))
+        except TypeError:
+            print(format_exc())
 
 from traceback import format_exc
 try:
@@ -67,13 +73,13 @@ try:
     bitmap_test = ab.Arbytmap()
     bitmap_test.set_deep_color_mode(True)
     '''
-
+'''
     input('Press "Enter" to continue conversion 1')
     convert_chain(ab.FORMAT_A8R8G8B8, (
-        ab.FORMAT_X8R8G8B8, ab.FORMAT_R8G8B8, ab.FORMAT_R5G6B5,
+        ab.FORMAT_R8G8B8, ab.FORMAT_R5G6B5,
         ab.FORMAT_A1R5G5B5, ab.FORMAT_A4R4G4B4, ab.FORMAT_R3G3B2,
         ab.FORMAT_R8G8B8))
- 
+
     input('Press "Enter" to continue conversion 2')
     convert_chain(ab.FORMAT_A8R8G8B8, (
         ab.FORMAT_A8L8, ab.FORMAT_A8R3G3B2, ab.FORMAT_A4R4G4B4,
@@ -81,23 +87,24 @@ try:
 
     input('Press "Enter" to continue conversion 3')
     convert_chain(ab.FORMAT_A8R8G8B8, (
-        ab.FORMAT_DXT5, ab.FORMAT_DXT4, ab.FORMAT_DXT3,
-        ab.FORMAT_DXT2, ab.FORMAT_DXT1))
-'''
-    convert_chain(ab.FORMAT_A8R8G8B8, (ab.FORMAT_A16B16G16R16,))
+        ab.FORMAT_DXT5, ab.FORMAT_DXT4,
+        ab.FORMAT_DXT3, ab.FORMAT_DXT2, ab.FORMAT_R8G8B8, ab.FORMAT_DXT1))
+
     input('Press "Enter" to continue conversion 4')
     convert_chain(ab.FORMAT_A8R8G8B8, (
-        ab.FORMAT_V16U16, ab.FORMAT_A16B16G16R16,
-        ab.FORMAT_A2R10G10B10, ab.FORMAT_A2B10G10R10, ab.FORMAT_V8U8,
-        ab.FORMAT_DXN, ab.FORMAT_CTX1, ab.FORMAT_R8G8B8))
+        ab.FORMAT_V16U16,
+        ab.FORMAT_R8G8B8, ab.FORMAT_A16B16G16R16,
+        ab.FORMAT_A2R10G10B10, ab.FORMAT_A2B10G10R10,
+        #ab.FORMAT_A16L16,
+        ab.FORMAT_V8U8, ab.FORMAT_DXN, ab.FORMAT_CTX1, ab.FORMAT_R8G8B8))
 
     input('Press "Enter" to continue conversion 5')
     convert_chain(ab.FORMAT_A8L8, (ab.FORMAT_DXT5AY, ab.FORMAT_A4L4,
-                                   ab.FORMAT_A8R8G8B8))
+                                   ab.FORMAT_A16L16, ab.FORMAT_A16))
 
     input('Press "Enter" to continue conversion 6')
     convert_chain(ab.FORMAT_A8R8G8B8, (ab.FORMAT_L8, ab.FORMAT_DXT5Y,
-                                       ab.FORMAT_L8))
+                                       ab.FORMAT_L8, ab.FORMAT_L16))
 except:
     print(format_exc())
 
