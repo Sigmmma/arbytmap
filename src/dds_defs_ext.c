@@ -8,7 +8,7 @@
 // to prevent loss of precision, cast these to ULL's before squaring
 #define SQ(x) ((unsigned long long)x)*((unsigned long long)x)
 
-#define READ_DXT_COLORS(x, unpack_max)\
+#define READ_DXT_COLORS(x)\
     color0 = packed_tex[x]&0xFFff;\
     color1 = packed_tex[x]>>16;\
     color_idx = packed_tex[x+1];\
@@ -27,7 +27,6 @@
         c_2[3] = (c_0[3]*2 + c_1[3])/3;\
         \
         colors[3] = c_3;\
-        c_3[0] = unpack_max;\
         c_3[1] = (c_0[1] + 2*c_1[1])/3;\
         c_3[2] = (c_0[2] + 2*c_1[2])/3;\
         c_3[3] = (c_0[3] + 2*c_1[3])/3;\
@@ -48,8 +47,7 @@
 #define READ_DXT5_A(scale, lookup, idx, j, val0, val1)\
     lookup[0] = val0 = scale[packed_tex[j]&0xFF];\
     lookup[1] = val1 = scale[(packed_tex[j]>>8)&0xFF];\
-    idx = ((unsigned long long)packed_tex[j+1]<<16) + (packed_tex[j]>>16);\
-    \
+    idx = (((unsigned long long)packed_tex[j+1])<<16) + (packed_tex[j]>>16);\
     if (val0 > val1) {\
         lookup[2] = (val0*6 + val1)/7;\
         lookup[3] = (val0*5 + val1*2)/7;\
@@ -66,21 +64,21 @@
         lookup[7] = scale[255];\
     }
 
-#define CALC_Z_NORMALIZE(r, g, b, x, y, mask)\
-    if (r&(mask+1)) {x = r&mask;} else {x = mask - r;}\
-    if (g&(mask+1)) {y = g&mask;} else {y = mask - g;}\
+#define CALC_Z_NORMALIZE(r, g, b, x, y, mask_sq, mask, sign_mask, typ)\
+    if (r&sign_mask) {x = r&mask;} else {x = mask - r;}\
+    if (g&sign_mask) {y = g&mask;} else {y = mask - g;}\
     \
-    d = (float)(mask*mask - x*x - y*y);\
+    d = (float)(mask_sq - x*x - y*y);\
     if (d > 0) {\
-        b = (unsigned char)(sqrtf(d)) + mask + 1;\
+        b = (typ)(sqrtf(d)) + sign_mask;\
     } else {\
-        n_len = sqrtf(mask*mask - d)/mask;\
-        x = (unsigned char)(x/n_len);\
-        y = (unsigned char)(y/n_len);\
+        n_len = sqrtf(mask_sq - d)/mask;\
+        x = (typ)(x/n_len);\
+        y = (typ)(y/n_len);\
         \
-        if (r&(mask+1)) {r = x+(mask+1);} else {r = mask - x;}\
-        if (g&(mask+1)) {g = y+(mask+1);} else {g = mask - y;}\
-        b = mask + 1;\
+        if (r&sign_mask) {r = x + sign_mask;} else {r = mask - x;}\
+        if (g&sign_mask) {g = y + sign_mask;} else {g = mask - y;}\
+        b = sign_mask;\
     }
 
 #define PICK_DXT_PALETTE_DIST()\
@@ -195,8 +193,8 @@
     a0 = 255; a1 = 0;\
     for (j = 0; j<chans_per_tex; j += ucc) {\
         a_tmp = a_scale[unpacked[a_pxl_i + j]];\
-        if ((a_tmp < a0) && (a_tmp != 0)) { a0 = a_tmp; }\
-        if ((a_tmp > a1) && (a_tmp != 255)) { a1 = a_tmp; }\
+        if ((a_tmp < a0) && (a_tmp != 0))   a0 = a_tmp;\
+        if ((a_tmp > a1) && (a_tmp != 255)) a1 = a_tmp;\
     }\
     if (a0 != a1) {\
         a_dif = a1 - a0;\
@@ -232,8 +230,8 @@ static void unpack_dxt1_8(
     char ucc=4;  // unpacked channel count
     char chans_per_tex = ucc*pix_per_tex;
     unsigned long long i=0, j=0, max_i=0, pxl_i=0, off=0;
-    unsigned char c_0[4]={unpack_max,0,0,0}, c_1[4]={unpack_max,0,0,0};
-    unsigned char c_2[4]={unpack_max,0,0,0}, c_3[4]={unpack_max,0,0,0};
+    unsigned char c_0[4]={unpack_max,0,0,0}, c_1[4]={unpack_max,0,0,0},
+                  c_2[4]={unpack_max,0,0,0}, c_3[4]={unpack_max,0,0,0};
     unsigned char transparent[4]={0,0,0,0};
     unsigned char *color;
     unsigned char *colors[4];
@@ -256,7 +254,7 @@ static void unpack_dxt1_8(
         are the colors and the color indexing in that order.
         Also, if the first color is a larger integer
         then color key transparency is NOT used.*/
-        READ_DXT_COLORS(j, unpack_max);
+        READ_DXT_COLORS(j);
 
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
@@ -281,8 +279,8 @@ static void unpack_dxt2_3_8(
     char ucc=4;  // unpacked channel count
     char chans_per_tex = ucc*pix_per_tex;
     unsigned long long i=0, j=0, max_i=0, pxl_i=0, off=0, alpha=0;
-    unsigned char c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0};
-    unsigned char c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
+    unsigned char c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
+                  c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
     unsigned char transparent[4]={0,0,0,0};
     unsigned char *color;
     unsigned char *colors[4];
@@ -303,7 +301,7 @@ static void unpack_dxt2_3_8(
         j = i<<2;
 
         alpha = ((unsigned long long)packed_tex[j+1]<<32) + packed_tex[j];
-        READ_DXT_COLORS(j+2, 0);
+        READ_DXT_COLORS(j+2);
 
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
@@ -328,8 +326,8 @@ static void unpack_dxt4_5_8(
     char ucc=4;  // unpacked channel count
     char chans_per_tex = ucc*pix_per_tex;
     unsigned long long i=0, j=0, max_i=0, pxl_i=0, off=0, alpha_idx=0;
-    unsigned char c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0};
-    unsigned char c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
+    unsigned char c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
+                  c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
     unsigned char transparent[4]={0,0,0,0};
     unsigned char *color;
     unsigned char *colors[4];
@@ -351,8 +349,7 @@ static void unpack_dxt4_5_8(
         j = i<<2;
 
         READ_DXT5_A(a_scale, a_lookup, alpha_idx, j, alpha0, alpha1);
-        READ_DXT_COLORS(j+2, 0);
-
+        READ_DXT_COLORS(j+2);
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
             unpacked_pix[off + chan0] = a_lookup[(alpha_idx>>(3*j))&7];
@@ -431,13 +428,13 @@ static void unpack_dxn_8(
         b_pxl_i = pxl_i + chan2;
         j = i<<2;
 
-        READ_DXT5_A(r_scale, r_lookup, r_idx, j, r0, r1);
-        READ_DXT5_A(g_scale, g_lookup, g_idx, j+2, g0, g1);
+        READ_DXT5_A(g_scale, g_lookup, g_idx, j, g0, g1);
+        READ_DXT5_A(r_scale, r_lookup, r_idx, j + 2, r0, r1);
 
         for (j=0; j<pix_per_tex; j++) {
-            r = x = r_lookup[(r_idx>>(j*3))&7];
             g = y = g_lookup[(g_idx>>(j*3))&7];
-            CALC_Z_NORMALIZE(r, g, b, x, y, 127);
+            r = x = r_lookup[(r_idx>>(j*3))&7];
+            CALC_Z_NORMALIZE(r, g, b, x, y, 0x7F*0x7F, 0x7F, 0x80, unsigned char);
             unpacked_pix[r_pxl_i + j*ucc] = r;
             unpacked_pix[g_pxl_i + j*ucc] = g;
             unpacked_pix[b_pxl_i + j*ucc] = b;
@@ -473,7 +470,7 @@ static void pack_dxt1_8(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        c_0i = c_1i = idx = dist0 = 0;
+        idx = dist0 = c_0i = c_1i = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i + 1;
         g_pxl_i = pxl_i + 2;
@@ -541,7 +538,7 @@ static void pack_dxt2_3_8(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        alpha = c_0i = c_1i = idx = dist0 = 0;
+        idx = dist0 = alpha = c_0i = c_1i = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -549,11 +546,8 @@ static void pack_dxt2_3_8(
 
         // calculate the alpha
         for (j=0; j<chans_per_tex; j+=ucc) {
-           alpha += (unsigned long long)a_scale[unpacked[pxl_i+j]]<<j;
+           alpha += (unsigned long long)((a_scale[unpacked[pxl_i+j]]<<j)&0xF);
            }
-        packed[i << 2] = alpha & 0xFFffFFff;
-        packed[(i << 2) + 1] = alpha >> 32;
-
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
         PICK_DXT_PALETTE_DIST();
@@ -566,6 +560,8 @@ static void pack_dxt2_3_8(
             if (color0 < color1) {SWAP_COLORS();}
             CALC_DXT_IDX_NO_ALPHA(idx);
         }
+        packed[i << 2]       = alpha & 0xFFffFFff;
+        packed[(i << 2) + 1] = alpha >> 32;
         packed[(i << 2) + 2] = (color1 << 16) + color0;
         packed[(i << 2) + 3] = idx;
     }
@@ -601,7 +597,7 @@ static void pack_dxt4_5_8(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = c_0i = c_1i = dist0 = a_idx = 0;
+        idx = dist0 = c_0i = c_1i = a_idx = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -619,9 +615,6 @@ static void pack_dxt4_5_8(
             PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale);
         }
 
-        packed[i << 2] = ((a_idx & 0xFFff) << 16) + (a1 << 8) + a0;
-        packed[(i << 2) + 1] = (a_idx >> 16) & 0xFFffFFff;
-
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
         PICK_DXT_PALETTE_DIST();
@@ -634,6 +627,8 @@ static void pack_dxt4_5_8(
             if (color0 < color1) { SWAP_COLORS(); }
             CALC_DXT_IDX_NO_ALPHA(idx);
         }
+        packed[i << 2] = ((a_idx & 0xFFff) << 16) + (a1 << 8) + a0;
+        packed[(i << 2) + 1] = (a_idx >> 16) & 0xFFffFFff;
         packed[(i << 2) + 2] = (color1 << 16) + color0;
         packed[(i << 2) + 3] = idx;
     }
@@ -660,8 +655,8 @@ static void unpack_dxt1_16(
     char ucc=4;  // unpacked channel count
     char chans_per_tex = ucc*pix_per_tex;
     unsigned long long i=0, j=0, max_i=0, pxl_i=0, off=0;
-    unsigned short c_0[4]={unpack_max,0,0,0}, c_1[4]={unpack_max,0,0,0};
-    unsigned short c_2[4]={unpack_max,0,0,0}, c_3[4]={unpack_max,0,0,0};
+    unsigned short c_0[4]={unpack_max,0,0,0}, c_1[4]={unpack_max,0,0,0},
+                   c_2[4]={unpack_max,0,0,0}, c_3[4]={unpack_max,0,0,0};
     unsigned short transparent[4]={0,0,0,0};
     unsigned short *color;
     unsigned short *colors[4];
@@ -672,7 +667,7 @@ static void unpack_dxt1_16(
     b_scale = (unsigned short *)b_scale_buf->buf;
 
     colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (unsigned long *) packed_tex_buf->buf;
+    packed_tex = (unsigned long *)packed_tex_buf->buf;
     max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
 
     //loop through each texel
@@ -684,7 +679,7 @@ static void unpack_dxt1_16(
         are the colors and the color indexing in that order.
         Also, if the first color is a larger integer
         then color key transparency is NOT used.*/
-        READ_DXT_COLORS(j, unpack_max);
+        READ_DXT_COLORS(j);
 
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
@@ -708,8 +703,8 @@ static void unpack_dxt2_3_16(
     char ucc=4;  // unpacked channel count
     char chans_per_tex = ucc*pix_per_tex;
     unsigned long long i=0, j=0, max_i=0, pxl_i=0, off=0, alpha=0;
-    unsigned short c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0};
-    unsigned short c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
+    unsigned short c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
+                   c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
     unsigned short transparent[4]={0,0,0,0};
     unsigned short *color;
     unsigned short *colors[4];
@@ -730,7 +725,7 @@ static void unpack_dxt2_3_16(
         j = i<<2;
 
         alpha = ((unsigned long long)packed_tex[j+1]<<32) + packed_tex[j];
-        READ_DXT_COLORS(j+2, 0);
+        READ_DXT_COLORS(j+2);
 
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
@@ -755,8 +750,8 @@ static void unpack_dxt4_5_16(
     char ucc=4;  // unpacked channel count
     char chans_per_tex = ucc*pix_per_tex;
     unsigned long long i=0, j=0, max_i=0, pxl_i=0, off=0, alpha_idx=0;
-    unsigned short c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0};
-    unsigned short c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
+    unsigned short c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
+                   c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
     unsigned short transparent[4]={0,0,0,0};
     unsigned short *color;
     unsigned short *colors[4];
@@ -778,8 +773,7 @@ static void unpack_dxt4_5_16(
         j = i<<2;
 
         READ_DXT5_A(a_scale, a_lookup, alpha_idx, j, alpha0, alpha1);
-        READ_DXT_COLORS(j+2, 0);
-
+        READ_DXT_COLORS(j+2);
         for (j=0; j<pix_per_tex; j++) {
             UNPACK_DXT_COLORS();
             unpacked_pix[off + chan0] = a_lookup[(alpha_idx>>(3*j))&7];
@@ -848,7 +842,7 @@ static void unpack_dxn_16(
     r_scale      = (unsigned short *)r_scale_buf->buf;
     g_scale      = (unsigned short *)g_scale_buf->buf;
 
-    packed_tex = (unsigned long *) packed_tex_buf->buf;
+    packed_tex = (unsigned long *)packed_tex_buf->buf;
     max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
 
     //loop through each texel
@@ -859,13 +853,13 @@ static void unpack_dxn_16(
         b_pxl_i = pxl_i + chan2;
         j = i<<2;
 
-        READ_DXT5_A(r_scale, r_lookup, r_idx, j, r0, r1);
-        READ_DXT5_A(g_scale, g_lookup, g_idx, j+2, g0, g1);
+        READ_DXT5_A(g_scale, g_lookup, g_idx, j, g0, g1);
+        READ_DXT5_A(r_scale, r_lookup, r_idx, j + 2, r0, r1);
 
         for (j=0; j<pix_per_tex; j++) {
-            r = x = r_lookup[(r_idx>>(j*3))&7];
             g = y = g_lookup[(g_idx>>(j*3))&7];
-            CALC_Z_NORMALIZE(r, g, b, x, y, 32767);
+            r = x = r_lookup[(r_idx>>(j*3))&7];
+            CALC_Z_NORMALIZE(r, g, b, x, y, 0x7Fff*0x7Fff, 0x7Fff, 0x8000, unsigned short);
             unpacked_pix[r_pxl_i + j*ucc] = r;
             unpacked_pix[g_pxl_i + j*ucc] = g;
             unpacked_pix[b_pxl_i + j*ucc] = b;
@@ -902,7 +896,7 @@ static void pack_dxt1_16(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = c_0i = c_1i = dist0 = 0;
+        idx = dist0 = c_0i = c_1i = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i + 1;
         g_pxl_i = pxl_i + 2;
@@ -971,7 +965,7 @@ static void pack_dxt2_3_16(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        alpha = idx = c_0i = c_1i = dist0 = 0;
+        idx = dist0 = alpha = c_0i = c_1i = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -979,11 +973,8 @@ static void pack_dxt2_3_16(
 
         // calculate the alpha
         for (j=0; j<chans_per_tex; j+=ucc) {
-           alpha += (unsigned long long)a_scale[unpacked[pxl_i+j]]<<j;
+           alpha += (unsigned long long)((a_scale[unpacked[pxl_i+j]]<<j)&0xF);
            }
-        packed[i<<2] = alpha&0xFFffFFff;
-        packed[(i<<2)+1] = alpha>>32;
-
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
         PICK_DXT_PALETTE_DIST();
@@ -996,6 +987,8 @@ static void pack_dxt2_3_16(
             if (color0 < color1) { SWAP_COLORS(); }
             CALC_DXT_IDX_NO_ALPHA(idx);
         }
+        packed[i << 2]       = alpha & 0xFFffFFff;
+        packed[(i << 2) + 1] = alpha >> 32;
         packed[(i << 2) + 2] = (color1 << 16) + color0;
         packed[(i << 2) + 3] = idx;
     }
@@ -1031,7 +1024,7 @@ static void pack_dxt4_5_16(
 
     //loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = c_0i = c_1i = dist0 = a_idx = 0;
+        idx = dist0 = c_0i = c_1i = a_idx = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -1049,9 +1042,6 @@ static void pack_dxt4_5_16(
             PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale);
         }
 
-        packed[i << 2] = ((a_idx & 0xFFff) << 16) + (a1 << 8) + a0;
-        packed[(i << 2) + 1] = (a_idx >> 16) & 0xFFffFFff;
-
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
         PICK_DXT_PALETTE_DIST();
@@ -1064,6 +1054,8 @@ static void pack_dxt4_5_16(
             if (color0 < color1) {SWAP_COLORS();}
             CALC_DXT_IDX_NO_ALPHA(idx);
         }
+        packed[i << 2] = ((a_idx & 0xFFff) << 16) + (a1 << 8) + a0;
+        packed[(i << 2) + 1] = (a_idx >> 16) & 0xFFffFFff;
         packed[(i << 2) + 2] = (color1 << 16) + color0;
         packed[(i << 2) + 3] = idx;
     }

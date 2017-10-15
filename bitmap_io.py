@@ -2,17 +2,22 @@ import os
 import time
 import mmap
 
-from struct import pack_into, unpack_from, unpack
 from array import array
+from copy import deepcopy
+from math import ceil, log
+from struct import pack_into, unpack_from, unpack
 from traceback import format_exc
-from constants import *
+tga_def = dds_def = png_def = None
+
+from arbytmap.constants import *
 try:
-    from supyr_struct.defs.bitmaps.tga import tga_def
     from supyr_struct.defs.bitmaps.dds import dds_def
+    from supyr_struct.defs.bitmaps.tga import tga_def
+    from supyr_struct.defs.bitmaps.objs.png import pad_idat_data
+    from supyr_struct.defs.bitmaps.png import png_def
     from supyr_struct.defs.util import fcc
 except Exception:
-    print("Bitmap IO was not loaded. Cannot load or save images.")
-    tga_def = dds_def = None
+    print("SupyrStruct was not loaded. Cannot load or save non-raw images.")
 
 try:
     try:
@@ -91,18 +96,23 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
                 elif bitdepths == set((1, 5)):    fmt = ab.FORMAT_A1R5G5B5
                 elif bitdepths == set((0, 5)):    fmt = ab.FORMAT_A1R5G5B5
                 elif bitdepths == set((4,  )):    fmt = ab.FORMAT_A4R4G4B4
-                elif bitdepths == set((0, 4)):    fmt = ab.FORMAT_A4R4G4B4
             elif fmt_head.rgb_bitcount == 24:  fmt = ab.FORMAT_R8G8B8
             elif fmt_head.rgb_bitcount == 32:
                 if   bitdepths == set((0, 8)): fmt = ab.FORMAT_X8R8G8B8
                 elif bitdepths == set((8,  )): fmt = ab.FORMAT_A8R8G8B8
-        elif fmt_flags.alpha_only: fmt = ab.FORMAT_A8
-        elif fmt_flags.has_alpha:  fmt = ab.FORMAT_A8L8
-        elif fmt_flags.luminance:  fmt = ab.FORMAT_L8
-        elif fmt_flags.yuv_space:  fmt = ab.FORMAT_Y8U8V8
+        elif fmt_flags.alpha_only:
+            if   fmt_head.rgb_bitcount == 8:  fmt = ab.FORMAT_A8
+            elif fmt_head.rgb_bitcount == 16: fmt = ab.FORMAT_A16
+        elif fmt_flags.has_alpha:
+            if   fmt_head.rgb_bitcount == 16: fmt = ab.FORMAT_A8L8
+            elif fmt_head.rgb_bitcount == 32: fmt = ab.FORMAT_A16L16
+        elif fmt_flags.luminance:
+            if   fmt_head.rgb_bitcount == 8:  fmt = ab.FORMAT_L8
+            elif fmt_head.rgb_bitcount == 16: fmt = ab.FORMAT_L16
         elif fmt_flags.vu_space:
             if   fmt_head.rgb_bitcount == 16: fmt = ab.FORMAT_V8U8
             elif fmt_head.rgb_bitcount == 32: fmt = ab.FORMAT_V16U16
+        elif fmt_flags.yuv_space:  fmt = ab.FORMAT_Y8U8V8
 
         if fmt is None:
             err += "UNABLE TO DETERMINE DDS FORMAT. FAILED TO LOAD TEXTURE.\n"
@@ -131,7 +141,7 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
         for sb in range(sub_bitmap_count):
             for m in range(mipmap_count + 1):
                 dims = ab.clip_dimensions(
-                    head.width>>m, head.height>>m, max(head.depth, 1)>>m, fmt)
+                    head.width>>m, head.height>>m, max(head.depth>>m, 1), fmt)
                 off = bitmap_bytes_to_array(dds_data, off, temp, fmt, *dims)
 
         # rearrange the images so they are sorted by [mip][bitmap]
@@ -140,7 +150,6 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
             for sb in range(sub_bitmap_count):
                 tex_block[m*sub_bitmap_count + sb] = temp[
                     sb*(mipmap_count + 1) + m]
-
         convertor.load_new_texture(texture_block=tex_block,
                                    texture_info=tex_info)
     except:
@@ -172,28 +181,28 @@ def load_from_tga_file(convertor, input_path, ext, **kwargs):
     #figure out what color format we've got
     bpp_test = cm_bpp if color_mapped else bpp
 
-    if bpp_test == 1 or head.image_type.format.enum_name == "bw_1_bit":
-        #tex_info["format"] = ab.FORMAT_A1
+    fmt_name = head.image_type.format.enum_name
+    fmt = None
+    if bpp_test == 1 or fmt_name == "bw_1_bit":
+        fmt = ab.FORMAT_A1
         err += "Unable to load black and white 1-bit color Targa images."
     elif bpp_test == 8:
-        tex_info["format"] = {
-            True:  ab.FORMAT_A8,
-            False: ab.FORMAT_L8}.get(alpha_depth == 8)
+        if fmt_name == "unmapped_rgb": pass
+        elif alpha_depth == 0: fmt = ab.FORMAT_L8
+        elif alpha_depth == 4: fmt = ab.FORMAT_A4L4
+        elif alpha_depth == 8: fmt = ab.FORMAT_A8
     elif bpp_test == 16:
-        tex_info["format"] = {
-            0: ab.FORMAT_R5G6B5,   1: ab.FORMAT_A1R5G5B5,
-            4: ab.FORMAT_A4R4G4B4, 8: ab.FORMAT_A8L8,
-            }.get(alpha_depth)
-    elif bpp_test == 24:
-        tex_info["format"] = ab.FORMAT_R8G8B8
+        if   alpha_depth == 8: fmt = ab.FORMAT_A8L8
+        elif alpha_depth == 1: fmt = ab.FORMAT_A1R5G5B5
+    elif bpp_test == 24:       fmt = ab.FORMAT_R8G8B8
     elif bpp_test == 32:
-        tex_info["format"] = {
-            True:  ab.FORMAT_A8R8G8B8,
-            False: ab.FORMAT_X8R8G8B8}.get(alpha_depth == 8)
+        if   alpha_depth == 0: fmt = ab.FORMAT_X8R8G8B8
+        elif alpha_depth == 8: fmt = ab.FORMAT_A8R8G8B8
 
-    if tex_info.get("format") is None:
+    if fmt not in ab.VALID_FORMATS:
         err += ("Unable to load %sbit color Targa images." % bpp)
 
+    tex_info["format"] = fmt
     if image_desc.interleaving.data:
         err += "Unable to load Targa images with interleaved pixels."
         
@@ -204,6 +213,7 @@ def load_from_tga_file(convertor, input_path, ext, **kwargs):
     tex_block = []
     if image_desc.screen_origin.enum_name == "lower_left":
         tga_file.flip_image_origin()
+        pixels = tga_file.data.pixels_wrapper.pixels
 
     typecode = ab.PACKED_TYPECODES[tex_info["format"]]
     if color_mapped:
@@ -221,14 +231,15 @@ def load_from_tga_file(convertor, input_path, ext, **kwargs):
                        palette[: head.color_map_origin])
         
         tex_info.update(palette=[palette], palettize=1, indexing_size=bpp)
-        tex_block.append(array("B", pixels))
+        pixel_array = array("B", pixels)
     elif bpp == 24:
-        tex_block.append(pad_24bit_array(pixels))
+        pixel_array = pad_24bit_array(pixels)
     elif bpp == 48:
-        tex_block.append(pad_48bit_array(pixels))
+        pixel_array = pad_48bit_array(pixels)
     else:
         pixel_array = array(typecode, pixels)
 
+    tex_block.append(pixel_array)
     convertor.load_new_texture(texture_block=tex_block,
                                texture_info=tex_info)
 
@@ -239,44 +250,62 @@ def save_to_rawdata_file(convertor, output_path, ext, **kwargs):
     to be directly opened be applications."""
 
     final_output_path = output_path
-
-    if not os.path.exists(os.path.dirname(output_path)):
+    if not os.path.exists(os.path.dirname(final_output_path)):
         os.makedirs(os.path.dirname(output_path))
-        
+
+    filenames = []
     if convertor.is_palettized():
         print("Cannot save palettized images to RAW files.")
-        return
+        return filenames
 
-    for sb in range(convertor.sub_bitmap_count):
-        sb_output_path = output_path
-        w, h, d = conv.width, conv.height, conv.depth
-        if convertor.sub_bitmap_count > 1:
-            sb_output_path = "%s_tex%s" % (sb_output_path, sb)
-                
-        #write each of the pixel arrays into the bitmap
-        for m in range(convertor.mipmap_count + 1):
-            i = m*convertor.sub_bitmap_count + sb
-            
-            final_output_path = sb_output_path
-            if convertor.mipmap_count:
-                final_output_path = "%s_mip%s" % (final_output_path, m)
-        
-            with open(final_output_path + ext, 'w+b') as raw_file:
-                pixel_array = convertor.texture_block[i]
+    fmt = convertor.format
+    tex_block = convertor.texture_block
+    sub_bitmap_ct = convertor.sub_bitmap_count
+    overwrite = kwargs.get("overwrite", True)
+    mip_levels = kwargs.get("mip_levels", (0, ))
+    if mip_levels in ("all", None):
+        mip_levels = range(convertor.mipmap_count + 1)
+
+    for m in mip_levels:
+        width  = max(convertor.width  >> m, 1)
+        height = max(convertor.height >> m, 1)
+        depth  = max(convertor.depth  >> m, 1)
+
+        mip_output_path = output_path
+        if len(mip_levels) > 1:
+            mip_output_path = "%s_mip%s" % (mip_output_path, m)
+
+        for sb in range(sub_bitmap_ct):
+            index = sb + m*sub_bitmap_ct
+            if index >= len(tex_block):
+                continue
+
+            final_output_path = mip_output_path
+            if sub_bitmap_ct > 1:
+                final_output_path = "%s_tex%s" % (final_output_path, sb)
+            final_output_path += ext
+
+            if not overwrite and os.path.exists(final_output_path):
+                continue
+
+            with open(final_output_path, 'wb+') as raw_file:
+                pixel_array = tex_block[index]
                 if convertor.packed:
-                    pixel_array = convertor.pack(pixel_array, w, h, d)
-                    w, h, d = ab.clip_dimensions(w//2, h//2, d//2)
+                    pixel_array = convertor.pack(
+                        pixel_array, width, height, depth)
                     if pixel_array is None:
-                        print("ERROR: UNABLE TO PACK IMAGE DATA.\n"+
-                              "CANCELLING DDS SAVE.")
-                        return()
+                        print("ERROR: UNABLE TO PACK IMAGE DATA.\n")
+                        continue
                 
-                if ab.BITS_PER_PIXEL[convertor.format] == 24:
+                if ab.BITS_PER_PIXEL[fmt] == 24:
                     raw_file.write(unpad_24bit_array(pixel_array))
-                elif ab.BITS_PER_PIXEL[convertor.format] == 48:
+                elif ab.BITS_PER_PIXEL[fmt] == 48:
                     raw_file.write(unpad_48bit_array(pixel_array))
                 else:
                     raw_file.write(pixel_array)
+            filenames.append(final_output_path)
+
+    return filenames
 
 
 def save_to_dds_file(convertor, output_path, ext, **kwargs):
@@ -285,15 +314,15 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     fmt = convertor.format
 
     if fmt in (ab.FORMAT_A16R16G16B16, ab.FORMAT_R16G16B16):
-        print("ERROR: CANNOT SAVE '%s' FORMAT TO DDS.\nCANCELLING DDS SAVE." %
+        print("ERROR: CANNOT SAVE %s TO DDS.\nCANCELLING DDS SAVE." %
               fmt)
-        return
+        return []
 
     dds_file = dds_def.build()
     dds_file.data.pixel_data = b''
     dds_file.filepath = "%s.%s" % (output_path, ext)
     if not kwargs.get("overwrite", True) and os.path.exists(dds_file.filepath):
-        return
+        return []
 
     head = dds_file.data.header
     flags = head.flags
@@ -327,7 +356,7 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
         if fmt in (ab.FORMAT_DXT3AY, ab.FORMAT_DXT3Y, ab.FORMAT_DXT3A,
                    ab.FORMAT_DXT5AY, ab.FORMAT_DXT5Y, ab.FORMAT_DXT5A):
             fmt_name = fmt_name[:len("LIN_DXT_")] + "A"
-            fmt_flags.luminance = "Y" in fmt
+            fmt_flags.luminance  = "Y" in fmt
             fmt_flags.alpha_only = not fmt_flags.luminance
             fmt_flags.has_alpha  = "A" in fmt and not fmt_flags.alpha_only
 
@@ -396,7 +425,7 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
         head.caps.mipmaps = flags.mipmaps = True
     if convertor.photoshop_compatability:
         head.mipmap_count += 1
-    dds_file.pprint(printout=True)
+
     #write each of the pixel arrays into the bitmap
     for sb in range(convertor.sub_bitmap_count):
         #write each of the pixel arrays into the bitmap
@@ -404,6 +433,9 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
             # get the index of the bitmap we'll be working with
             i = m*convertor.sub_bitmap_count + sb
             pixels = convertor.texture_block[i]
+            w, h, d = ab.clip_dimensions(convertor.width>>m,
+                                         convertor.height>>m,
+                                         convertor.depth>>m)
 
             if convertor.is_palettized():
                 pal = convertor.palette[i]
@@ -418,121 +450,293 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
 
             if pixels is None:
                 print("ERROR: UNABLE TO PACK IMAGE DATA.\nCANCELLING WRITE.")
-                return
+                return []
 
             if bpp == 24:
                 pixels = unpad_24bit_array(pixels)
             dds_file.data.pixel_data += pixels
 
-        w, h, d = ab.clip_dimensions(w//2, h//2, d//2)
-
     dds_file.serialize(temp=False, backup=False, calc_pointers=False)
+    return [dds_file.filepath]
 
 
 def save_to_tga_file(convertor, output_path, ext, **kwargs):
     """Saves the currently loaded texture to a TGA file"""
-    conv = convertor
-    fmt = conv.format
-    
-    if (fmt in (ab.FORMAT_R5G6B5, ab.FORMAT_A4R4G4B4,
-                ab.FORMAT_A8L8, ab.FORMAT_V8U8) or fmt in ab.COMPRESSED_FORMATS):
-        print("CANNOT EXTRACT THIS FORMAT TO TGA. EXTRACTING TO DDS INSTEAD.")
-        save_to_dds_file(conv, output_path, "dds", **kwargs)
-        return
-    elif ab.BITS_PER_PIXEL[fmt] > 32:
-        print("ERROR: CANNOT SAVE BITMAP OF HIGHER THAN 32 BIT "+
-              "COLOR DEPTH TO DDS.\nCANCELLING TGA SAVE.")
-        return
+    fmt = convertor.format
+    filenames = []
+
+    make_copy = fmt not in (
+        ab.FORMAT_A1, ab.FORMAT_L8, ab.FORMAT_A8,
+        ab.FORMAT_A1R5G5B5, ab.FORMAT_R8G8B8,
+        ab.FORMAT_X8R8G8B8, ab.FORMAT_A8R8G8B8)
+
+    if fmt != ab.FORMAT_A8R8G8B8 and make_copy:
+        conv_cpy = deepcopy(convertor)
+        conv_cpy.load_new_conversion_settings(target_format=ab.FORMAT_A8R8G8B8)
+        conv_cpy.convert_texture()
+        return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
+                                     **kwargs)
 
     channel_count = ab.CHANNEL_COUNTS[fmt]
 
     tga_file = tga_def.build()
     head = tga_file.data.header
     image_desc = head.image_descriptor
-
-    head.width  = conv.width
-    head.height = conv.height*conv.depth
     image_desc.screen_origin.set_to("upper_left")
-    if conv.is_palettized():
+    if convertor.is_palettized():
         head.has_color_map.set_to("yes")
         head.image_type.format.set_to("color_mapped_rgb")
-        head.color_map_length = 2**conv.indexing_size
+        head.color_map_length = 2**convertor.indexing_size
         head.color_map_depth = ab.BITS_PER_PIXEL[fmt]
 
         head.bpp = 8
-        if conv.target_indexing_size > 8:
-            head.bpp = conv.indexing_size
+        if convertor.target_indexing_size > 8:
+            head.bpp = convertor.indexing_size
     else:
         head.bpp = ab.BITS_PER_PIXEL[fmt]
         head.image_type.format.set_to("bw_8_bit")
         if channel_count > 1:
-            image_desc.alpha_bit_count = CHANNEL_DEPTHS[fmt][0]
+            image_desc.alpha_bit_count = ab.CHANNEL_DEPTHS[fmt][0]
         if channel_count > 2:
             head.image_type.format.set_to("unmapped_rgb")
 
     final_output_path = output_path
-    width = conv.width
-    height = conv.height
-    pals = conv.palette
-    tex_block = conv.texture_block
-    mip_count = convertor.mipmap_count+1
+    pals = convertor.palette
+    tex_block = convertor.texture_block
+    sub_bitmap_ct = convertor.sub_bitmap_count
+    mip_levels = kwargs.get("mip_levels", (0, ))
     overwrite = kwargs.get("overwrite", True)
 
-    for sb in range(conv.sub_bitmap_count):
-        if conv.sub_bitmap_count > 1:
-            final_output_path = "%s_tex%s" % (output_path, sb)
+    if mip_levels in ("all", None):
+        mip_levels = range(convertor.mipmap_count + 1)
 
-        tga_file.filepath = "%s.%s" % (final_output_path, ext)
-        if not overwrite and os.path.exists(tga_file.filepath):
-            continue
+    for m in mip_levels:
+        width  = max(convertor.width  >> m, 1)
+        height = max(convertor.height >> m, 1)
+        depth  = max(convertor.depth  >> m, 1)
+        head.width  = width
+        head.height = height*depth
+        mip_output_path = output_path
+        if len(mip_levels) > 1:
+            mip_output_path = "%s_mip%s" % (mip_output_path, m)
 
-        if conv.is_palettized():
-            pal = pals[sb]
-            idx = tex_block[sb]
-            if conv.palette_packed:
-                pal = conv.palette_packer(pal)
-                
-            '''need to pack the indexing and make sure it's 8-bit
-               since TGA doesn't support less than 8 bit indexing'''
+        for sb in range(sub_bitmap_ct):
+            index = sb + m*sub_bitmap_ct
+            if index >= len(tex_block):
+                continue
 
-            if not conv.packed:
-                idx = conv.indexing_packer(idx)
-            elif conv.indexing_size < 8:
-                temp = conv.target_indexing_size
-                conv.target_indexing_size = 8
-                idx = conv.indexing_packer(conv.indexing_unpacker(idx))
-                conv.target_indexing_size = temp
+            final_output_path = mip_output_path
+            if sub_bitmap_ct > 1:
+                final_output_path = "%s_tex%s" % (final_output_path, sb)
+
+            tga_file.filepath = "%s.%s" % (final_output_path, ext)
+            if not overwrite and os.path.exists(tga_file.filepath):
+                continue
+
+            if convertor.is_palettized():
+                pal = pals[index]
+                idx = tex_block[index]
+                if not convertor.palette_packed:
+                    pal = convertor.palette_packer(pal)
                     
-            tga_file.color_table = pal
-            tga_file.pixels_wrapper.pixels = idx
+                '''need to pack the indexing and make sure it's 8-bit
+                   since TGA doesn't support less than 8 bit indexing'''
+
+                if not convertor.packed:
+                    idx = convertor.indexing_packer(idx)
+                elif convertor.indexing_size < 8:
+                    temp = convertor.target_indexing_size
+                    convertor.target_indexing_size = 8
+                    try:
+                        idx = convertor.indexing_packer(
+                            convertor.indexing_unpacker(idx))
+                    except Exception as e:
+                        convertor.target_indexing_size = temp
+                        raise e
+                    finally:
+                        convertor.target_indexing_size = temp
+
+                tga_file.data.color_table = bytes(pal)
+                tga_file.data.pixels_wrapper.pixels = idx
+            else:
+                pixel_array = tex_block[index]
+                if not convertor.packed:
+                    pixel_array = convertor.pack(pixel_array, width, height, 0)
+                    if pixel_array is None:
+                        print("ERROR: UNABLE TO PACK IMAGE DATA.\n"+
+                              "CANCELLING TGA SAVE.")
+                        return filenames
+
+                if ab.BITS_PER_PIXEL[fmt] == 24:
+                    pixel_array = unpad_24bit_array(pixel_array)
+                
+                tga_file.data.pixels_wrapper.pixels = pixel_array
+
+            tga_file.serialize(temp=False, backup=False, calc_pointers=False)
+            filenames.append(tga_file.filepath)
+
+    return filenames
+
+
+def save_to_png_file(convertor, output_path, ext, **kwargs):
+    """Saves the currently loaded texture to a PNG file"""
+    fmt = convertor.format
+    palettized = convertor.is_palettized()
+    if fmt in ab.THREE_CHANNEL_FORMATS:
+        channel_count = 3
+    else:
+        channel_count = ab.CHANNEL_COUNTS[fmt]
+
+    if channel_count <= 2:
+        valid_depths = (1, 2, 4, 8, 16)
+    else:
+        valid_depths = (8, 16)
+
+    bit_depth = fmt_depth = max(ab.CHANNEL_DEPTHS[fmt] + (1, ))
+    target_depth = 1<<int(ceil(log(bit_depth, 2)))
+    keep_alpha = kwargs.get("keep_alpha", channel_count <= 2)
+
+    filenames = []
+
+    if palettized or channel_count == 3:
+        if target_depth == 16: fmt_to_save_as = ab.FORMAT_R16G16B16
+        else:                  fmt_to_save_as = ab.FORMAT_R8G8B8
+    elif channel_count >= 2:
+        # png doesnt allow 2 channel greyscale, so convert them to 4 channel
+        if keep_alpha:
+            if target_depth > 8: fmt_to_save_as = ab.FORMAT_A16R16G16B16
+            else:                fmt_to_save_as = ab.FORMAT_A8R8G8B8
         else:
-            pixel_array = tex_block[sb]
-            if not conv.packed:
-                pixel_array = conv.pack(pixel_array, width, height, 0)
-                width, height, _ = ab.clip_dimensions(width//2, height//2)
-                if pixel_array is None:
-                    print("ERROR: UNABLE TO PACK IMAGE DATA.\n"+
-                          "CANCELLING TGA SAVE.")
-                    return
+            if target_depth > 8: fmt_to_save_as = ab.FORMAT_R16G16B16
+            else:                fmt_to_save_as = ab.FORMAT_R8G8B8
+    elif target_depth == 16: fmt_to_save_as = ab.FORMAT_L16
+    elif target_depth == 8:  fmt_to_save_as = ab.FORMAT_L8
+    elif target_depth == 4:  fmt_to_save_as = ab.FORMAT_L4
+    elif target_depth == 2:  fmt_to_save_as = ab.FORMAT_L2
+    elif target_depth == 1:  fmt_to_save_as = ab.FORMAT_L1
+    elif bit_depth > 8:      fmt_to_save_as = ab.FORMAT_L16
+    else:                    fmt_to_save_as = ab.FORMAT_L8
 
-            if ab.BITS_PER_PIXEL[fmt] == 24:
-                pixel_array = unpad_24bit_array(pixel_array)
-            
-            tga_file.pixels_wrapper.pixels = pixel_array
+    if fmt != fmt_to_save_as or bit_depth not in valid_depths:
+        conv_cpy = deepcopy(convertor)
+        if target_depth > 8:
+            conv_cpy.set_deep_color_mode(True)
 
-        tga_file.serialize(temp=False, backup=False, calc_pointers=False)
+        conv_cpy.load_new_conversion_settings(target_format=fmt_to_save_as)
+        conv_cpy.convert_texture()
+        return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
+                                     **kwargs)
+
+    png_file = png_def.build()
+    png_file.data.chunks.append(case="IHDR")
+    head = png_file.data.chunks[-1]
+    plte_chunk = None
+    if palettized:
+        bit_depth = convertor.indexing_size
+        color_type = "indexed_color"
+        png_file.data.chunks.append(case="sRGB")
+        png_file.data.chunks.append(case="PLTE")
+        plte_chunk = png_file.data.chunks[-1]
+    elif channel_count > 2:
+        color_type = "truecolor"
+        if channel_count == 4:
+            color_type = "truecolor_with_alpha"
+
+        png_file.data.chunks.append(case="sRGB")
+    elif channel_count == 2:
+        color_type = "greyscale_with_alpha"
+    else:
+        color_type = "greyscale"
+
+    head.bit_depth = bit_depth
+    head.color_type.set_to(color_type)
+
+    png_file.data.chunks.append(case="IDAT")
+    idat_chunk = png_file.data.chunks[-1]
+    png_file.data.chunks.append(case="IEND")
+
+    tex_block = convertor.texture_block
+    pals = convertor.palette
+    sub_bitmap_ct = convertor.sub_bitmap_count
+    mip_levels = kwargs.get("mip_levels", (0, ))
+    overwrite = kwargs.get("overwrite", True)
+
+    if mip_levels in ("all", None):
+        mip_levels = range(convertor.mipmap_count + 1)
+
+    for m in mip_levels:
+        width  = max(convertor.width  >> m, 1)
+        height = max(convertor.height >> m, 1)
+        depth  = max(convertor.depth  >> m, 1)
+        head.width  = width
+        head.height = height*depth
+        mip_output_path = output_path
+        if len(mip_levels) > 1:
+            mip_output_path = "%s_mip%s" % (mip_output_path, m)
+
+        for sb in range(sub_bitmap_ct):
+            index = sb + m*sub_bitmap_ct
+            if index >= len(tex_block):
+                continue
+
+            final_output_path = mip_output_path
+            if sub_bitmap_ct > 1:
+                final_output_path = "%s_tex%s" % (final_output_path, sb)
+
+            png_file.filepath = "%s.%s" % (final_output_path, ext)
+            if not overwrite and os.path.exists(png_file.filepath):
+                continue
+
+            stride = width * head.bit_depth
+            pix = tex_block[index]
+            if palettized:
+                pal = pals[index]
+                if not convertor.palette_packed:
+                    pal = convertor.palette_packer(pal)
+                if not convertor.packed:
+                    pix = convertor.indexing_packer(pix)
+
+                plte_chunk.data = bytes(pal)
+            else:
+                stride *= channel_count
+                if channel_count == 1 and fmt_depth == 16:
+                    stride = stride//2
+
+                if not convertor.packed:
+                    pix = convertor.pack_raw(pix)
+
+                if channel_count <= 2:
+                    pass
+                elif channel_count == 4:
+                    pix = bytearray(pix)
+                    if   fmt_depth == 8:
+                        swap_channels(pix, (2, 1, 0, 3))
+                    elif fmt_depth == 16:
+                        swap_channels(pix, (4, 5, 2, 3, 0, 1, 6, 7))
+                elif fmt_depth == 8:
+                    pix = bytearray(unpad_24bit_array(pix))
+                    swap_channels(pix, (2, 1, 0))
+                elif fmt_depth == 16:
+                    pix = bytearray(unpad_48bit_array(pix))
+                    swap_channels(pix, (4, 5, 2, 3, 0, 1))
+
+            png_file.set_chunk_data(
+                idat_chunk, pad_idat_data(pix, stride//8))
+            png_file.serialize(temp=False, backup=False, calc_pointers=False)
+            filenames.append(png_file.filepath)
+
+    return filenames
 
 
 def get_pixel_bytes_size(fmt, width, height, depth=1):
-    pixel_size = ab.PIXEL_ENCODING_SIZES[ab.PACKED_TYPECODES[fmt]]
+    bpp = ab.BITS_PER_PIXEL[fmt]
 
     #make sure the dimensions for the format are correct
     width, height, depth = ab.clip_dimensions(width, height, depth, fmt)
-    
-    bitmap_size = ab.pixel_count_to_array_length(
-        height*width*depth, pixel_size, fmt)*pixel_size
-
-    return bitmap_size
+    return (bpp*height*width*depth)//8
+    #pixel_size = ab.PIXEL_ENCODING_SIZES[ab.PACKED_TYPECODES[fmt]]
+    #return ab.pixel_count_to_array_length(
+    #    height*width*depth, pixel_size, fmt)*pixel_size
 
 
 def make_array(typecode, item_ct, item_size=None, fill=0):
@@ -541,6 +745,22 @@ def make_array(typecode, item_ct, item_size=None, fill=0):
     if item_size is None:
         item_size = PIXEL_ENCODING_SIZES.get(typecode, 1)
     return array(typecode, bytes([fill])*item_ct*item_size)
+
+
+def swap_channels(pix, channel_map):
+    step = len(channel_map)
+    channel_map = tuple(channel_map)
+    src_map     = tuple(range(step))
+    if channel_map == src_map: return
+    assert set(channel_map) == set(src_map)
+
+    if fast_bitmap_io:
+        return bitmap_io_ext.swap_channels(pix, array("H", channel_map))
+
+    for i in range(0, len(pix), step):
+        orig = pix[i: i + step]
+        for j in src_map:
+            pix[i + j] = orig[channel_map[j]]
 
 
 def bitmap_bytes_to_array(rawdata, offset, texture_block, fmt,
@@ -671,7 +891,7 @@ def unpad_24bit_array(padded):
                 unpadded[i*3+2] = padded[i*4+3]
     else:
         raise TypeError(
-            "Bad typecode for padded 24bit array. Expected H or Q, got %s" %
+            "Bad typecode for padded 24bit array. Expected B or L, got %s" %
             padded.typecode)
         
     return unpadded
@@ -728,3 +948,6 @@ if tga_def is not None:
 if dds_def is not None:
     file_writers["dds"] = save_to_dds_file
     file_readers["dds"] = load_from_dds_file
+
+if png_def is not None:
+    file_writers["png"] = save_to_png_file

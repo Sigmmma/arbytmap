@@ -441,7 +441,6 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
 def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
     assert packed.typecode == 'L'
-
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
@@ -540,7 +539,6 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
 
     r_scale = self.channel_upscalers[1]
     g_scale = self.channel_upscalers[2]
-    b_scale = self.channel_upscalers[3]
 
     try:
         chan1 = self.channel_mapping.index(1)
@@ -556,7 +554,7 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
             ucc, pixels_per_texel, chan1, chan2, chan3)
     else:
         # convert to tuples for faster access
-        r_scale, g_scale, b_scale = tuple(r_scale), tuple(g_scale), tuple(b_scale)
+        r_scale, g_scale = tuple(r_scale), tuple(g_scale)
         pixel_indices = range(pixels_per_texel)
         red   = [0,0,0,0,0,0,0,0]
         green = [0,0,0,0,0,0,0,0]
@@ -800,6 +798,7 @@ def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
     chan_mask = (1 << bpc) - 1   # == 255 for 8bpc
     dist_max  = (sign_mask - 1)  # == 127 for 8bpc
     dist_max_sq = dist_max**2    # == 16129 for 8bpc
+
     for i in range(0, len(packed)):
         j = ucc*i
         r = packed[i]&chan_mask
@@ -886,7 +885,9 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
         dist0 = dist1 = c_0i = c_1i = idx = 0
 
         pxl_i = (txl_i//2)*channels_per_texel
-        r_pxl_i, g_pxl_i, b_pxl_i = pxl_i+1, pxl_i+2, pxl_i+3
+        r_pxl_i = pxl_i + 1
+        g_pxl_i = pxl_i + 2
+        b_pxl_i = pxl_i + 3
 
         # compare distance between all pixels and find the two furthest apart
         # (we are actually comparing the area of the distance as it's faster)
@@ -895,7 +896,7 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
             g = upa[g_pxl_i+i]
             b = upa[b_pxl_i+i]
             for j in pixel_indices:
-                if i is j: continue
+                if j <= i: continue
                 dist1 = ((r-upa[r_pxl_i+j])**2+
                          (g-upa[g_pxl_i+j])**2+
                          (b-upa[b_pxl_i+j])**2)
@@ -1033,7 +1034,9 @@ def pack_dxt2_3(self, unpacked, width, height, depth=1):
         dist0 = dist1 = c_0i = c_1i = 0
 
         pxl_i = (txl_i//4)*channels_per_texel
-        r_pxl_i, g_pxl_i, b_pxl_i = pxl_i+1, pxl_i+2, pxl_i+3
+        r_pxl_i = pxl_i + 1
+        g_pxl_i = pxl_i + 2
+        b_pxl_i = pxl_i + 3
 
         '''CALCULATE THE ALPHA'''
         # calculate alpha channel for DXT 2/3
@@ -1049,7 +1052,7 @@ def pack_dxt2_3(self, unpacked, width, height, depth=1):
         # (we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
             for j in pixel_indices:
-                if i is j: continue
+                if j <= i: continue
                 dist1 = ((upa[r_pxl_i+i]-upa[r_pxl_i+j])**2+
                          (upa[g_pxl_i+i]-upa[g_pxl_i+j])**2+
                          (upa[b_pxl_i+i]-upa[b_pxl_i+j])**2)
@@ -1150,7 +1153,9 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
 
         #cache so it doesn't have to keep being calculated
         pxl_i = (txl_i//4)*channels_per_texel
-        r_pxl_i, g_pxl_i, b_pxl_i = pxl_i+1, pxl_i+2, pxl_i+3
+        r_pxl_i = pxl_i + 1
+        g_pxl_i = pxl_i + 2
+        b_pxl_i = pxl_i + 3
 
         '''CALCULATE THE ALPHA'''
         #find the most extreme values
@@ -1234,7 +1239,7 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
         # (we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
             for j in pixel_indices:
-                if i is j: continue
+                if j <= i: continue
                 dist1 = ((upa[r_pxl_i+i]-upa[r_pxl_i+j])**2+
                          (upa[g_pxl_i+i]-upa[g_pxl_i+j])**2+
                          (upa[b_pxl_i+i]-upa[b_pxl_i+j])**2)
@@ -1322,63 +1327,80 @@ def pack_dxt5a(self, unpacked, width, height, depth=1):
         #cache so it doesn't have to keep being calculated
         pxl_i = (txl_i//(2*ucc))*channels_per_texel
         chan = (txl_i//2)%ucc
-        val0 = idx = 0
-        val1 = 255
+        idx = 0
         scale = scales[chan]
 
-        #find the most extreme vals
-        for i in pixel_indices:
-            val = scale[upa[pxl_i+i+chan]]
-            val0 = max(val0, val)
-            val1 = min(val1, val)
+        vals = tuple(map(lambda i: scale[upa[pxl_i+i+chan]], pixel_indices))
+        val0 = max(vals)
+        val1 = min(vals)
 
-        # if the most extreme vals are NOT 0 and
-        # 255, use them as the interpolation vals
-        if val0 != 0 or val1 != 255:
-            # In this mode, value_0 must be greater than value_1
+        #if the most extreme values are NOT 0 and
+        #255, use them as the interpolation values
+        if val0 == val1:
+            pass
+        elif val0 != 255 or val1:
+            """In this mode, value_0 must be greater than value_1"""
+            #if they are the same number then
+            #the indexing can stay at all zero
+            dif = val0 - val1
+            half_dif = dif//2
+            #calculate and store which interpolated
+            #index each alpha value is closest to
+            for i in range(len(vals)):
+                #0 = c_0                 1 = c_1
+                #2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
+                #4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
+                #6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
 
-            # if they are the same number then
-            # the indexing can stay at all zero
-            if val0 != val1:
-                val_dif = val0-val1
-                # calculate and store which interpolated
-                # index each alpha value is closest to
-                for i in pixel_indices:
-                    tmp = ((scale[upa[pxl_i+i+chan]]-val1)*7 +
-                           val_dif//2)//val_dif
-                    # Because the colors are stored in reverse
-                    # order, we need to invert the index
-                    if tmp == 0:
-                        idx += 1<<(i*3//ucc)
-                    elif tmp < 7:
-                        idx += (8-tmp)<<(i*3//ucc)
+                #calculate how far between both colors
+                #that the value is as a 0 to 7 int
+                tmp = ((vals[i] - val1)*7 + half_dif)//dif
+                if tmp == 0:
+                    idx += 1<<(i*3)
+                elif tmp < 7:
+                    #Because the colors are stored in opposite
+                    #order, we need to invert the index
+                    idx += (8-tmp)<<(i*3)
         else:
-            # In this mode, val0 must be less than or equal to val1
-            # if the most extreme vals ARE 0 and 255 though, then
-            # we need to calculate the second most extreme vals
+            """In this mode, value_0 must be less than or equal to value_1"""
+            #if the most extreme values ARE 0 and 255 though, then
+            #we need to calculate the second most extreme values
             for i in pixel_indices:
-                comp = scale[upa[pxl_i+i+chan]]
-                if val0 > comp and comp > 0: val0 = comp
-                if val1 < comp and comp < 255: val1 = comp
+                tmp = a_scale[upa[pxl_i+i]]
+                #store if lowest int so far
+                if tmp < val0 and tmp > 0: val0 = tmp
+                #store if greatest int so far
+                if tmp > val1 and tmp < 255: val1 = tmp
 
-            # if they are the same number then
-            # the indexing can stay at all zero
+            #if they are the same number then
+            #the indexing can stay at all zero
             if val0 != val1:
-                val_dif = val0-val1
-                # calculate and store which interpolated
-                # index each alpha value is closest to
-                for i in pixel_indices:
-                    comp = scale[upa[pxl_i+i+chan]]
+                #calculate and store which interpolated
+                #index each alpha value is closest to
+
+                dif = val1 - val0
+                half_dif = dif//2
+                for i in range(len(vals)):
+                    #there are 4 interpolated colors in this mode
+                    #0 =  c_0                1 = c_1
+                    #2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
+                    #4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
+                    #6 =  0                  7 = 255
+                    comp = vals[i]
                     if comp == 0:
-                        idx += 6<<(i*3//ucc)
+                        #if the value is 0 we set it to index 6
+                        idx += 6<<(i*3)
                     elif comp == 255:
-                        idx += 7<<(i*3//ucc)
+                        #if the value is 255 we set it to index 7
+                        idx += 7<<(i*3)
                     else:
-                        tmp = ((comp-val0)*5 + val_dif//2)//val_dif
+                        #calculate how far between both colors
+                        #that the value is as a 0 to 5 int
+                        tmp = ((comp - val0)*5 + half_dif)//dif
                         if tmp == 5:
-                            idx += 1<<(i*3//ucc)
+                            idx += 1<<(i*3)
                         elif tmp > 0:
-                            idx += (tmp+1)<<(i*3//ucc)
+                            idx += (tmp+1)<<(i*3)
 
         rpa[txl_i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
         rpa[txl_i+1] = idx>>16
@@ -1417,66 +1439,83 @@ def pack_dxn(self, unpacked, width, height, depth=1):
     for txl_i in range(0, len(repacked), 2):
         #cache so it doesn't have to keep being calculated
         pxl_i = (txl_i>>2)*channels_per_texel
-        val0 = idx = 0
-        val1 = 255
+        idx = 0
 
         # figure out if we're packing red or green(1=red, 2=green)
         chan = (((txl_i>>1)+1)%2)+1
         scale = scales[chan]
 
-        #8: find the most extreme vals
-        for i in pixel_indices:
-            val = scale[upa[pxl_i+i+chan]]
-            val0 = max(val0, val)
-            val1 = min(val1, val)
+        vals = tuple(map(lambda i: scale[upa[pxl_i+i+chan]], pixel_indices))
+        val0 = max(vals)
+        val1 = min(vals)
 
-        # if the most extreme vals are NOT 0 and
-        # 255, use them as the interpolation vals
-        if val0 != 0 or val1 != 255:
+        #if the most extreme values are NOT 0 and
+        #255, use them as the interpolation values
+        if val0 == val1:
+            pass
+        elif val0 != 255 or val1:
             """In this mode, value_0 must be greater than value_1"""
-
             #if they are the same number then
             #the indexing can stay at all zero
-            if val0 != val1:
-                val_dif = val0-val1
-                # calculate and store which interpolated
-                # index each alpha value is closest to
-                for i in pixel_indices:
-                    tmp = ((scale[upa[pxl_i+i+chan]]-val1)*7 + val_dif//2)//val_dif
-                    """Because the colors are stored in reverse
-                    order, we need to invert the index"""
-                    if tmp == 0:
-                        idx += 1<<(i*3//ucc)
-                    elif tmp < 7:
-                        idx += (8-tmp)<<(i*3//ucc)
+            dif = val0 - val1
+            half_dif = dif//2
+            #calculate and store which interpolated
+            #index each alpha value is closest to
+            for i in range(len(vals)):
+                #0 = c_0                 1 = c_1
+                #2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
+                #4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
+                #6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
 
+                #calculate how far between both colors
+                #that the value is as a 0 to 7 int
+                tmp = ((vals[i] - val1)*7 + half_dif)//dif
+                if tmp == 0:
+                    idx += 1<<(i*3)
+                elif tmp < 7:
+                    #Because the colors are stored in opposite
+                    #order, we need to invert the index
+                    idx += (8-tmp)<<(i*3)
         else:
             """In this mode, value_0 must be less than or equal to value_1"""
-            #if the most extreme vals ARE 0 and 255 though, then
-            #we need to calculate the second most extreme vals
+            #if the most extreme values ARE 0 and 255 though, then
+            #we need to calculate the second most extreme values
             for i in pixel_indices:
-                comp = scale[upa[pxl_i+i+chan]]
-                if val0 > comp and comp > 0:   val0 = comp
-                if val1 < comp and comp < 255: val1 = comp
+                tmp = a_scale[upa[pxl_i+i]]
+                #store if lowest int so far
+                if tmp < val0 and tmp > 0: val0 = tmp
+                #store if greatest int so far
+                if tmp > val1 and tmp < 255: val1 = tmp
 
             #if they are the same number then
             #the indexing can stay at all zero
             if val0 != val1:
-                val_dif = val1-val0
-                # calculate and store which interpolated
-                # index each alpha value is closest to
-                for i in pixel_indices:
-                    comp = scale[upa[pxl_i+i+chan]]
+                #calculate and store which interpolated
+                #index each alpha value is closest to
+
+                dif = val1 - val0
+                half_dif = dif//2
+                for i in range(len(vals)):
+                    #there are 4 interpolated colors in this mode
+                    #0 =  c_0                1 = c_1
+                    #2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
+                    #4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
+                    #6 =  0                  7 = 255
+                    comp = vals[i]
                     if comp == 0:
-                        idx += 6<<(i*3//ucc)
+                        #if the value is 0 we set it to index 6
+                        idx += 6<<(i*3)
                     elif comp == 255:
-                        idx += 7<<(i*3//ucc)
+                        #if the value is 255 we set it to index 7
+                        idx += 7<<(i*3)
                     else:
-                        tmp = ((comp-val0)*5 + (val_dif//2))//val_dif
+                        #calculate how far between both colors
+                        #that the value is as a 0 to 5 int
+                        tmp = ((comp - val0)*5 + half_dif)//dif
                         if tmp == 5:
-                            idx += 1<<(i*3//ucc)
+                            idx += 1<<(i*3)
                         elif tmp > 0:
-                            idx += (tmp+1)<<(i*3//ucc)
+                            idx += (tmp+1)<<(i*3)
 
         rpa[txl_i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
         rpa[txl_i+1] = idx>>16
@@ -1514,7 +1553,7 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
 
     #loop for each texel
     for txl_i in range(0, len(repacked), 2):
-        dist0 = dist1 = c_0i = c_1i = 0
+        dist0 = dist1 = c_0i = c_1i = idx = 0
         xy_0 = [0,0,0,0]
         xy_1 = [0,0,0,0]
         xy_2 = [0,0,0,0]
@@ -1522,25 +1561,27 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
 
         #cache so it doesn't have to keep being calculated
         pxl_i = (txl_i//2)*channels_per_texel
-        r_pxl_i, g_pxl_i = pxl_i+1, pxl_i+2
+        r_pxl_i = pxl_i + 1
+        g_pxl_i = pxl_i + 2
 
         # compare distance between all pixels and find the two furthest apart
         #(we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
             for j in pixel_indices:
-                dist1 = ((upa[r_pxl_i+i]-upa[r_pxl_i+j])**2+
-                         (upa[g_pxl_i+i]-upa[g_pxl_i+j])**2)
+                if j <= i: continue
+                dist1 = ((upa[r_pxl_i + i] - upa[r_pxl_i + j])**2 +
+                         (upa[g_pxl_i + i] - upa[g_pxl_i + j])**2)
                 if dist1 > dist0:
                     dist0 = dist1
                     c_0i = i
                     c_1i = j
 
         # store furthest apart colors for use
-        xy_0[0] = r_scale[upa[pxl_i + 1 + c_0i]]
-        xy_0[1] = g_scale[upa[pxl_i + 2 + c_0i]]
+        xy_0[0] = r_scale[upa[r_pxl_i + c_0i]]
+        xy_0[1] = g_scale[upa[g_pxl_i + c_0i]]
 
-        xy_1[0] = r_scale[upa[pxl_i + 1 + c_1i]]
-        xy_1[1] = g_scale[upa[pxl_i + 2 + c_1i]]
+        xy_1[0] = r_scale[upa[r_pxl_i + c_1i]]
+        xy_1[1] = g_scale[upa[g_pxl_i + c_1i]]
 
         color0 = xy_0[0] + (xy_0[1]<<8)
         color1 = xy_1[0] + (xy_1[1]<<8)
@@ -1552,17 +1593,17 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
             rpa[txl_i] = color0 + (color1<<16)
 
             # calculate the intermediate colors
-            xy_2[0] = (xy_0[0]*2+xy_1[0])//3
-            xy_2[1] = (xy_0[1]*2+xy_1[1])//3
+            xy_2[0] = (xy_0[0]*2 + xy_1[0])//3
+            xy_2[1] = (xy_0[1]*2 + xy_1[1])//3
 
-            xy_3[0] = (xy_0[0]+xy_1[0]*2)//3
-            xy_3[1] = (xy_0[1]+xy_1[1]*2)//3
+            xy_3[0] = (xy_0[0] + xy_1[0]*2)//3
+            xy_3[1] = (xy_0[1] + xy_1[1]*2)//3
 
             # calculate each pixel's closest match
             # and assign it the proper index
             for i in pixel_indices:
-                x = r_scale[upa[r_pxl_i+i]]
-                y = g_scale[upa[g_pxl_i+i]]
+                x = r_scale[upa[r_pxl_i + i]]
+                y = g_scale[upa[g_pxl_i + i]]
                 dist0 = (x-xy_0[0])**2 + (y-xy_0[1])**2
                 dist1 = (x-xy_1[0])**2 + (y-xy_1[1])**2
 
@@ -1570,12 +1611,14 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
                 if dist0 <= dist1: #closer to color 0
                     if dist0 > (x-xy_2[0])**2 + (y-xy_2[1])**2:
                         #closest to color 2
-                        rpa[txl_i+1] += 2<<(i//2)
+                        idx += 2<<(i//2)
                 elif dist1 < (x-xy_3[0])**2 + (y-xy_3[1])**2:
                     #closest to color 1
-                    rpa[txl_i+1] += 1<<(i//2)
+                    idx += 1<<(i//2)
                 else: #closest to color 3
-                    rpa[txl_i+1] += 3<<(i//2)
+                    idx += 3<<(i//2)
+
+        rpa[txl_i+1] = idx
 
     return repacked
 
