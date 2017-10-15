@@ -180,14 +180,14 @@ static PyObject *py_populate_scaler_array(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*d:populate_scaler_array", &buf, &scale))
         return Py_None;
 
-    char_arr  = (unsigned char  *)buf.buf;
-    short_arr = (unsigned short *)buf.buf;
     max_i = buf.len;
     if (buf.itemsize == 2) {
+        short_arr = (unsigned short *)buf.buf;
         max_i /= 2;
         for (i=0; i < max_i; i++)
             short_arr[i] = (unsigned short)(i*scale + 0.5);
     } else {
+        char_arr = (unsigned char  *)buf.buf;
         for (i=0; i < max_i; i++)
             char_arr[i] = (unsigned char)(i*scale + 0.5);
     }

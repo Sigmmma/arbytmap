@@ -1,6 +1,7 @@
 from array import array
 from traceback import format_exc
-from constants import *
+
+from arbytmap.constants import *
 
 """TEXTURE TYPES"""
 TYPE_2D = "2D"
@@ -9,13 +10,19 @@ TYPE_CUBEMAP = "CUBE"
 
 """TEXTURE FORMATS"""
 FORMAT_A1 = "A1"  #NOT YET IMPLEMENTED
+FORMAT_A2 = "A2"  #NOT YET IMPLEMENTED
+FORMAT_L2 = "L2"  #NOT YET IMPLEMENTED
 FORMAT_A4 = "A4"  #NOT YET IMPLEMENTED
 FORMAT_L4 = "L4"  #NOT YET IMPLEMENTED
 FORMAT_A8 = "A8"
 FORMAT_L8 = "L8"
 FORMAT_AL8 = "AL8"
+FORMAT_A16 = "A16"
+FORMAT_L16 = "L16"
+FORMAT_A2L2 = "A2L2"  #NOT YET IMPLEMENTED
 FORMAT_A4L4 = "A4L4"
 FORMAT_A8L8 = "A8L8"
+FORMAT_A16L16 = "A16L16"
 FORMAT_R3G3B2 = "R3G3B2"
 FORMAT_R5G6B5 = "R5G6B5"
 FORMAT_R8G8B8 = "R8G8B8"
@@ -133,6 +140,14 @@ def register_format(format_id, **kwargs):
             raise TypeError((
                 "Cannot define '%s' format without a given bits per " +
                 "pixel or specifying each channels bit depths.") % format_id)
+        elif max(depths) > 16:
+            raise TypeError(
+                "Cannot define '%s' as the max bits per channel is 16." %
+                format_id)
+        elif bpp > 64:
+            raise TypeError(
+                "Cannot define '%s' as the max bits per pixel is 64." %
+                format_id)
 
         if not packed_typecode:
             packed_typecode = INVERSE_PIXEL_ENCODING_SIZES[(bpp + 7)//8]
@@ -246,14 +261,20 @@ def clip_dimensions(width, height, depth=1, fmt=FORMAT_A8R8G8B8):
 # Need to implement unpacking more than 1 pixel
 # per byte for the formats i've commented out.
 #register_format(format_id=FORMAT_A1, depths=(1,))
+#register_format(format_id=FORMAT_A2, depths=(2,))
+#register_format(format_id=FORMAT_L2, depths=(2,))
 #register_format(format_id=FORMAT_A4, depths=(4,))
 #register_format(format_id=FORMAT_L4, depths=(4,))
 register_format(format_id=FORMAT_A8, depths=(8,))
 register_format(format_id=FORMAT_L8, depths=(8,))
+register_format(format_id=FORMAT_AL8, depths=(8,8),
+                offsets=(0,0), masks=(255, 255), bpp=8)
+register_format(format_id=FORMAT_A16, depths=(16,))
+register_format(format_id=FORMAT_L16, depths=(16,))
+#register_format(format_id=FORMAT_A2L2, depths=(2,2))
 register_format(format_id=FORMAT_A4L4, depths=(4,4))
 register_format(format_id=FORMAT_A8L8, depths=(8,8))
-register_format(format_id=FORMAT_AL8,  depths=(8,8),
-                offsets=(0,0), masks=(255, 255), bpp=8)
+register_format(format_id=FORMAT_A16L16, depths=(16,16))
 
 register_format(format_id=FORMAT_R3G3B2,   depths=(2,3,3))
 register_format(format_id=FORMAT_R5G6B5,   depths=(5,6,5))
