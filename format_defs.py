@@ -10,6 +10,7 @@ TYPE_CUBEMAP = "CUBE"
 
 """TEXTURE FORMATS"""
 FORMAT_A1 = "A1"  #NOT YET IMPLEMENTED
+FORMAT_L1 = "L1"  #NOT YET IMPLEMENTED
 FORMAT_A2 = "A2"  #NOT YET IMPLEMENTED
 FORMAT_L2 = "L2"  #NOT YET IMPLEMENTED
 FORMAT_A4 = "A4"  #NOT YET IMPLEMENTED
@@ -261,6 +262,7 @@ def clip_dimensions(width, height, depth=1, fmt=FORMAT_A8R8G8B8):
 # Need to implement unpacking more than 1 pixel
 # per byte for the formats i've commented out.
 #register_format(format_id=FORMAT_A1, depths=(1,))
+#register_format(format_id=FORMAT_L1, depths=(1,))
 #register_format(format_id=FORMAT_A2, depths=(2,))
 #register_format(format_id=FORMAT_L2, depths=(2,))
 #register_format(format_id=FORMAT_A4, depths=(4,))
