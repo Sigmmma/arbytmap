@@ -20,12 +20,9 @@ except Exception:
     print("SupyrStruct was not loaded. Cannot load or save non-raw images.")
 
 try:
-    try:
-        from .ext import bitmap_io_ext
-    except Exception:
-        from ext import bitmap_io_ext
+    from arbytmap.ext import bitmap_io_ext
     fast_bitmap_io = True
-except Exception:
+except:
     fast_bitmap_io = False
 
 
@@ -261,21 +258,30 @@ def save_to_rawdata_file(convertor, output_path, ext, **kwargs):
     fmt = convertor.format
     tex_block = convertor.texture_block
     sub_bitmap_ct = convertor.sub_bitmap_count
-    overwrite = kwargs.get("overwrite", True)
-    mip_levels = kwargs.get("mip_levels", (0, ))
-    if mip_levels in ("all", None):
+    overwrite      = kwargs.get("overwrite", True)
+    mip_levels     = kwargs.get("mip_levels", (0, ))
+    bitmap_indexes = kwargs.get("bitmap_indexes", "all")
+
+    if bitmap_indexes == "all":
+        bitmap_indexes = range(sub_bitmap_ct)
+    elif isinstance(bitmap_indexes, int):
+        bitmap_indexes = (bitmap_indexes, )
+
+    if mip_levels == "all":
         mip_levels = range(convertor.mipmap_count + 1)
+    elif isinstance(mip_levels, int):
+        mip_levels = (mip_levels, )
 
     for m in mip_levels:
-        width  = max(convertor.width  >> m, 1)
-        height = max(convertor.height >> m, 1)
-        depth  = max(convertor.depth  >> m, 1)
+        width  = max(convertor.width  // (1<<m), 1)
+        height = max(convertor.height // (1<<m), 1)
+        depth  = max(convertor.depth  // (1<<m), 1)
 
         mip_output_path = output_path
         if len(mip_levels) > 1:
             mip_output_path = "%s_mip%s" % (mip_output_path, m)
 
-        for sb in range(sub_bitmap_ct):
+        for sb in bitmap_indexes:
             index = sb + m*sub_bitmap_ct
             if index >= len(tex_block):
                 continue
@@ -323,6 +329,19 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     dds_file.filepath = "%s.%s" % (output_path, ext)
     if not kwargs.get("overwrite", True) and os.path.exists(dds_file.filepath):
         return []
+
+    mip_levels     = kwargs.get("mip_levels", "all")
+    bitmap_indexes = kwargs.get("bitmap_indexes", "all")
+
+    if bitmap_indexes == "all":
+        bitmap_indexes = range(convertor.sub_bitmap_count)
+    elif isinstance(bitmap_indexes, int):
+        bitmap_indexes = (bitmap_indexes, )
+
+    if mip_levels == "all":
+        mip_levels = range(convertor.mipmap_count + 1)
+    elif isinstance(mip_levels, int):
+        mip_levels = (mip_levels, )
 
     head = dds_file.data.header
     flags = head.flags
@@ -416,10 +435,10 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
         head.caps.complex = True
         head.caps2.cubemap = True
         for name in ("pos_x", "pos_y", "pos_z",
-                     "neg_x", "neg_y", "neg_z")[: convertor.sub_bitmap_count]:
+                     "neg_x", "neg_y", "neg_z")[: len(bitmap_indexes)]:
             head.caps2[name] = True
 
-    head.mipmap_count = convertor.mipmap_count
+    head.mipmap_count = len(mip_levels) - 1
     if convertor.mipmap_count:
         head.caps.complex = True
         head.caps.mipmaps = flags.mipmaps = True
@@ -427,15 +446,15 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
         head.mipmap_count += 1
 
     #write each of the pixel arrays into the bitmap
-    for sb in range(convertor.sub_bitmap_count):
+    for sb in bitmap_indexes:
         #write each of the pixel arrays into the bitmap
-        for m in range(convertor.mipmap_count + 1):
+        for m in mip_levels:
             # get the index of the bitmap we'll be working with
             i = m*convertor.sub_bitmap_count + sb
             pixels = convertor.texture_block[i]
-            w, h, d = ab.clip_dimensions(convertor.width>>m,
-                                         convertor.height>>m,
-                                         convertor.depth>>m)
+            w, h, d = ab.clip_dimensions(convertor.width  // (1<<m),
+                                         convertor.height // (1<<m),
+                                         convertor.depth  // (1<<m))
 
             if convertor.is_palettized():
                 pal = convertor.palette[i]
@@ -504,23 +523,31 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
     pals = convertor.palette
     tex_block = convertor.texture_block
     sub_bitmap_ct = convertor.sub_bitmap_count
-    mip_levels = kwargs.get("mip_levels", (0, ))
-    overwrite = kwargs.get("overwrite", True)
+    overwrite      = kwargs.get("overwrite", True)
+    mip_levels     = kwargs.get("mip_levels", (0, ))
+    bitmap_indexes = kwargs.get("bitmap_indexes", "all")
 
-    if mip_levels in ("all", None):
+    if bitmap_indexes == "all":
+        bitmap_indexes = range(sub_bitmap_ct)
+    elif isinstance(bitmap_indexes, int):
+        bitmap_indexes = (bitmap_indexes, )
+
+    if mip_levels == "all":
         mip_levels = range(convertor.mipmap_count + 1)
+    elif isinstance(mip_levels, int):
+        mip_levels = (mip_levels, )
 
     for m in mip_levels:
-        width  = max(convertor.width  >> m, 1)
-        height = max(convertor.height >> m, 1)
-        depth  = max(convertor.depth  >> m, 1)
+        width  = max(convertor.width  // (1<<m), 1)
+        height = max(convertor.height // (1<<m), 1)
+        depth  = max(convertor.depth  // (1<<m), 1)
         head.width  = width
         head.height = height*depth
         mip_output_path = output_path
         if len(mip_levels) > 1:
             mip_output_path = "%s_mip%s" % (mip_output_path, m)
 
-        for sb in range(sub_bitmap_ct):
+        for sb in bitmap_indexes:
             index = sb + m*sub_bitmap_ct
             if index >= len(tex_block):
                 continue
@@ -609,13 +636,16 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
         else:
             if target_depth > 8: fmt_to_save_as = ab.FORMAT_R16G16B16
             else:                fmt_to_save_as = ab.FORMAT_R8G8B8
-    elif target_depth == 16: fmt_to_save_as = ab.FORMAT_L16
+    elif fmt == ab.FORMAT_A16: fmt_to_save_as = fmt = ab.FORMAT_L16
+    elif fmt == ab.FORMAT_A8:  fmt_to_save_as = fmt = ab.FORMAT_L8
+    elif fmt == ab.FORMAT_A4:  fmt_to_save_as = fmt = ab.FORMAT_L4
+    elif fmt == ab.FORMAT_A2:  fmt_to_save_as = fmt = ab.FORMAT_L2
+    elif fmt == ab.FORMAT_A1:  fmt_to_save_as = fmt = ab.FORMAT_L1
+    elif bit_depth > 8:      fmt_to_save_as = ab.FORMAT_L16
     elif target_depth == 8:  fmt_to_save_as = ab.FORMAT_L8
     elif target_depth == 4:  fmt_to_save_as = ab.FORMAT_L4
     elif target_depth == 2:  fmt_to_save_as = ab.FORMAT_L2
     elif target_depth == 1:  fmt_to_save_as = ab.FORMAT_L1
-    elif bit_depth > 8:      fmt_to_save_as = ab.FORMAT_L16
-    else:                    fmt_to_save_as = ab.FORMAT_L8
 
     if fmt != fmt_to_save_as or bit_depth not in valid_depths:
         conv_cpy = deepcopy(convertor)
@@ -623,7 +653,9 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
             conv_cpy.set_deep_color_mode(True)
 
         conv_cpy.load_new_conversion_settings(target_format=fmt_to_save_as)
-        conv_cpy.convert_texture()
+        if not conv_cpy.convert_texture():
+            return []
+
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
 
@@ -658,23 +690,31 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     tex_block = convertor.texture_block
     pals = convertor.palette
     sub_bitmap_ct = convertor.sub_bitmap_count
-    mip_levels = kwargs.get("mip_levels", (0, ))
-    overwrite = kwargs.get("overwrite", True)
+    overwrite      = kwargs.get("overwrite", True)
+    mip_levels     = kwargs.get("mip_levels", (0, ))
+    bitmap_indexes = kwargs.get("bitmap_indexes", "all")
 
-    if mip_levels in ("all", None):
+    if bitmap_indexes == "all":
+        bitmap_indexes = range(sub_bitmap_ct)
+    elif isinstance(bitmap_indexes, int):
+        bitmap_indexes = (bitmap_indexes, )
+
+    if mip_levels == "all":
         mip_levels = range(convertor.mipmap_count + 1)
+    elif isinstance(mip_levels, int):
+        mip_levels = (mip_levels, )
 
     for m in mip_levels:
-        width  = max(convertor.width  >> m, 1)
-        height = max(convertor.height >> m, 1)
-        depth  = max(convertor.depth  >> m, 1)
+        width  = max(convertor.width  // (1<<m), 1)
+        height = max(convertor.height // (1<<m), 1)
+        depth  = max(convertor.depth  // (1<<m), 1)
         head.width  = width
         head.height = height*depth
         mip_output_path = output_path
         if len(mip_levels) > 1:
             mip_output_path = "%s_mip%s" % (mip_output_path, m)
 
-        for sb in range(sub_bitmap_ct):
+        for sb in bitmap_indexes:
             index = sb + m*sub_bitmap_ct
             if index >= len(tex_block):
                 continue
@@ -706,19 +746,23 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
                     pix = convertor.pack_raw(pix)
 
                 if channel_count <= 2:
-                    pass
+                    pix = bytearray(pix)
+                    if fmt_depth == 16:
+                        stride *= 2  # no idea why this is needed, but it is...
+                        if channel_count != 1:
+                            swap_channels(pix, (1, 0))
                 elif channel_count == 4:
                     pix = bytearray(pix)
                     if   fmt_depth == 8:
                         swap_channels(pix, (2, 1, 0, 3))
                     elif fmt_depth == 16:
-                        swap_channels(pix, (4, 5, 2, 3, 0, 1, 6, 7))
+                        swap_channels(pix, (5, 4, 3, 2, 1, 0, 7, 6))
                 elif fmt_depth == 8:
                     pix = bytearray(unpad_24bit_array(pix))
                     swap_channels(pix, (2, 1, 0))
                 elif fmt_depth == 16:
                     pix = bytearray(unpad_48bit_array(pix))
-                    swap_channels(pix, (4, 5, 2, 3, 0, 1))
+                    swap_channels(pix, (5, 4, 3, 2, 1, 0))
 
             png_file.set_chunk_data(
                 idat_chunk, pad_idat_data(pix, stride//8))
