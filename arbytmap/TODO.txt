@@ -1,11 +1,1 @@
-fix converting dxt2/3/4/5 to dxt1 with ck transparency causing weird artifacts
-
-fix converting from argb to A16L16(maybe other AL too?) breaking
-
-fix saving v16u16 as 48bit png looking fricked up.
-    weird thing is the image in the png is exactly how it should look, but it
-    isnt being rendered properly. Like, extracting the image data from the png,
-    decompressing it, and removing the filter byte from each scanline. That
-    will give you back a perfect looking 48bit color rgb image
-
-fix dxt5 alpha generation being screwed for min and max values
+fix conversions to A16 and A16L16 not working properly

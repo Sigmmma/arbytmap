@@ -1,6 +1,7 @@
-
-import time
+import os
 import sys
+import tempfile
+import time
 
 from traceback import format_exc
 from array import array
@@ -9,64 +10,31 @@ from os import path
 from copy import deepcopy
 
 from arbytmap.constants import *
-try:
-    from .format_defs import *
-except Exception:
-    from format_defs import *
-
-try:
-    from . import swizzler
-except Exception:
-    import swizzler
-
-try:
-    from . import bitmap_io
-except Exception:
-    import bitmap_io
-
-try:
-    from . import dds_defs
-except Exception:
-    import dds_defs
+from arbytmap.format_defs import *
+from arbytmap import swizzler
+from arbytmap import bitmap_io
+from arbytmap import dds_defs
 
 bitmap_io.ab = dds_defs.ab = sys.modules[__name__]
 dds_defs.initialize()
 
 try:
-    try:
-        from .ext import raw_packer_ext
-    except Exception:
-        from ext import raw_packer_ext
-    fast_raw_packer = True
-except:
-    fast_raw_packer = False
-
-try:
-    try:
-        from .ext import raw_unpacker_ext
-    except Exception:
-        from ext import raw_unpacker_ext
-    fast_raw_unpacker = True
-except:
-    fast_raw_unpacker = False
-
-try:
-    try:
-        from .ext import arbytmap_ext
-    except Exception:
-        from ext import arbytmap_ext
+    from arbytmap.ext import arbytmap_ext
     fast_arbytmap = True
 except:
     fast_arbytmap = False
 
 try:
-    try:
-        from .ext import bitmap_io_ext
-    except Exception:
-        from ext import bitmap_io_ext
-    fast_bitmap_io = True
+    from arbytmap.ext import raw_packer_ext
+    fast_raw_packer = True
 except:
-    fast_bitmap_io = False
+    fast_raw_packer = False
+
+try:
+    from arbytmap.ext import raw_unpacker_ext
+    fast_raw_unpacker = True
+except:
+    fast_raw_unpacker = False
 
 
 '''When constructing this class you must provide the
@@ -257,13 +225,10 @@ class Arbytmap():
         if "deswizzler" not in texture_info:
             self.deswizzler = swizzler.Swizzler(
                 converter=self, mask_type="DEFAULT")
-        elif swizzler is not None:
+        else:
             self.deswizzler = swizzler.Swizzler(
                 converter=self,
                 mask_type=texture_info["deswizzler"])
-        else:
-            print("ERROR: SWIZZLER MODULE NOT LOADED. "+
-                  "CANNOT SWIZZLE/UNSWIZZLE WITHOUT SWIZZLER.")
 
         self.texture_type = texture_info.get("texture_type", TYPE_2D)
         self.channel_order = texture_info.get(
@@ -303,7 +268,6 @@ class Arbytmap():
 
         self.texture_block = texture_block
         self.texture_info = texture_info
-
 
     def load_new_conversion_settings(self, **kwargs):
         #only run if there is a valid texture block loaded
@@ -732,6 +696,29 @@ class Arbytmap():
             if -1 in cmm:
                 cmd.append(CHANNEL_ERASE_DIVISOR)
 
+    def make_photoimages(self, temp_path, **kw):
+        '''Creates and returns PhotoImage objects of the loaded texture.
+        This is done by writing the texture to a png file and creating
+        a Tkinter.PhotoImage object from it.'''
+        if globals().get("tkinter") is None:
+            # only import tkinter if we need to
+            global tkinter
+            import tkinter
+
+        if not(temp_path and isinstance(temp_path, str)):
+            raise TypeError(
+                "Base filename must be provided when creating PhotoImages.")
+
+        images = []
+        for fname in self.save_to_file(output_path=temp_path, ext="png", **kw):
+            images.append(tkinter.PhotoImage(file=fname))
+            try:
+                os.remove(fname)
+            except Exception:
+                pass
+
+        return images
+
     def save_to_file(self, **kwargs):
         """saves the loaded bitmap to a file"""
         output_path = kwargs.pop('output_path', self.filepath)
@@ -741,22 +728,20 @@ class Arbytmap():
             raise TypeError("Cannot save bitmap without output path.")
         elif self.texture_block is None:
             raise TypeError("No bitmap loaded to save to file.")
-        elif bitmap_io is None:
-            raise TypeError(
-                "Bitmap io module isnt loaded. Cant save bitmap to file.")
 
         # if the extension isnt provided in the
         # kwargs we try to get it from the filepath
         if ext is None:
             output_path, ext = path.splitext(output_path)
-            ext = ext[1:]
+            ext = ext.lstrip(".")
 
         ext = ext.lower()
 
         if ext not in bitmap_io.file_writers:
             raise TypeError("Unknown bitmap file export format '%s'" % ext)
 
-        bitmap_io.file_writers[ext](self, output_path, ext.lower(), **kwargs)
+        return bitmap_io.file_writers[ext](
+            self, output_path, ext.lower(), **kwargs)
 
     def load_from_file(self, **kwargs):
         """loads the current bitmap from a file"""
@@ -765,22 +750,20 @@ class Arbytmap():
 
         if input_path is None:
             raise TypeError("Cannot save bitmap without input path.")
-        elif bitmap_io is None:
-            raise TypeError(
-                "Bitmap io module isnt loaded. Cant load bitmap from file.")
 
         # if the extension isnt provided in the
         # kwargs we try to get it from the filepath
         if ext is None:
             input_path, ext = path.splitext(input_path)
-            ext = ext[1:]
+            ext = ext.lstrip(".")
 
         ext = ext.lower()
 
         if ext not in bitmap_io.file_readers:
             raise TypeError("Unknown bitmap file import format '%s'" % ext)
 
-        bitmap_io.file_readers[ext](self, input_path, ext.lower(), **kwargs)
+        return bitmap_io.file_readers[ext](
+            self, input_path, ext.lower(), **kwargs)
 
     def convert_texture(self):
         """Runs all the conversions routines for the parameters specified"""
@@ -832,14 +815,8 @@ class Arbytmap():
 
                 """SWIZZLE THE TEXTURE IF POSSIBLE AND THE TARGET
                 SWIZZLE MODE IS NOT THE CURRENT SWIZZLE MODE."""
-                if self.target_format in COMPRESSED_FORMATS:
-                    pass
-                elif swizzler is not None:
+                if self.target_format not in COMPRESSED_FORMATS:
                     self.reswizzler.swizzle_texture()
-                else:
-                    raise TypeError(
-                        "Swizzler module not loaded. " +
-                        "Cannot unswizzle without swizzler.")
 
                 # return that the conversion was successful
                 return True
@@ -849,16 +826,10 @@ class Arbytmap():
             unswizzled before we can do certain conversions with it.
             We can't downsample while swizzled nor convert to a
             compressed format(swizzling unsupported)'''
-            if not(self.swizzled and (
-                self.downres_amount > 0 or self.generate_mipmaps or
-                target_fmt in COMPRESSED_FORMATS)):
-                pass
-            elif swizzler is not None:
+            if self.swizzled and (self.downres_amount > 0 or
+                                  self.generate_mipmaps or
+                                  target_fmt in COMPRESSED_FORMATS):
                 self.deswizzler.swizzle_texture(True)
-            else:
-                raise TypeError(
-                    "Swizzler module not loaded. " +
-                    "Cannot unswizzle without swizzler.")
 
             '''figure out if we need to depalettize. some formats wont
             support palettes, like DXT1-5, and downressing and other
@@ -909,9 +880,7 @@ class Arbytmap():
             '''DOWNRES BITMAP TO A LOWER RESOLUTION IF STILL NEEDING TO'''
             # only run if there aren't any mipmaps and
             # this bitmap still needs to be downressed
-            if self.mipmap_count != 0 or self.downres_amount <= 0:
-                pass
-            elif swizzler is not None:
+            if self.mipmap_count == 0 and self.downres_amount > 0:
                 for sb in range(self.sub_bitmap_count):
                     downressed_pixels, w, h, d = self._downsample_bitmap(
                         tex_block[sb], self.downres_amount,
@@ -925,17 +894,11 @@ class Arbytmap():
                 tex_info["width"] = self.width = w
                 tex_info["height"] = self.height = h
                 tex_info["depth"] = self.depth = d
-            else:
-                raise TypeError(
-                    "Swizzler module not loaded. " +
-                    "Cannot downres without swizzler.")
 
 
 
             '''GENERATE MIPMAPS'''
-            if not self.generate_mipmaps:
-                pass
-            elif swizzler is not None:
+            if self.generate_mipmaps:
                 new_mip_count = int(log(
                     max(self.width, self.height, self.depth), 2))
                 mips_to_make = new_mip_count - self.mipmap_count
@@ -974,11 +937,6 @@ class Arbytmap():
                             mw//2, mh//2, md//2)
                     # change the mipmap count in the settings
                     tex_info["mipmap_count"] = self.mipmap_count = new_mip_count
-            else:
-                raise TypeError(
-                    "Swizzler module not loaded. " +
-                    "Cannot generate mipmaps without swizzler.")
-
 
 
             '''REPACK THE PIXEL DATA TO THE TARGET FORMAT'''
@@ -1032,14 +990,8 @@ class Arbytmap():
 
             """SWIZZLE THE TEXTURE IF POSSIBLE AND THE TARGET
             SWIZZLE MODE IS NOT THE CURRENT SWIZZLE MODE."""
-            if self.target_format in COMPRESSED_FORMATS:
-                pass
-            elif swizzler is not None:
+            if self.target_format not in COMPRESSED_FORMATS:
                 self.reswizzler.swizzle_texture()
-            else:
-                raise TypeError(
-                    "Swizzler module not loaded. " +
-                    "Cannot swizzle without swizzler.")
 
             # now that we have thoroughly messed with the bitmap, we need
             # to change the format and default all the channel mappings

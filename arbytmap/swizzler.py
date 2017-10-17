@@ -4,10 +4,7 @@ from traceback import format_exc
 import time
 
 try:
-    try:
-        from .ext import swizzler_ext
-    except Exception:
-        from ext import swizzler_ext
+    from arbytmap.ext import swizzler_ext
     fast_swizzler = True
 except Exception:
     fast_swizzler = False

@@ -6,10 +6,7 @@ from math import sqrt
 ab = None
 
 try:
-    try:
-        from .ext import dds_defs_ext
-    except Exception:
-        from ext import dds_defs_ext
+    from arbytmap.ext import dds_defs_ext
     fast_dds_defs = True
 except Exception:
     fast_dds_defs = False
@@ -106,6 +103,7 @@ def initialize():
                      masks=(0, 0xFFff, 0xFFff))
     return
 
+    # these aren't ready yet
     ab.register_format(ab.FORMAT_G8R8, bpp=16, dds_format=True,
                      unpacker=unpack_gr, packer=pack_gr,
                      depths=(8,8,8), offsets=(0,8,0), masks=(0, 0xFF, 0xFF))
@@ -351,6 +349,8 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     r_scale = self.channel_upscalers[1]
     g_scale = self.channel_upscalers[2]
     b_scale = self.channel_upscalers[3]
+    alpha_max = a_scale[-1]
+    alpha_min = a_scale[0]
 
     try:
         chan0 = self.channel_mapping.index(0)
@@ -392,8 +392,8 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
                 a_lookup[3] = (alpha0*3 + alpha1*2)//5
                 a_lookup[4] = (alpha0*2 + alpha1*3)//5
                 a_lookup[5] = (alpha0   + alpha1*4)//5
-                a_lookup[6] = 0
-                a_lookup[7] = 255
+                a_lookup[6] = alpha_min
+                a_lookup[7] = alpha_max
 
             #half of the first array entry in DXT4/5 format is both
             #alpha values and the first third of the indexing
@@ -539,6 +539,10 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
 
     r_scale = self.channel_upscalers[1]
     g_scale = self.channel_upscalers[2]
+    r_min = r_scale[0]
+    g_min = g_scale[0]
+    r_max = r_scale[-1]
+    g_max = g_scale[-1]
 
     try:
         chan1 = self.channel_mapping.index(1)
@@ -589,8 +593,8 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
                 red[3] = (r0*3 + r1*2)//5
                 red[4] = (r0*2 + r1*3)//5
                 red[5] = (r0   + r1*4)//5
-                red[6] = r_scale[0]
-                red[7] = r_scale[255]
+                red[6] = r_min
+                red[7] = r_max
 
             if g0 > g1:
                 green[2] = (g0*6 + g1  )//7
@@ -604,8 +608,8 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
                 green[3] = (g0*3 + g1*2)//5
                 green[4] = (g0*2 + g1*3)//5
                 green[5] = (g0   + g1*4)//5
-                green[6] = g_scale[0]
-                green[7] = g_scale[255]
+                green[6] = g_min
+                green[7] = g_max
 
             for k in pixel_indices:
                 x = r = red[(red_idx >> (k*3))&7]
@@ -684,74 +688,79 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
         print("Cannot unpack DXN texture. Channel mapping must include " +
               "channels 1, 2, and 3, not %s" % self.channel_mapping)
 
-    # convert to tuples for faster access
-    r_scale, g_scale = tuple(r_scale), tuple(g_scale)
+    if fast_dds_defs:
+        dds_defs_ext.unpack_ctx1(
+            unpacked, packed, r_scale, g_scale,
+            ucc, pixels_per_texel, chan1, chan2, chan3, unpack_max)
+    else:
+        # convert to tuples for faster access
+        r_scale, g_scale = tuple(r_scale), tuple(g_scale)
 
-    #loop through each texel
-    for i in range(len(packed)//2):
-        j = i*2
-        pxl_i = i*channels_per_texel
+        #loop through each texel
+        for i in range(len(packed)//2):
+            j = i*2
+            pxl_i = i*channels_per_texel
 
-        values = packed[j]
-        idx = packed[j+1]
+            values = packed[j]
+            idx = packed[j+1]
 
-        """unpack the colors"""
-        c_0[1] = x0 = r0 = r_scale[(values) & 255]
-        c_0[2] = y0 = g0 = g_scale[(values>>8) & 255]
-        c_1[1] = x1 = r1 = r_scale[(values>>16) & 255]
-        c_1[2] = y1 = g1 = g_scale[(values>>24) & 255]
+            """unpack the colors"""
+            c_0[1] = x0 = r0 = r_scale[(values) & 255]
+            c_0[2] = y0 = g0 = g_scale[(values>>8) & 255]
+            c_1[1] = x1 = r1 = r_scale[(values>>16) & 255]
+            c_1[2] = y1 = g1 = g_scale[(values>>24) & 255]
 
-        """calculate the z-components"""
-        # we're normalizing the coordinates here, not just unpacking them
-        x0 = x0&mask if x0&sign_mask else zero_point - x0
-        y0 = y0&mask if y0&sign_mask else zero_point - y0
-        x1 = x1&mask if x1&sign_mask else zero_point - x1
-        y1 = y1&mask if y1&sign_mask else zero_point - y1
+            """calculate the z-components"""
+            # we're normalizing the coordinates here, not just unpacking them
+            x0 = x0&mask if x0&sign_mask else zero_point - x0
+            y0 = y0&mask if y0&sign_mask else zero_point - y0
+            x1 = x1&mask if x1&sign_mask else zero_point - x1
+            y1 = y1&mask if y1&sign_mask else zero_point - y1
 
-        d = mask_sq - x0**2 - y0**2
-        if d > 0:
-            b0 = int(sqrt(d)) + zero_point
-        else:
-            b0 = zero_point
-            n_len = sqrt(mask_sq - d)/mask
-            x0 = int(x0/n_len)
-            y0 = int(y0/n_len)
+            d = mask_sq - x0**2 - y0**2
+            if d > 0:
+                b0 = int(sqrt(d)) + zero_point
+            else:
+                b0 = zero_point
+                n_len = sqrt(mask_sq - d)/mask
+                x0 = int(x0/n_len)
+                y0 = int(y0/n_len)
 
-            r0 = x0 + zero_point if r0&sign_mask else zero_point - x0
-            g0 = y0 + zero_point if g0&sign_mask else zero_point - y0
+                r0 = x0 + zero_point if r0&sign_mask else zero_point - x0
+                g0 = y0 + zero_point if g0&sign_mask else zero_point - y0
 
-        d = mask_sq - x1**2 - y1**2
-        if d > 0:
-            b1 = int(sqrt(d)) + zero_point
-        else:
-            b1 = zero_point
-            n_len = sqrt(mask_sq - d)/mask
-            x1 = int(x1/n_len)
-            y1 = int(y1/n_len)
+            d = mask_sq - x1**2 - y1**2
+            if d > 0:
+                b1 = int(sqrt(d)) + zero_point
+            else:
+                b1 = zero_point
+                n_len = sqrt(mask_sq - d)/mask
+                x1 = int(x1/n_len)
+                y1 = int(y1/n_len)
 
-            r1 = x1 + zero_point if r1&sign_mask else zero_point - x1
-            g1 = y1 + zero_point if g1&sign_mask else zero_point - y1
+                r1 = x1 + zero_point if r1&sign_mask else zero_point - x1
+                g1 = y1 + zero_point if g1&sign_mask else zero_point - y1
 
-        # store the normalized colors
-        c_0[1] = r0; c_1[1] = r1
-        c_0[2] = g0; c_1[2] = g1
-        c_0[3] = b0; c_1[3] = b1
+            # store the normalized colors
+            c_0[1] = r0; c_1[1] = r1
+            c_0[2] = g0; c_1[2] = g1
+            c_0[3] = b0; c_1[3] = b1
 
-        # calculate the in-between colors
-        c_2[1] = (c_0[1]*2 + c_1[1])//3
-        c_2[2] = (c_0[2]*2 + c_1[2])//3
-        c_2[3] = (c_0[3]*2 + c_1[3])//3
+            # calculate the in-between colors
+            c_2[1] = (c_0[1]*2 + c_1[1])//3
+            c_2[2] = (c_0[2]*2 + c_1[2])//3
+            c_2[3] = (c_0[3]*2 + c_1[3])//3
 
-        c_3[1] = (c_0[1] + c_1[1]*2)//3
-        c_3[2] = (c_0[2] + c_1[2]*2)//3
-        c_3[3] = (c_0[3] + c_1[3]*2)//3
+            c_3[1] = (c_0[1] + c_1[1]*2)//3
+            c_3[2] = (c_0[2] + c_1[2]*2)//3
+            c_3[3] = (c_0[3] + c_1[3]*2)//3
 
-        for k in pixel_indices:
-            color = colors[(idx >> (k*2))&3]
-            off = k*ucc + pxl_i
-            unpacked[off + chan1] = color[1]
-            unpacked[off + chan2] = color[2]
-            unpacked[off + chan3] = color[3]
+            for k in pixel_indices:
+                color = colors[(idx >> (k*2))&3]
+                off = k*ucc + pxl_i
+                unpacked[off + chan1] = color[1]
+                unpacked[off + chan2] = color[2]
+                unpacked[off + chan3] = color[3]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -791,43 +800,48 @@ def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
         print("Cannot unpack VU texture. Channel mapping must include " +
               "channels 1, 2, and 3, not %s" % self.channel_mapping)
 
-    # convert to tuples for faster access
-    r_scale, g_scale, b_scale = tuple(r_scale), tuple(g_scale), tuple(b_scale)
+    if fast_dds_defs:
+        dds_defs_ext.unpack_vu(
+            unpacked, packed, r_scale, g_scale, b_scale,
+            ucc, chan1, chan2, chan3)
+    else:
+        sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
+        chan_mask = (1 << bpc) - 1   # == 255 for 8bpc
+        dist_max  = (sign_mask - 1)  # == 127 for 8bpc
+        dist_max_sq = dist_max**2    # == 16129 for 8bpc
 
-    sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
-    chan_mask = (1 << bpc) - 1   # == 255 for 8bpc
-    dist_max  = (sign_mask - 1)  # == 127 for 8bpc
-    dist_max_sq = dist_max**2    # == 16129 for 8bpc
+        # convert to tuples for faster access
+        r_scale, g_scale, b_scale = tuple(r_scale),\
+                                    tuple(g_scale), tuple(b_scale)
+        for i in range(0, len(packed)):
+            j = ucc*i
+            u = packed[i]&chan_mask
+            v = (packed[i]>>bpc)&chan_mask
+            '''
+            So an RGB normal map is [0, 255] and maps linearly to [-1, 1],
+            and V8U8 is [-127, 127] and does NOT map linearly to [-1, 1].
+            If read as unsigned, V8U8 maps [0, 127] to [-127, 0] and
+            [128, 255] to [0, 127]. Because of this, we may need to
+            subtract 255 from the r and g values. This is complicated
+            even more by the fact that the packed array isnt signed in
+            the form we are reading from it, so we need account for that.
+            '''
+            u = u-chan_mask if u&sign_mask else u
+            v = v-chan_mask if v&sign_mask else v
 
-    for i in range(0, len(packed)):
-        j = ucc*i
-        r = packed[i]&chan_mask
-        g = (packed[i]>>bpc)&chan_mask
-        '''
-        So an RGB normal map is [0, 255] and maps linearly to [-1, 1],
-        and V8U8 is [-127, 127] and does NOT map linearly to [-1, 1].
-        If read as unsigned, V8U8 maps [0, 127] to [-127, 0] and
-        [128, 255] to [0, 127]. Because of this, we may need to
-        subtract 255 from the r and g values. This is complicated
-        even more by the fact that the packed array isnt signed in
-        the form we are reading from it, so we need account for that.
-        '''
-        r = r-chan_mask if r&sign_mask else r
-        g = g-chan_mask if g&sign_mask else g
+            # we're normalizing the coordinates here, not just unpacking them
+            d = dist_max_sq - u**2 - v**2
+            if d > 0:
+                w = int(sqrt(d))
+            else:
+                n_len = sqrt(dist_max_sq - d)/dist_max
+                u = int(u/n_len)
+                v = int(v/n_len)
+                w = 0
 
-        # we're normalizing the coordinates here, not just unpacking them
-        d = dist_max_sq - r**2 - g**2
-        if d > 0:
-            b = int(sqrt(d))
-        else:
-            n_len = sqrt(dist_max_sq - d)/dist_max
-            r = int(r/n_len)
-            g = int(g/n_len)
-            b = 0
-
-        unpacked[j + chan1] = r_scale[r + sign_mask]
-        unpacked[j + chan2] = g_scale[g + sign_mask]
-        unpacked[j + chan3] = b_scale[b + sign_mask]
+            unpacked[j + chan1] = r_scale[u + sign_mask]
+            unpacked[j + chan2] = g_scale[v + sign_mask]
+            unpacked[j + chan3] = b_scale[w + sign_mask]
 
     return unpacked
 
@@ -1163,75 +1177,78 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
         alpha0 = max(alpha_vals)
         alpha1 = min(alpha_vals)
 
-        #if the most extreme values are NOT 0 and
-        #255, use them as the interpolation values
         if alpha0 == alpha1:
+            # if they are the same number then
+            # the indexing can stay at all zero
             pass
-        elif alpha0 != 255 or alpha1:
+        elif alpha1 and alpha0 != 255:
+            # if the most extreme values are NOT 0 or
+            # 255, use them as the interpolation values
             """In this mode, value_0 must be greater than value_1"""
-            #if they are the same number then
-            #the indexing can stay at all zero
             alpha_dif = alpha0 - alpha1
             half_dif = alpha_dif//2
-            #calculate and store which interpolated
-            #index each alpha value is closest to
+            # calculate and store which interpolated
+            # index each alpha value is closest to
             for i in range(len(alpha_vals)):
-                #0 = c_0                 1 = c_1
-                #2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
-                #4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
-                #6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
+                # 0 = c_0                 1 = c_1
+                # 2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
+                # 4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
+                # 6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
 
-                #calculate how far between both colors
-                #that the value is as a 0 to 7 int
+                # calculate how far between both colors
+                # that the value is as a 0 to 7 int
                 tmp = ((alpha_vals[i] - alpha1)*7 + half_dif)//alpha_dif
                 if tmp == 0:
                     alpha_idx += 1<<(i*3)
                 elif tmp < 7:
-                    #Because the colors are stored in opposite
-                    #order, we need to invert the index
+                    # Because the colors are stored in opposite
+                    # order, we need to invert the index
                     alpha_idx += (8-tmp)<<(i*3)
         else:
             """In this mode, value_0 must be less than or equal to value_1"""
-            #if the most extreme values ARE 0 and 255 though, then
-            #we need to calculate the second most extreme values
-            for i in pixel_indices:
-                tmp = a_scale[upa[pxl_i+i]]
-                #store if lowest int so far
-                if tmp < alpha0 and tmp > 0: alpha0 = tmp
-                #store if greatest int so far
-                if tmp > alpha1 and tmp < 255: alpha1 = tmp
+            # if the most extreme values ARE 0 and 255 though, then
+            # we need to calculate the second most extreme values
+            alpha0 = 255
+            alpha1 = 0
+            for val in alpha_vals:
+                # store if lowest int so far
+                if val < alpha0 and val:        alpha0 = val
+                # store if greatest int so far
+                if val > alpha1 and val != 255: alpha1 = val
 
-            #if they are the same number then
-            #the indexing can stay at all zero
-            if alpha0 != alpha1:
-                #calculate and store which interpolated
-                #index each alpha value is closest to
-
+            if alpha1:
                 alpha_dif = alpha1 - alpha0
-                half_dif = alpha_dif//2
-                for i in range(len(alpha_vals)):
-                    #there are 4 interpolated colors in this mode
-                    #0 =  c_0                1 = c_1
-                    #2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
-                    #4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
-                    #6 =  0                  7 = 255
-                    comp = alpha_vals[i]
-                    if comp == 0:
-                        #if the value is 0 we set it to index 6
-                        alpha_idx += 6<<(i*3)
-                    elif comp == 255:
-                        #if the value is 255 we set it to index 7
-                        alpha_idx += 7<<(i*3)
-                    else:
-                        #calculate how far between both colors
-                        #that the value is as a 0 to 5 int
-                        tmp = ((comp - alpha0)*5 + half_dif)//alpha_dif
-                        if tmp == 5:
-                            alpha_idx += 1<<(i*3)
-                        elif tmp > 0:
-                            alpha_idx += (tmp+1)<<(i*3)
+            else:
+                alpha0 = alpha_dif = 0
+                alpha1 = 255
 
-        rpa[txl_i] = ((alpha_idx<<16) + (alpha1<<8) + alpha0)&0xFFffFFff
+            half_dif = alpha_dif//2
+
+            # calculate and store which interpolated
+            # index each alpha value is closest to
+            for i in range(len(alpha_vals)):
+                # there are 4 interpolated colors in this mode
+                # 0 =  c_0                1 = c_1
+                # 2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
+                # 4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
+                # 6 =  0                  7 = 255
+                comp = alpha_vals[i]
+                if comp == 0:
+                    # if the value is 0 we set it to index 6
+                    alpha_idx += 6<<(i*3)
+                elif comp == 255:
+                    # if the value is 255 we set it to index 7
+                    alpha_idx += 7<<(i*3)
+                elif alpha_dif:
+                    # calculate how far between both colors
+                    # that the value is as a 0 to 5 int
+                    tmp = ((comp - alpha0)*5 + half_dif)//alpha_dif
+                    if tmp == 5:
+                        alpha_idx += 1<<(i*3)
+                    elif tmp > 0:
+                        alpha_idx += (tmp+1)<<(i*3)
+
+        rpa[txl_i]   = ((alpha_idx<<16) + (alpha1<<8) + alpha0)&0xFFffFFff
         rpa[txl_i+1] = alpha_idx>>16
 
         '''CALCULATE THE COLORS'''
@@ -1334,73 +1351,76 @@ def pack_dxt5a(self, unpacked, width, height, depth=1):
         val0 = max(vals)
         val1 = min(vals)
 
-        #if the most extreme values are NOT 0 and
-        #255, use them as the interpolation values
         if val0 == val1:
+            # if they are the same number then
+            # the indexing can stay at all zero
             pass
-        elif val0 != 255 or val1:
+        elif val1 and val0 != 255:
+            # if the most extreme values are NOT 0 or
+            # 255, use them as the interpolation values
             """In this mode, value_0 must be greater than value_1"""
-            #if they are the same number then
-            #the indexing can stay at all zero
             dif = val0 - val1
             half_dif = dif//2
-            #calculate and store which interpolated
-            #index each alpha value is closest to
+            # calculate and store which interpolated
+            # index each value is closest to
             for i in range(len(vals)):
-                #0 = c_0                 1 = c_1
-                #2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
-                #4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
-                #6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
+                # 0 = c_0                 1 = c_1
+                # 2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
+                # 4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
+                # 6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
 
-                #calculate how far between both colors
-                #that the value is as a 0 to 7 int
+                # calculate how far between both colors
+                # that the value is as a 0 to 7 int
                 tmp = ((vals[i] - val1)*7 + half_dif)//dif
                 if tmp == 0:
                     idx += 1<<(i*3)
                 elif tmp < 7:
-                    #Because the colors are stored in opposite
-                    #order, we need to invert the index
+                    # Because the colors are stored in opposite
+                    # order, we need to invert the index
                     idx += (8-tmp)<<(i*3)
         else:
             """In this mode, value_0 must be less than or equal to value_1"""
-            #if the most extreme values ARE 0 and 255 though, then
-            #we need to calculate the second most extreme values
-            for i in pixel_indices:
-                tmp = a_scale[upa[pxl_i+i]]
-                #store if lowest int so far
-                if tmp < val0 and tmp > 0: val0 = tmp
-                #store if greatest int so far
-                if tmp > val1 and tmp < 255: val1 = tmp
+            # if the most extreme values ARE 0 and 255 though, then
+            # we need to calculate the second most extreme values
+            val0 = 255
+            val1 = 0
+            for val in vals:
+                # store if lowest int so far
+                if val < val0 and val:        val0 = val
+                # store if greatest int so far
+                if val > val1 and val != 255: val1 = val
 
-            #if they are the same number then
-            #the indexing can stay at all zero
-            if val0 != val1:
-                #calculate and store which interpolated
-                #index each alpha value is closest to
-
+            if val1:
                 dif = val1 - val0
-                half_dif = dif//2
-                for i in range(len(vals)):
-                    #there are 4 interpolated colors in this mode
-                    #0 =  c_0                1 = c_1
-                    #2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
-                    #4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
-                    #6 =  0                  7 = 255
-                    comp = vals[i]
-                    if comp == 0:
-                        #if the value is 0 we set it to index 6
-                        idx += 6<<(i*3)
-                    elif comp == 255:
-                        #if the value is 255 we set it to index 7
-                        idx += 7<<(i*3)
-                    else:
-                        #calculate how far between both colors
-                        #that the value is as a 0 to 5 int
-                        tmp = ((comp - val0)*5 + half_dif)//dif
-                        if tmp == 5:
-                            idx += 1<<(i*3)
-                        elif tmp > 0:
-                            idx += (tmp+1)<<(i*3)
+            else:
+                val0 = dif = 0
+                val1 = 255
+
+            half_dif = dif//2
+
+            # calculate and store which interpolated
+            # index each value is closest to
+            for i in range(len(vals)):
+                # there are 4 interpolated colors in this mode
+                # 0 =  c_0                1 = c_1
+                # 2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
+                # 4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
+                # 6 =  0                  7 = 255
+                comp = vals[i]
+                if comp == 0:
+                    # if the value is 0 we set it to index 6
+                    idx += 6<<(i*3)
+                elif comp == 255:
+                    # if the value is 255 we set it to index 7
+                    idx += 7<<(i*3)
+                elif dif:
+                    # calculate how far between both colors
+                    # that the value is as a 0 to 5 int
+                    tmp = ((comp - val0)*5 + half_dif)//dif
+                    if tmp == 5:
+                        idx += 1<<(i*3)
+                    elif tmp > 0:
+                        idx += (tmp+1)<<(i*3)
 
         rpa[txl_i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
         rpa[txl_i+1] = idx>>16
@@ -1449,75 +1469,78 @@ def pack_dxn(self, unpacked, width, height, depth=1):
         val0 = max(vals)
         val1 = min(vals)
 
-        #if the most extreme values are NOT 0 and
-        #255, use them as the interpolation values
         if val0 == val1:
+            # if they are the same number then
+            # the indexing can stay at all zero
             pass
-        elif val0 != 255 or val1:
+        elif val1 and val0 != 255:
+            # if the most extreme values are NOT 0 or
+            # 255, use them as the interpolation values
             """In this mode, value_0 must be greater than value_1"""
-            #if they are the same number then
-            #the indexing can stay at all zero
             dif = val0 - val1
             half_dif = dif//2
-            #calculate and store which interpolated
-            #index each alpha value is closest to
+            # calculate and store which interpolated
+            # index each value is closest to
             for i in range(len(vals)):
-                #0 = c_0                 1 = c_1
-                #2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
-                #4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
-                #6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
+                # 0 = c_0                 1 = c_1
+                # 2 = (6*c_0 + c_1)//7    3 = (5*c_0 + 2*c_1)//7
+                # 4 = (4*c_0 + 3*c_1)//7  5 = (3*c_0 + 4*c_1)//7
+                # 6 = (2*c_0 + 5*c_1)//7  7 = (c_0 + 6*c_1)//7
 
-                #calculate how far between both colors
-                #that the value is as a 0 to 7 int
+                # calculate how far between both colors
+                # that the value is as a 0 to 7 int
                 tmp = ((vals[i] - val1)*7 + half_dif)//dif
                 if tmp == 0:
                     idx += 1<<(i*3)
                 elif tmp < 7:
-                    #Because the colors are stored in opposite
-                    #order, we need to invert the index
+                    # Because the colors are stored in opposite
+                    # order, we need to invert the index
                     idx += (8-tmp)<<(i*3)
         else:
             """In this mode, value_0 must be less than or equal to value_1"""
-            #if the most extreme values ARE 0 and 255 though, then
-            #we need to calculate the second most extreme values
-            for i in pixel_indices:
-                tmp = a_scale[upa[pxl_i+i]]
-                #store if lowest int so far
-                if tmp < val0 and tmp > 0: val0 = tmp
-                #store if greatest int so far
-                if tmp > val1 and tmp < 255: val1 = tmp
+            # if the most extreme values ARE 0 and 255 though, then
+            # we need to calculate the second most extreme values
+            val0 = 255
+            val1 = 0
+            for val in vals:
+                # store if lowest int so far
+                if val < val0 and val:        val0 = val
+                # store if greatest int so far
+                if val > val1 and val != 255: val1 = val
 
-            #if they are the same number then
-            #the indexing can stay at all zero
-            if val0 != val1:
-                #calculate and store which interpolated
-                #index each alpha value is closest to
-
+            if val1:
                 dif = val1 - val0
-                half_dif = dif//2
-                for i in range(len(vals)):
-                    #there are 4 interpolated colors in this mode
-                    #0 =  c_0                1 = c_1
-                    #2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
-                    #4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
-                    #6 =  0                  7 = 255
-                    comp = vals[i]
-                    if comp == 0:
-                        #if the value is 0 we set it to index 6
-                        idx += 6<<(i*3)
-                    elif comp == 255:
-                        #if the value is 255 we set it to index 7
-                        idx += 7<<(i*3)
-                    else:
-                        #calculate how far between both colors
-                        #that the value is as a 0 to 5 int
-                        tmp = ((comp - val0)*5 + half_dif)//dif
-                        if tmp == 5:
-                            idx += 1<<(i*3)
-                        elif tmp > 0:
-                            idx += (tmp+1)<<(i*3)
+            else:
+                val0 = dif = 0
+                val1 = 255
 
-        rpa[txl_i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
+            half_dif = dif//2
+
+            # calculate and store which interpolated
+            # index each value is closest to
+            for i in range(len(vals)):
+                # there are 4 interpolated colors in this mode
+                # 0 =  c_0                1 = c_1
+                # 2 = (4*c_0 + c_1)//5    3 = (3*c_0 + 2*c_1)//5
+                # 4 = (2*c_0 + 3*c_1)//5  5 = (c_0 + 4*c_1)//5
+                # 6 =  0                  7 = 255
+                comp = vals[i]
+                if comp == 0:
+                    # if the value is 0 we set it to index 6
+                    idx += 6<<(i*3)
+                elif comp == 255:
+                    # if the value is 255 we set it to index 7
+                    idx += 7<<(i*3)
+                elif dif:
+                    # calculate how far between both colors
+                    # that the value is as a 0 to 5 int
+                    tmp = ((comp - val0)*5 + half_dif)//dif
+                    if tmp == 5:
+                        idx += 1<<(i*3)
+                    elif tmp > 0:
+                        idx += (tmp+1)<<(i*3)
+
+        rpa[txl_i]   = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
         rpa[txl_i+1] = idx>>16
 
     return repacked
@@ -1640,40 +1663,29 @@ def pack_vu(self, unpacked, width, height, depth=1, bpc=8):
     bytes_per_pixel = (bpc * 2)//8
     typecode = ab.INVERSE_PIXEL_ENCODING_SIZES[bytes_per_pixel]
     packed = ab.bitmap_io.make_array(typecode, len(unpacked)//ucc)
-    _, r_scale, g_scale, __ = self.channel_downscalers
+    _, u_scale, v_scale, __ = self.channel_downscalers
     if ucc == 2:
         chan0, chan1 = 0, 1
     else:
         chan0, chan1 = 1, 2
 
+    if fast_dds_defs:
+        dds_defs_ext.pack_vu(packed, unpacked, u_scale, v_scale,
+                             ucc, chan0, chan1)
+        return packed
+
     # convert to tuples for faster access
-    r_scale, g_scale = tuple(r_scale), tuple(g_scale)
+    u_scale, v_scale = tuple(u_scale), tuple(v_scale)
 
     sign_mask = 1 << (bpc - 1)
-    diff1 = (sign_mask << bpc) + sign_mask
-    diff2 = (sign_mask << bpc) - sign_mask
+    sign_mask = sign_mask + (sign_mask << bpc)
     for i in range(0, len(unpacked), ucc):
-        # packing channels 1 and 2
-        r = r_scale[unpacked[i + chan0]]
-        g = g_scale[unpacked[i + chan1]]
         '''
         So an RGB normal map is [0, 255] and maps linearly to [-1, 1],
         and V8U8 is [-127, 127] and does NOT map linearly to [-1, 1].
         '''
-        if r&sign_mask:
-            if g&sign_mask:
-                packed[i//ucc] = (g<<bpc) + r - diff1  # -((128<<8) + 128)
-            else:
-                packed[i//ucc] = (g<<bpc) + r + diff2  #   (128<<8) - 128
-        elif g&sign_mask:
-            packed[i//ucc] = (g<<bpc) + r - diff2  # (128<<8) - 128
-        else:
-            packed[i//ucc] = (g<<bpc) + r + diff1  # (128<<8) + 128
-
-        # this is a simplified version of the above
-        # r = r-128 if r&128 else r+128
-        # g = g-128 if g&128 else g+128
-        # packed[i//ucc] = (g<<8) + r
+        packed[i//ucc] = (((v_scale[unpacked[i + chan1]]<<bpc) +
+                            u_scale[unpacked[i + chan0]])^sign_mask)
 
     return packed
 
