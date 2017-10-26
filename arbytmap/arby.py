@@ -138,6 +138,13 @@ class Arbytmap():
             #create/set this class's variables to those in the texture block
             self.load_new_texture(**kwargs)
 
+    def __del__(self):
+        self.texture_block = None
+        self.texture_info = None
+        self.palette = None
+        self.channel_upscalers = None
+        self.channel_downscalers = None
+
     def set_deep_color_mode(self, deep_state=None):
         """Allows changing the unpacking mode of this module
         from "true color"(32BPP) to "deep color"(64BPP).
@@ -159,8 +166,8 @@ class Arbytmap():
 
     #call this when providing the convertor with a new list of pixel arrays
     def load_new_texture(self, **kwargs):
-        texture_block = self.texture_block = kwargs.get("texture_block")
-        texture_info = self.texture_info = kwargs.get("texture_info")
+        texture_block = list(kwargs.get("texture_block"))
+        texture_info = dict(kwargs.get("texture_info"))
 
         if texture_block is None:
             raise TypeError(
@@ -173,14 +180,14 @@ class Arbytmap():
                   "CANNOT LOAD BITMAP WITHOUT A DESCRIPTION OF THE BITMAP")
 
         if "format" not in texture_info:
-            self.texture_block = None
+            texture_block = None
             raise TypeError(
                 "ERROR: THE SUPPLIED BITMAP'S INFO BLOCK HAS NO " +
                 "FORMAT ENTRY!\nCAN NOT LOAD BITMAP WITHOUT " +
                 "KNOWING THE BITMAP'S FORMAT.")
 
         if texture_info["format"] not in VALID_FORMATS:
-            self.texture_block = None
+            texture_block = None
             raise TypeError(
                 "ERROR: THE SUPPLIED BITMAP IS IN AN UNKNOWN FORMAT!\n",
                 "IF YOU WISH TO USE THIS FORMAT YOU MUST " +
@@ -262,12 +269,12 @@ class Arbytmap():
         self.indexing_unpacker = texture_info.get(
             "indexing_unpacker", self._unpack_indexing)
 
+        self.texture_block = texture_block
+        self.texture_info  = texture_info
+
         #we may have been provided with conversion
         #settings at the same time we were given the texture
         self.load_new_conversion_settings(**kwargs)
-
-        self.texture_block = texture_block
-        self.texture_info = texture_info
 
     def load_new_conversion_settings(self, **kwargs):
         #only run if there is a valid texture block loaded
@@ -514,15 +521,18 @@ class Arbytmap():
         #figure out how large the entries in the arrays need to be
         #In order for the fast unpackers to work well with these,
         #we make sure all the upscale arrays use the same encoding.
-        scale_size = (max(self.unpacked_depths) + 7)//8
-        array_enc  = INVERSE_PIXEL_ENCODING_SIZES[scale_size]
+        array_enc  = INVERSE_PIXEL_ENCODING_SIZES[
+            (max(self.unpacked_depths) + 7)//8]
         scale_size = PIXEL_ENCODING_SIZES[array_enc]
         for i in range(len(self.unpacked_depths)):
             #this is the amount the values will be scaled to and from
-            scale_ct = 2**self.source_depths[self.channel_mapping[i]]
+            chan = self.channel_mapping[i]
             max_val  = 2**self.unpacked_depths[i] - 1
-            if   scale_ct == 1:
-                scales = bitmap_io.make_array(array_enc, scale_ct, scale_size)
+            scale_ct = 1 if chan < 0 else 2**self.source_depths[chan]
+
+            if scale_ct == 1:
+                f = 0 if i else 255
+                scales = bitmap_io.make_array(array_enc, 1, scale_size, fill=f)
             elif scale_ct == 2:
                 scales = (array(array_enc, [0]*(scale_ct//2)) +
                           array(array_enc, [max_val]*(scale_ct-(scale_ct//2))))
@@ -530,7 +540,8 @@ class Arbytmap():
                 scale = max_val / (scale_ct - 1)
 
                 if fast_arbytmap:
-                    scales = bitmap_io.make_array(array_enc, scale_ct, scale_size)
+                    scales = bitmap_io.make_array(
+                        array_enc, scale_ct, scale_size)
                     arbytmap_ext.populate_scaler_array(scales, scale)
                 else:
                     scales = array(array_enc, (int(j * scale + 0.5)
@@ -551,7 +562,7 @@ class Arbytmap():
             # values to their downscaled values
             scale_ct     = 2**self.unpacked_depths[i]
             out_scale_ct = 2**self.target_depths[i]
-            if   out_scale_ct == 1 or scale_ct == 1:
+            if out_scale_ct == 1 or scale_ct == 1:
                 scales = bitmap_io.make_array(array_enc, scale_ct, scale_size)
             elif out_scale_ct == 2:
                 # if the source depth is 1 bit we use a
@@ -575,8 +586,8 @@ class Arbytmap():
     def _set_channel_load_mapping(self, **kwargs):
         """THIS FUNCTION CREATES MAPPINGS THAT ALLOW US TO
         SWAP CHANNELS AROUND PER PIXEL AS THEY ARE UNPACKED"""
-
-        if kwargs.get("channel_mapping") is not None:
+        is_custom_map = kwargs.get("channel_mapping") is not None
+        if is_custom_map:
             self.channel_mapping = array("b", kwargs["channel_mapping"])
             self.swapping_channels = True
         else:
@@ -591,22 +602,24 @@ class Arbytmap():
         if self.format not in CHANNEL_MASKS:
             return
 
-        #create the default offset, mask, and depth arrays
-        self.channel_masks   = array("Q", CHANNEL_MASKS[self.format])
-        self.channel_offsets = array("B", CHANNEL_OFFSETS[self.format])
-        self.channel_depths  = array("B", CHANNEL_DEPTHS[self.format])
+        if not is_custom_map:
+            #create the default offset, mask, and depth arrays
+            self.channel_masks   = array(self._UNPACK_ARRAY_CODE,
+                                         CHANNEL_MASKS[self.format])
+            self.channel_offsets = array("B", CHANNEL_OFFSETS[self.format])
+            self.channel_depths  = array("B", CHANNEL_DEPTHS[self.format])
+            return
 
-        if kwargs.get("channel_mapping") is not None:
-            #set the number of channels to how many are in the channel mapping
-            self.unpacked_channel_count = len(kwargs["channel_mapping"])
-            self.channel_masks   = array("L", [])
-            self.channel_offsets = array("B", [])
-            self.channel_depths  = array("B", [])
+        #set the number of channels to how many are in the channel mapping
+        self.unpacked_channel_count = len(self.channel_mapping)
+        self.channel_masks   = array(self._UNPACK_ARRAY_CODE, [])
+        self.channel_offsets = array("B", [])
+        self.channel_depths  = array("B", [])
 
         """THE BELOW CODE WILL SWAP AROUND THE OFFSETS, MASKS, AND
         CHANNEL DEPTHS PER CHANNEL. THIS WILL ALLOW US TO SWITCH
         CHANNELS WITH EACH OTHER BY CHANGING THE ORDER WE UNPACK THEM."""
-        for i in range(len(kwargs.get("channel_mapping", ()))):
+        for i in range(len(self.channel_mapping)):
             channel = self.channel_mapping[i]
 
             if channel < 0 or channel >= self.source_channel_count:
@@ -615,17 +628,10 @@ class Arbytmap():
                 this will be used for things like A8 to self._UNPACK_FORMAT"""
                 self.channel_masks.append(0)
                 self.channel_offsets.append(0)
-
-                #we preserve the alpha channel depth
-                #so we can set it to full white
-                if i == 0:
-                    self.channel_depths.append(
-                        CHANNEL_DEPTHS[self.format][0])
-                else:
-                    self.channel_depths.append(0)
+                self.channel_depths.append(0)
             else:
                 """otherwise build the channel masks/offsets/depths from
-                the approporate template arrays for the channel specified"""
+                the appropriate template arrays for the channel specified"""
                 self.channel_masks.append(
                     CHANNEL_MASKS[self.format][channel])
                 self.channel_offsets.append(
@@ -667,7 +673,7 @@ class Arbytmap():
                 "FORMAT WITH %s CHANNELS.\nA MAPPING IS NEEDED TO " +
                 "SPECIFY WHAT SHOULD BE MERGED WITH WHAT.\n" +
                 "DEREFERENCING TEXTURE BLOCK FROM BITMAP " +
-                "CONVERTER TO PREVENT UNSTABLE CONVERSION.") % (scc, tcc))
+                "CONVERTER TO PREVENT UNSTABLE CONVERSION.") % (ucc, tcc))
         elif len(kwargs["channel_merge_mapping"]) != ucc:
             self.texture_block = None
             raise TypeError((
@@ -710,7 +716,9 @@ class Arbytmap():
                 "Base filename must be provided when creating PhotoImages.")
 
         images = []
-        for fname in self.save_to_file(output_path=temp_path, ext="png", **kw):
+        kw.update(output_path=temp_path, ext="png", png_compress_level=1)
+        for fname in self.save_to_file(**kw):
+            # there is lag creating the first photoimage with transparency
             images.append(tkinter.PhotoImage(file=fname))
             try:
                 os.remove(fname)
@@ -733,9 +741,8 @@ class Arbytmap():
         # kwargs we try to get it from the filepath
         if ext is None:
             output_path, ext = path.splitext(output_path)
-            ext = ext.lstrip(".")
 
-        ext = ext.lower()
+        ext = ext.lstrip(".").lower()
 
         if ext not in bitmap_io.file_writers:
             raise TypeError("Unknown bitmap file export format '%s'" % ext)
@@ -755,9 +762,8 @@ class Arbytmap():
         # kwargs we try to get it from the filepath
         if ext is None:
             input_path, ext = path.splitext(input_path)
-            ext = ext.lstrip(".")
 
-        ext = ext.lower()
+        ext = ext.lstrip(".").lower()
 
         if ext not in bitmap_io.file_readers:
             raise TypeError("Unknown bitmap file import format '%s'" % ext)
@@ -1281,22 +1287,17 @@ class Arbytmap():
         offsets = self.channel_offsets
         masks   = self.channel_masks
         upscale = self.channel_upscalers
-        fill_value = 0
 
         if BITS_PER_PIXEL[self.format] in (8, 16, 24, 32, 48, 64):
-            # this is a little hack to set the alpha
-            # channel value to white if we are erasing it
-            if masks[0] == 0:
-                fill_value = 2**self.channel_depths[0] - 1
             if self.unpacked_channel_count == 4:
                 unpacked_array = self._unpack_raw_4_channel(
-                    packed_array, offsets, masks, upscale, fill_value)
+                    packed_array, offsets, masks, upscale)
             elif self.unpacked_channel_count == 2:
                 unpacked_array = self._unpack_raw_2_channel(
-                    packed_array, offsets, masks, upscale, fill_value)
+                    packed_array, offsets, masks, upscale)
             elif self.unpacked_channel_count == 1:
                 unpacked_array = self._unpack_raw_1_channel(
-                    packed_array, offsets, masks, upscale, fill_value)
+                    packed_array, offsets, masks, upscale)
 
             return unpacked_array
 
@@ -1304,8 +1305,7 @@ class Arbytmap():
             "Arbyemap cannot unpack raw pixels of sizes " +
             "other than 8, 16, 24, 32, 48, or 64 bit.")
 
-    def _unpack_raw_4_channel(self, packed_array, offsets,
-                              masks, upscale, fill_value=0):
+    def _unpack_raw_4_channel(self, packed_array, offsets, masks, upscale):
         a_shift, r_shift, g_shift, b_shift = (offsets[0], offsets[1],
                                               offsets[2], offsets[3])
         a_mask,  r_mask,  g_mask,  b_mask  = (masks[0],   masks[1],
@@ -1316,8 +1316,7 @@ class Arbytmap():
         # create a new array to hold the pixels after we unpack them
         ucc = self.unpacked_channel_count
         unpacked_array = bitmap_io.make_array(
-            self._UNPACK_ARRAY_CODE, len(packed_array)*ucc, fill=fill_value)
-
+            self._UNPACK_ARRAY_CODE, len(packed_array)*ucc)
         if fast_raw_unpacker:
             raw_unpacker_ext.unpack_raw_4_channel(
                 unpacked_array, packed_array,
@@ -1335,8 +1334,7 @@ class Arbytmap():
 
         return unpacked_array
 
-    def _unpack_raw_2_channel(self, packed_array, offsets,
-                              masks, upscale, fill_value=0):
+    def _unpack_raw_2_channel(self, packed_array, offsets, masks, upscale):
         a_shift, i_shift = offsets[0], offsets[1]
         a_mask,  i_mask  = masks[0],   masks[1]
         a_scale, i_scale = upscale[0], upscale[1]
@@ -1344,7 +1342,7 @@ class Arbytmap():
         # create a new array to hold the pixels after we unpack them
         ucc = self.unpacked_channel_count
         unpacked_array = bitmap_io.make_array(
-            self._UNPACK_ARRAY_CODE, len(packed_array)*ucc, fill=fill_value)
+            self._UNPACK_ARRAY_CODE, len(packed_array)*ucc)
 
         if fast_raw_unpacker:
             raw_unpacker_ext.unpack_raw_2_channel(
@@ -1359,14 +1357,13 @@ class Arbytmap():
 
         return unpacked_array
 
-    def _unpack_raw_1_channel(self, packed_array, offsets,
-                              masks, upscale, fill_value=0):
+    def _unpack_raw_1_channel(self, packed_array, offsets, masks, upscale):
         shift, mask, scale = offsets[0], masks[0], upscale[0]
 
         # create a new array to hold the pixels after we unpack them
         ucc = self.unpacked_channel_count
         unpacked_array = bitmap_io.make_array(
-            self._UNPACK_ARRAY_CODE, len(packed_array)*ucc, fill=fill_value)
+            self._UNPACK_ARRAY_CODE, len(packed_array)*ucc)
 
         if fast_raw_unpacker:
             raw_unpacker_ext.unpack_raw_1_channel(

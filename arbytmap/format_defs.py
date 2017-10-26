@@ -247,9 +247,9 @@ def get_mipmap_dimensions(width, height, depth, mipmap_level, format):
     '''This function will give the dimensions of the
     specified mipmap level, format, and fullsize dimensions'''
     #since the dimensions change per mipmap we need to calculate them
-    return (clip_dimensions(
-        width//2**mipmap_level, height//2**mipmap_level,
-        depth//2**mipmap_level, format))
+    return clip_dimensions(width//(2**mipmap_level),
+                           height//(2**mipmap_level),
+                           depth//(2**mipmap_level), format)
 
 
 def clip_dimensions(width, height, depth=1, fmt=FORMAT_A8R8G8B8):

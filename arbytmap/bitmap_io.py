@@ -152,7 +152,7 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
     except:
         print(format_exc())
 
-                
+
 def load_from_tga_file(convertor, input_path, ext, **kwargs):
     """Loads a TGA file into the convertor."""
     tga_file = tga_def.build(filepath="%s.%s" % (input_path, ext))
@@ -289,14 +289,15 @@ def save_to_rawdata_file(convertor, output_path, ext, **kwargs):
             final_output_path = mip_output_path
             if sub_bitmap_ct > 1:
                 final_output_path = "%s_tex%s" % (final_output_path, sb)
-            final_output_path += ext
+            
+            final_output_path = "%s.%s" % (final_output_path, ext)
 
             if not overwrite and os.path.exists(final_output_path):
                 continue
 
             with open(final_output_path, 'wb+') as raw_file:
                 pixel_array = tex_block[index]
-                if convertor.packed:
+                if not convertor.packed:
                     pixel_array = convertor.pack(
                         pixel_array, width, height, depth)
                     if pixel_array is None:
@@ -318,6 +319,16 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     """Saves the currently loaded texture to a DDS file"""
     typ = convertor.texture_type
     fmt = convertor.format
+
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    channel_map = kwargs.pop("channel_mapping", None)
+    if channel_map is not None or convertor.swizzled != swizzle_mode:
+        conv_cpy = deepcopy(convertor)
+        conv_cpy.load_new_conversion_settings(
+            swizzle_mode=swizzle_mode, channel_mapping=channel_map)
+        conv_cpy.convert_texture()
+        return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
+                                     **kwargs)
 
     if fmt in (ab.FORMAT_A16R16G16B16, ab.FORMAT_R16G16B16):
         print("ERROR: CANNOT SAVE %s TO DDS.\nCANCELLING DDS SAVE." %
@@ -489,9 +500,15 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
         ab.FORMAT_A1R5G5B5, ab.FORMAT_R8G8B8,
         ab.FORMAT_X8R8G8B8, ab.FORMAT_A8R8G8B8)
 
-    if fmt != ab.FORMAT_A8R8G8B8 and make_copy:
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    if ("channel_mapping" in kwargs or (fmt != ab.FORMAT_A8R8G8B8 and make_copy)
+            or convertor.swizzled != swizzle_mode):
         conv_cpy = deepcopy(convertor)
-        conv_cpy.load_new_conversion_settings(target_format=ab.FORMAT_A8R8G8B8)
+        # TODO: optimize this so the only textures loaded in and converted
+        # are the mip_levels and sub_bitmaps that were requested to be saved
+        conv_cpy.load_new_conversion_settings(
+            target_format=ab.FORMAT_A8R8G8B8, swizzle_mode=swizzle_mode,
+            channel_mapping=kwargs.pop("channel_mapping", None))
         conv_cpy.convert_texture()
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
@@ -625,12 +642,9 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
 
     filenames = []
 
-    if palettized or channel_count == 3:
-        if target_depth == 16: fmt_to_save_as = ab.FORMAT_R16G16B16
-        else:                  fmt_to_save_as = ab.FORMAT_R8G8B8
-    elif channel_count >= 2:
+    if channel_count >= 2:
         # png doesnt allow 2 channel greyscale, so convert them to 4 channel
-        if keep_alpha:
+        if keep_alpha and channel_count == 4:
             if target_depth > 8: fmt_to_save_as = ab.FORMAT_A16R16G16B16
             else:                fmt_to_save_as = ab.FORMAT_A8R8G8B8
         else:
@@ -647,15 +661,21 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     elif target_depth == 2:  fmt_to_save_as = ab.FORMAT_L2
     elif target_depth == 1:  fmt_to_save_as = ab.FORMAT_L1
 
-    if fmt != fmt_to_save_as or bit_depth not in valid_depths:
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    channel_map = kwargs.pop("channel_mapping", None)
+    if (bit_depth not in valid_depths or channel_map is not None or
+            fmt != fmt_to_save_as or convertor.swizzled != swizzle_mode):
         conv_cpy = deepcopy(convertor)
+        # TODO: optimize this so the only textures loaded in and converted
+        # are the mip_levels and sub_bitmaps that were requested to be saved
         if target_depth > 8:
             conv_cpy.set_deep_color_mode(True)
 
-        conv_cpy.load_new_conversion_settings(target_format=fmt_to_save_as)
+        conv_cpy.load_new_conversion_settings(
+            target_format=fmt_to_save_as, swizzle_mode=convertor.swizzle_mode,
+            channel_mapping=channel_map)
         if not conv_cpy.convert_texture():
             return []
-
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
 
@@ -669,6 +689,9 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
         png_file.data.chunks.append(case="sRGB")
         png_file.data.chunks.append(case="PLTE")
         plte_chunk = png_file.data.chunks[-1]
+        if channel_count == 4:
+            png_file.data.chunks.append(case="tRNS")
+            trns_chunk = png_file.data.chunks[-1]
     elif channel_count > 2:
         color_type = "truecolor"
         if channel_count == 4:
@@ -693,6 +716,7 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     overwrite      = kwargs.get("overwrite", True)
     mip_levels     = kwargs.get("mip_levels", (0, ))
     bitmap_indexes = kwargs.get("bitmap_indexes", "all")
+    png_compress_level = kwargs.get("png_compress_level", None)
 
     if bitmap_indexes == "all":
         bitmap_indexes = range(sub_bitmap_ct)
@@ -731,12 +755,27 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
             pix = tex_block[index]
             if palettized:
                 pal = pals[index]
-                if not convertor.palette_packed:
-                    pal = convertor.palette_packer(pal)
                 if not convertor.packed:
                     pix = convertor.indexing_packer(pix)
 
-                plte_chunk.data = bytes(pal)
+                if channel_count == 4:
+                    if convertor.palette_packed:
+                        pal = convertor.palette_unpacker(pal)
+                    alpha_pal = array(
+                        "B", (pal[i] for i in range(0, len(pal), 4)))
+                    trns_chunk.palette = alpha_pal
+                    old_pal = pal
+                    pal = bytearray(len(pal)*3//4)
+                    for i in range(len(pal)//3):
+                        j = i*4
+                        i = i*3
+                        pal[i: i+3] = old_pal[j+1: j+4]
+                    plte_chunk.data = pal
+                else:
+                    if not convertor.palette_packed:
+                        pal = convertor.palette_packer(pal)
+                    plte_chunk.data = bytes(pal)
+
             else:
                 stride *= channel_count
                 if channel_count == 1 and fmt_depth == 16:
@@ -763,9 +802,9 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
                 elif fmt_depth == 16:
                     pix = bytearray(unpad_48bit_array(pix))
                     swap_channels(pix, (5, 4, 3, 2, 1, 0))
-
             png_file.set_chunk_data(
-                idat_chunk, pad_idat_data(pix, stride//8))
+                idat_chunk, pad_idat_data(pix, stride//8),
+                png_compress_level=png_compress_level)
             png_file.serialize(temp=False, backup=False, calc_pointers=False)
             filenames.append(png_file.filepath)
 
@@ -839,8 +878,8 @@ def bitmap_bytes_to_array(rawdata, offset, texture_block, fmt,
 
     #if not enough pixel data was supplied, extra will be added
     if len(pixel_array)*pixel_size < bitmap_size:
-        print("WARNING: PIXEL DATA SUPPLIED DID NOT MEET "+
-              "THE SIZE EXPECTED. PADDING WITH ZEROS.")
+        #print("WARNING: PIXEL DATA SUPPLIED DID NOT MEET "+
+        #      "THE SIZE EXPECTED. PADDING WITH ZEROS.")
         pixel_array.extend(
             make_array(pixel_array.typecode, bitmap_size - len(pixel_array), 1))
     

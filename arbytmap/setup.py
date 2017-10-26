@@ -13,13 +13,14 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 curr_dir = dirname(__file__)
 #               YYYY.MM.DD
-release_date = "2017.10.17"
-version = (0, 6, 5)
+release_date = "2017.10.26"
+version = (0, 8, 2)
 
 
 # Below here was copied from the setup file of simplejson.
 # I could rewrite it, but it is too simple to justify reinterpreting
 is_pypy = hasattr(sys, 'pypy_translation_info')
+ext_errors = None
 if sys.platform == 'win32':
    ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError,
                  IOError, ValueError)
@@ -37,12 +38,13 @@ class ve_build_ext(build_ext):
             raise BuildFailed()
 
     def build_extension(self, ext):
-        try:
+        if ext_errors:
+            try:
+                build_ext.build_extension(self, ext)
+            except ext_errors:
+                raise BuildFailed()
+        else:
             build_ext.build_extension(self, ext)
-        except ext_errors:
-            raise BuildFailed()
-# Above here was copied from the setup file of simplejson.
-# I could rewrite it, but it is too simple to justify reinterpreting
 
 
 try:

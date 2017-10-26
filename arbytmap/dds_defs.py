@@ -131,27 +131,28 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     #create a new array to hold the pixels after we unpack them
     unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
 
+    chan0 = self.channel_mapping[0]
+    chan1 = self.channel_mapping[1]
+    chan2 = self.channel_mapping[2]
+    chan3 = self.channel_mapping[3]
+    has_a = chan0 >= 0
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
     a_scale = self.channel_upscalers[0]
     r_scale = self.channel_upscalers[1]
     g_scale = self.channel_upscalers[2]
     b_scale = self.channel_upscalers[3]
-
-    try:
-        chan0 = self.channel_mapping.index(0)
-        chan1 = self.channel_mapping.index(1)
-        chan2 = self.channel_mapping.index(2)
-        chan3 = self.channel_mapping.index(3)
-    except Exception:
-        print("Cannot unpack DXT texture. Channel mapping must include " +
-              "channels 0, 1, 2, and 3, not %s" % self.channel_mapping)
-
     if fast_dds_defs:
         dds_defs_ext.unpack_dxt1(
             unpacked, packed, r_scale, g_scale, b_scale,
-            pixels_per_texel, chan0, chan1, chan2, chan3, unpack_max)
+            pixels_per_texel, chan0, chan1, chan2, chan3)
     else:
         channels_per_texel = ucc*pixels_per_texel
         pixel_indices = range(pixels_per_texel)
+
+        r_mask,  g_mask,  b_mask  = self.channel_masks[1:]
+        r_shift, g_shift, b_shift = self.channel_offsets[1:]
 
         #create the arrays to hold the color channel data
         c_0 = [unpack_max,0,0,0]
@@ -175,13 +176,12 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
             color_idx = packed[j+1]
 
             """unpack the colors"""
-            c_0[1] = r_scale[(color0>>11) & 31]
-            c_0[2] = g_scale[(color0>>5) & 63]
-            c_0[3] = b_scale[(color0) & 31]
-
-            c_1[1] = r_scale[(color1>>11) & 31]
-            c_1[2] = g_scale[(color1>>5) & 63]
-            c_1[3] = b_scale[(color1) & 31]
+            c_0[1] = r_scale[(color0>>r_shift) & r_mask]
+            c_1[1] = r_scale[(color1>>r_shift) & r_mask]
+            c_0[2] = g_scale[(color0>>g_shift) & g_mask]
+            c_1[2] = g_scale[(color1>>g_shift) & g_mask]
+            c_1[3] = b_scale[(color1>>b_shift) & b_mask]
+            c_0[3] = b_scale[(color0>>b_shift) & b_mask]
 
             #if the first color is a larger integer
             #then color key transparency is NOT used
@@ -203,10 +203,11 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
             for j in pixel_indices:
                 color = colors[(color_idx >> (j*2))&3]
                 off = j*ucc + pxl_i
-                unpacked[off + chan0] = color[0]
-                unpacked[off + chan1] = color[1]
-                unpacked[off + chan2] = color[2]
-                unpacked[off + chan3] = color[3]
+                if has_a: unpacked[off] = color[chan0]
+                else:     unpacked[off] = unpack_max
+                if has_r: unpacked[off + 1] = color[chan1]
+                if has_g: unpacked[off + 2] = color[chan2]
+                if has_b: unpacked[off + 3] = color[chan3]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -245,19 +246,20 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    a_scale = self.channel_upscalers[0]
-    r_scale = self.channel_upscalers[1]
-    g_scale = self.channel_upscalers[2]
-    b_scale = self.channel_upscalers[3]
-
-    try:
-        chan0 = self.channel_mapping.index(0)
-        chan1 = self.channel_mapping.index(1)
-        chan2 = self.channel_mapping.index(2)
-        chan3 = self.channel_mapping.index(3)
-    except Exception:
-        print("Cannot unpack DXT texture. Channel mapping must include " +
-              "channels 0, 1, 2, and 3, not %s" % self.channel_mapping)
+    chan0 = self.channel_mapping[0]
+    chan1 = self.channel_mapping[1]
+    chan2 = self.channel_mapping[2]
+    chan3 = self.channel_mapping[3]
+    has_a = chan0 >= 0
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
+    a_scale = self.channel_upscalers[chan0]
+    r_scale = self.channel_upscalers[chan1]
+    g_scale = self.channel_upscalers[chan2]
+    b_scale = self.channel_upscalers[chan3]
+    r_mask,  g_mask,  b_mask  = self.channel_masks[1:]
+    r_shift, g_shift, b_shift = self.channel_offsets[1:]
 
     if fast_dds_defs:
         dds_defs_ext.unpack_dxt2_3(
@@ -279,13 +281,12 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
             color_idx = packed[j+3]
 
             """unpack the colors"""
-            c_0[1] = r_scale[(color0>>11) & 31]
-            c_0[2] = g_scale[(color0>>5) & 63]
-            c_0[3] = b_scale[(color0) & 31]
-
-            c_1[1] = r_scale[(color1>>11) & 31]
-            c_1[2] = g_scale[(color1>>5) & 63]
-            c_1[3] = b_scale[(color1) & 31]
+            c_0[1] = r_scale[(color0>>r_shift) & r_mask]
+            c_1[1] = r_scale[(color1>>r_shift) & r_mask]
+            c_0[2] = g_scale[(color0>>g_shift) & g_mask]
+            c_1[2] = g_scale[(color1>>g_shift) & g_mask]
+            c_1[3] = b_scale[(color1>>b_shift) & b_mask]
+            c_0[3] = b_scale[(color0>>b_shift) & b_mask]
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -301,11 +302,23 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
             for j in pixel_indices:
                 color = colors[(color_idx >> (j*2))&3]
                 off = j*ucc + pxl_i
+                a = (alpha >> (j*4))&15
 
-                unpacked[off + chan0] = a_scale[(alpha >> (j*4))&15]
-                unpacked[off + chan1] = color[1]
-                unpacked[off + chan2] = color[2]
-                unpacked[off + chan3] = color[3]
+                if chan0 == 0: unpacked[off] = a_scale[a]
+                elif has_a:    unpacked[off] = color[chan0]
+                else:          unpacked[off] = unpack_max
+
+                if chan1 == 0: unpacked[off + 1] = a_scale[a]
+                elif has_r:    unpacked[off + 1] = color[chan1]
+                else:          unpacked[off + 1] = unpack_max
+
+                if chan2 == 0: unpacked[off + 2] = a_scale[a]
+                elif has_g:    unpacked[off + 2] = color[chan2]
+                else:          unpacked[off + 2] = unpack_max
+
+                if chan3 == 0: unpacked[off + 3] = a_scale[a]
+                elif has_b:    unpacked[off + 3] = color[chan3]
+                else:          unpacked[off + 3] = unpack_max
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -344,22 +357,22 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    a_lookup = [0,0,0,0,0,0,0,0]
-    a_scale = self.channel_upscalers[0]
-    r_scale = self.channel_upscalers[1]
-    g_scale = self.channel_upscalers[2]
-    b_scale = self.channel_upscalers[3]
-    alpha_max = a_scale[-1]
-    alpha_min = a_scale[0]
+    chan0 = self.channel_mapping[0]
+    chan1 = self.channel_mapping[1]
+    chan2 = self.channel_mapping[2]
+    chan3 = self.channel_mapping[3]
+    has_a = chan0 >= 0
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
+    a_scale = self.channel_upscalers[chan0]
+    r_scale = self.channel_upscalers[chan1]
+    g_scale = self.channel_upscalers[chan2]
+    b_scale = self.channel_upscalers[chan3]
+    r_mask,  g_mask,  b_mask  = self.channel_masks[1:]
+    r_shift, g_shift, b_shift = self.channel_offsets[1:]
 
-    try:
-        chan0 = self.channel_mapping.index(0)
-        chan1 = self.channel_mapping.index(1)
-        chan2 = self.channel_mapping.index(2)
-        chan3 = self.channel_mapping.index(3)
-    except Exception:
-        print("Cannot unpack DXT texture. Channel mapping must include " +
-              "channels 0, 1, 2, and 3, not %s" % self.channel_mapping)
+    a_lookup = [0,0,0,0,0,0,0,0]
 
     if fast_dds_defs:
         dds_defs_ext.unpack_dxt4_5(
@@ -374,8 +387,8 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
             pxl_i = i*channels_per_texel
             j = i*4
 
-            a_lookup[0] = alpha0 = a_scale[packed[j] & 255]
-            a_lookup[1] = alpha1 = a_scale[(packed[j] >> 8) & 255]
+            a_lookup[0] = alpha0 = packed[j] & 255
+            a_lookup[1] = alpha1 = (packed[j] >> 8) & 255
             alpha_idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
 
             """depending on which alpha is larger
@@ -392,8 +405,8 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
                 a_lookup[3] = (alpha0*3 + alpha1*2)//5
                 a_lookup[4] = (alpha0*2 + alpha1*3)//5
                 a_lookup[5] = (alpha0   + alpha1*4)//5
-                a_lookup[6] = alpha_min
-                a_lookup[7] = alpha_max
+                a_lookup[6] = 0
+                a_lookup[7] = 255
 
             #half of the first array entry in DXT4/5 format is both
             #alpha values and the first third of the indexing
@@ -402,13 +415,12 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
             color_idx = packed[j+3]
 
             """unpack the colors"""
-            c_0[1] = r_scale[(color0>>11) & 31]
-            c_0[2] = g_scale[(color0>>5) & 63]
-            c_0[3] = b_scale[(color0) & 31]
-
-            c_1[1] = r_scale[(color1>>11) & 31]
-            c_1[2] = g_scale[(color1>>5) & 63]
-            c_1[3] = b_scale[(color1) & 31]
+            c_0[1] = r_scale[(color0>>r_shift) & r_mask]
+            c_1[1] = r_scale[(color1>>r_shift) & r_mask]
+            c_0[2] = g_scale[(color0>>g_shift) & g_mask]
+            c_1[2] = g_scale[(color1>>g_shift) & g_mask]
+            c_1[3] = b_scale[(color1>>b_shift) & b_mask]
+            c_0[3] = b_scale[(color0>>b_shift) & b_mask]
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -424,11 +436,23 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
             for j in pixel_indices:
                 color = colors[(color_idx >> (j*2))&3]
                 off = j*ucc + pxl_i
+                a = a_lookup[(alpha_idx >> (j*3))&7]
 
-                unpacked[off + chan0] = a_lookup[(alpha_idx >> (j*3))&7]
-                unpacked[off + chan1] = color[1]
-                unpacked[off + chan2] = color[2]
-                unpacked[off + chan3] = color[3]
+                if chan0 == 0: unpacked[off] = a_scale[a]
+                elif has_a:    unpacked[off] = color[chan0]
+                else:          unpacked[off] = unpack_max
+
+                if chan1 == 0: unpacked[off + 1] = a_scale[a]
+                elif has_r:    unpacked[off + 1] = color[chan1]
+                else:          unpacked[off + 1] = unpack_max
+
+                if chan2 == 0: unpacked[off + 2] = a_scale[a]
+                elif has_g:    unpacked[off + 2] = color[chan2]
+                else:          unpacked[off + 2] = unpack_max
+
+                if chan3 == 0: unpacked[off + 3] = a_scale[a]
+                elif has_b:    unpacked[off + 3] = color[chan3]
+                else:          unpacked[off + 3] = unpack_max
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -455,22 +479,16 @@ def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
     #create a new array to hold the pixels after we unpack them
     unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
 
-    # we expect up to 4 channels cna exist, so we put some
-    # placeholder arrays in just in case we dont use them all
-    scales = [array(unpack_code)]*4
-    chans  = [0]*4
-
-    # invert the channel mapping since thats how we'll need to use it
-    assert ucc == scc
-    channel_map = self.channel_mapping
-    for i in range(ucc):
-        scales[i] = self.channel_upscalers[i]
-        chans[channel_map[i]] = i
+    scales = list(self.channel_upscalers)
+    chans  = list(self.channel_mapping)
 
     if fast_dds_defs:
+        make_ct = 4 - len(scales)
+        scales.extend([array(scales[0].typecode)] * make_ct)
+        chans.extend([-1] * make_ct)
         dds_defs_ext.unpack_dxt5a(
             unpacked, packed, scales[0], scales[1], scales[2], scales[3],
-            ucc, pixels_per_texel, chans[0], chans[1], chans[2], chans[3])
+            ucc, scc, pixels_per_texel, chans[0], chans[1], chans[2], chans[3])
     else:
         for i in range(len(scales)):
             scales[i] = tuple(scales[i])
@@ -480,13 +498,17 @@ def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
 
         #loop through each texel
         for i in range(len(packed)//2):
-            chan = chans[i%ucc]
+            #chan = chans[i%ucc]
+            chan = i%ucc
+            # TODO: Modify this with an inner loop so
+            # it can unpack the texel's channels in the
+            # order specified by the channel mapping.
             pxl_i = (i//scc)*channels_per_texel + chan
             scale = scales[chan]
             j = i*2
 
-            lookup[0] = val0 = scale[packed[j] & 255]
-            lookup[1] = val1 = scale[(packed[j] >> 8) & 255]
+            lookup[0] = val0 = packed[j] & 255
+            lookup[1] = val1 = (packed[j] >> 8) & 255
             idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
 
             """depending on which value is larger
@@ -503,11 +525,12 @@ def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
                 lookup[3] = (val0*3 + val1*2)//5
                 lookup[4] = (val0*2 + val1*3)//5
                 lookup[5] = (val0   + val1*4)//5
-                lookup[6] = scale[0]
-                lookup[7] = scale[255]
+                lookup[6] = 0
+                lookup[7] = 255
 
-            for k in pixel_indices:
-                unpacked[k*ucc + pxl_i] = lookup[(idx >> (k*3))&7]
+            for j in pixel_indices:
+                unpacked[pxl_i + j*ucc] = scale[
+                    lookup[(idx >> (j*3))&7]]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -537,20 +560,19 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
     #create a new array to hold the pixels after we unpack them
     unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
 
-    r_scale = self.channel_upscalers[1]
-    g_scale = self.channel_upscalers[2]
+    chan1 = self.channel_mapping[1]
+    chan2 = self.channel_mapping[2]
+    chan3 = self.channel_mapping[3]
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
+    r_scale = self.channel_upscalers[chan1]
+    g_scale = self.channel_upscalers[chan2]
+
     r_min = r_scale[0]
     g_min = g_scale[0]
     r_max = r_scale[-1]
     g_max = g_scale[-1]
-
-    try:
-        chan1 = self.channel_mapping.index(1)
-        chan2 = self.channel_mapping.index(2)
-        chan3 = self.channel_mapping.index(3)
-    except Exception:
-        print("Cannot unpack DXN texture. Channel mapping must include " +
-              "channels 1, 2, and 3, not %s" % self.channel_mapping)
 
     if fast_dds_defs:
         dds_defs_ext.unpack_dxn(
@@ -560,62 +582,59 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
         # convert to tuples for faster access
         r_scale, g_scale = tuple(r_scale), tuple(g_scale)
         pixel_indices = range(pixels_per_texel)
-        red   = [0,0,0,0,0,0,0,0]
-        green = [0,0,0,0,0,0,0,0]
+        r_lookup = [0,0,0,0,0,0,0,0]
+        g_lookup = [0,0,0,0,0,0,0,0]
 
         #loop through each texel
         for i in range(len(packed)//4):
             pxl_i = i*channels_per_texel
             j = i*4
-            r_index = pxl_i + chan1
-            g_index = pxl_i + chan2
-            b_index = pxl_i + chan3
 
-            g0 = green[0] = g_scale[packed[j]&255]
-            g1 = green[1] = g_scale[(packed[j]>>8)&255]
-            green_idx = ((packed[j]>>16)&65535) + (packed[j+1]<<16)
+            g0 = g_lookup[0] = packed[j]&255
+            g1 = g_lookup[1] = (packed[j]>>8)&255
+            g_idx = ((packed[j]>>16)&65535) + (packed[j+1]<<16)
 
-            r0 = red[0] = r_scale[packed[j+2]&255]
-            r1 = red[1] = r_scale[(packed[j+2]>>8)&255]
-            red_idx = ((packed[j+2]>>16)&65535) + (packed[j+3]<<16)
+            r0 = r_lookup[0] = packed[j+2]&255
+            r1 = r_lookup[1] = (packed[j+2]>>8)&255
+            r_idx = ((packed[j+2]>>16)&65535) + (packed[j+3]<<16)
 
             #depending on which alpha value is larger
             #the indexing is calculated differently
             if r0 > r1:
-                red[2] = (r0*6 + r1  )//7
-                red[3] = (r0*5 + r1*2)//7
-                red[4] = (r0*4 + r1*3)//7
-                red[5] = (r0*3 + r1*4)//7
-                red[6] = (r0*2 + r1*5)//7
-                red[7] = (r0   + r1*6)//7
+                r_lookup[2] = (r0*6 + r1  )//7
+                r_lookup[3] = (r0*5 + r1*2)//7
+                r_lookup[4] = (r0*4 + r1*3)//7
+                r_lookup[5] = (r0*3 + r1*4)//7
+                r_lookup[6] = (r0*2 + r1*5)//7
+                r_lookup[7] = (r0   + r1*6)//7
             else:
-                red[2] = (r0*4 + r1  )//5
-                red[3] = (r0*3 + r1*2)//5
-                red[4] = (r0*2 + r1*3)//5
-                red[5] = (r0   + r1*4)//5
-                red[6] = r_min
-                red[7] = r_max
+                r_lookup[2] = (r0*4 + r1  )//5
+                r_lookup[3] = (r0*3 + r1*2)//5
+                r_lookup[4] = (r0*2 + r1*3)//5
+                r_lookup[5] = (r0   + r1*4)//5
+                r_lookup[6] = r_min
+                r_lookup[7] = r_max
 
             if g0 > g1:
-                green[2] = (g0*6 + g1  )//7
-                green[3] = (g0*5 + g1*2)//7
-                green[4] = (g0*4 + g1*3)//7
-                green[5] = (g0*3 + g1*4)//7
-                green[6] = (g0*2 + g1*5)//7
-                green[7] = (g0   + g1*6)//7
+                g_lookup[2] = (g0*6 + g1  )//7
+                g_lookup[3] = (g0*5 + g1*2)//7
+                g_lookup[4] = (g0*4 + g1*3)//7
+                g_lookup[5] = (g0*3 + g1*4)//7
+                g_lookup[6] = (g0*2 + g1*5)//7
+                g_lookup[7] = (g0   + g1*6)//7
             else:
-                green[2] = (g0*4 + g1  )//5
-                green[3] = (g0*3 + g1*2)//5
-                green[4] = (g0*2 + g1*3)//5
-                green[5] = (g0   + g1*4)//5
-                green[6] = g_min
-                green[7] = g_max
+                g_lookup[2] = (g0*4 + g1  )//5
+                g_lookup[3] = (g0*3 + g1*2)//5
+                g_lookup[4] = (g0*2 + g1*3)//5
+                g_lookup[5] = (g0   + g1*4)//5
+                g_lookup[6] = g_min
+                g_lookup[7] = g_max
 
             for k in pixel_indices:
-                x = r = red[(red_idx >> (k*3))&7]
-                y = g = green[(green_idx >> (k*3))&7]
+                g = y = g_scale[g_lookup[(g_idx>>(k*3))&7]]
+                r = x = r_scale[r_lookup[(r_idx>>(k*3))&7]]
 
-                k *= ucc
+                off = k*ucc + pxl_i
 
                 # we're normalizing the coordinates
                 # here, not just unpacking them
@@ -634,9 +653,10 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
                     r = x + zero_point if r&sign_mask else zero_point - x
                     g = y + zero_point if g&sign_mask else zero_point - y
 
-                unpacked[k + r_index] = r
-                unpacked[k + g_index] = g
-                unpacked[k + b_index] = b
+                colors = [0, r, g, b]
+                if has_r: unpacked[off + 1] = colors[chan1]
+                if has_g: unpacked[off + 2] = colors[chan2]
+                if has_b: unpacked[off + 3] = colors[chan3]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -677,21 +697,19 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    r_scale = self.channel_upscalers[1]
-    g_scale = self.channel_upscalers[2]
-
-    try:
-        chan1 = self.channel_mapping.index(1)
-        chan2 = self.channel_mapping.index(2)
-        chan3 = self.channel_mapping.index(3)
-    except Exception:
-        print("Cannot unpack DXN texture. Channel mapping must include " +
-              "channels 1, 2, and 3, not %s" % self.channel_mapping)
+    chan1 = self.channel_mapping[1]
+    chan2 = self.channel_mapping[2]
+    chan3 = self.channel_mapping[3]
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
+    r_scale = self.channel_upscalers[chan1]
+    g_scale = self.channel_upscalers[chan2]
 
     if fast_dds_defs:
         dds_defs_ext.unpack_ctx1(
             unpacked, packed, r_scale, g_scale,
-            ucc, pixels_per_texel, chan1, chan2, chan3, unpack_max)
+            ucc, pixels_per_texel, chan1, chan2, chan3)
     else:
         # convert to tuples for faster access
         r_scale, g_scale = tuple(r_scale), tuple(g_scale)
@@ -758,9 +776,9 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
             for k in pixel_indices:
                 color = colors[(idx >> (k*2))&3]
                 off = k*ucc + pxl_i
-                unpacked[off + chan1] = color[1]
-                unpacked[off + chan2] = color[2]
-                unpacked[off + chan3] = color[3]
+                if has_r: unpacked[off + 1] = color[chan1]
+                if has_g: unpacked[off + 2] = color[chan2]
+                if has_b: unpacked[off + 3] = color[chan3]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -788,17 +806,15 @@ def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    r_scale = self.channel_upscalers[1]
-    g_scale = self.channel_upscalers[2]
-    b_scale = self.channel_upscalers[3]
-
-    try:
-        chan1 = self.channel_mapping.index(1)
-        chan2 = self.channel_mapping.index(2)
-        chan3 = self.channel_mapping.index(3)
-    except Exception:
-        print("Cannot unpack VU texture. Channel mapping must include " +
-              "channels 1, 2, and 3, not %s" % self.channel_mapping)
+    chan1 = self.channel_mapping[1]
+    chan2 = self.channel_mapping[2]
+    chan3 = self.channel_mapping[3]
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
+    r_scale = self.channel_upscalers[chan1]
+    g_scale = self.channel_upscalers[chan2]
+    b_scale = self.channel_upscalers[chan3]
 
     if fast_dds_defs:
         dds_defs_ext.unpack_vu(
@@ -813,6 +829,7 @@ def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
         # convert to tuples for faster access
         r_scale, g_scale, b_scale = tuple(r_scale),\
                                     tuple(g_scale), tuple(b_scale)
+        scales = (None, r_scale, g_scale, b_scale)
         for i in range(0, len(packed)):
             j = ucc*i
             u = packed[i]&chan_mask
@@ -839,9 +856,13 @@ def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
                 v = int(v/n_len)
                 w = 0
 
-            unpacked[j + chan1] = r_scale[u + sign_mask]
-            unpacked[j + chan2] = g_scale[v + sign_mask]
-            unpacked[j + chan3] = b_scale[w + sign_mask]
+            colors = [0,
+                      r_scale[u + sign_mask],
+                      g_scale[v + sign_mask],
+                      b_scale[w + sign_mask]]
+            if has_r: unpacked[j + 1] = colors[chan1]
+            if has_g: unpacked[j + 2] = colors[chan2]
+            if has_b: unpacked[j + 3] = colors[chan3]
 
     return unpacked
 
