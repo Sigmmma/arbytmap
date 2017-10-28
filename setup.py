@@ -13,8 +13,8 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 curr_dir = dirname(__file__)
 #               YYYY.MM.DD
-release_date = "2017.10.26"
-version = (0, 8, 2)
+release_date = "2017.10.28"
+version = (0, 8, 5)
 
 
 # Below here was copied from the setup file of simplejson.
@@ -69,12 +69,12 @@ setup_kwargs = dict(
         'arbytmap.ext',
         ],
     ext_modules = [
-        Extension("arbytmap.ext.arbytmap_ext", ["arbytmap\\src\\arbytmap_ext.c"]),
-        Extension("arbytmap.ext.bitmap_io_ext", ["arbytmap\\src\\bitmap_io_ext.c"]),
-        Extension("arbytmap.ext.dds_defs_ext", ["arbytmap\\src\\dds_defs_ext.c"]),
-        Extension("arbytmap.ext.raw_packer_ext", ["arbytmap\\src\\raw_packer_ext.c"]),
-        Extension("arbytmap.ext.raw_unpacker_ext", ["arbytmap\\src\\raw_unpacker_ext.c"]),
-        Extension("arbytmap.ext.swizzler_ext", ["arbytmap\\src\\swizzler_ext.c"])
+        Extension("arbytmap.ext.arbytmap_ext", ["arbytmap/src/arbytmap_ext.c"]),
+        Extension("arbytmap.ext.bitmap_io_ext", ["arbytmap/src/bitmap_io_ext.c"]),
+        Extension("arbytmap.ext.dds_defs_ext", ["arbytmap/src/dds_defs_ext.c"]),
+        Extension("arbytmap.ext.raw_packer_ext", ["arbytmap/src/raw_packer_ext.c"]),
+        Extension("arbytmap.ext.raw_unpacker_ext", ["arbytmap/src/raw_unpacker_ext.c"]),
+        Extension("arbytmap.ext.swizzler_ext", ["arbytmap/src/swizzler_ext.c"])
         ],
     package_data={
         '': ['*.txt', '*.md', '*.rst'],
