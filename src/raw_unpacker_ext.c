@@ -123,9 +123,8 @@ static void unpack_raw_1_channel_8bpp(
 
     unsigned char  *packed_pix_8;
     unsigned short *packed_pix_16;
-    unsigned long *packed_pix_32;
+    unsigned long  *packed_pix_32;
     unsigned long long *packed_pix_64;
-    // THESE ALL NEED TO BE CHANGED TO ACCEPT UP TO packed_pix_64
 
     packed_pix_size = packed_pix_buf->itemsize;
 

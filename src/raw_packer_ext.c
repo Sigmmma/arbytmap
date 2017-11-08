@@ -67,10 +67,10 @@ static void pack_raw_4_channel_merge_8bpp(
     unsigned long long i=0, max_i=0;
     long long a_rnd, r_rnd, g_rnd, b_rnd;
 
-    unsigned char  (*packed_pix_8)[];
-    unsigned short (*packed_pix_16)[];
-    unsigned long  (*packed_pix_32)[];
-    unsigned long long (*packed_pix_64)[];
+    unsigned char  *packed_pix_8;
+    unsigned short *packed_pix_16;
+    unsigned long  *packed_pix_32;
+    unsigned long long *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
@@ -90,19 +90,19 @@ static void pack_raw_4_channel_merge_8bpp(
 
     if (packed_pix_size == 8) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_64)[i] = PACK_ARGB_MERGE(unsigned long long)&0xFFffFFffFFffFFffULL;
+            packed_pix_64[i] = PACK_ARGB_MERGE(unsigned long long)&0xFFffFFffFFffFFffULL;
         }
     } else if (packed_pix_size == 4) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_32)[i] = PACK_ARGB_MERGE(unsigned long)&0xFFffFFffUL;
+            packed_pix_32[i] = PACK_ARGB_MERGE(unsigned long)&0xFFffFFffUL;
         }
     } else if (packed_pix_size == 2) {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_16)[i] = PACK_ARGB_MERGE(unsigned short)&0xFFff;
+            packed_pix_16[i] = PACK_ARGB_MERGE(unsigned short)&0xFFff;
         }
     } else {
         for (i=0; i < max_i; i++) {
-            (*packed_pix_8)[i] = PACK_ARGB_MERGE(unsigned char)&0xFF;
+            packed_pix_8[i] = PACK_ARGB_MERGE(unsigned char)&0xFF;
         }
     }
 }
@@ -685,8 +685,8 @@ static void pack_indexing(
     char indexing_size)
 {
     //THIS FUNCTION IS CURRENTLY UNTESTED.
-    unsigned char (*packed_indexing)[];
-    unsigned char (*unpacked_indexing)[];
+    unsigned char *packed_indexing;
+    unsigned char *unpacked_indexing;
     unsigned long long i=0, j=0, max_i=0;
 
     packed_indexing = (unsigned char*) packed_indexing_buf->buf;
@@ -697,28 +697,28 @@ static void pack_indexing(
     if (indexing_size == 4) {
         for (i=0; i < max_i; i++) {
             j = i<<1;
-            (*packed_indexing)[i] = ( (*unpacked_indexing)[j] +
-                                     ((*unpacked_indexing)[j+1]<<4))&255;
+            packed_indexing[i] = (  unpacked_indexing[j] +
+                                   (unpacked_indexing[j+1]<<4))&255;
         }
     } else if (indexing_size == 2) {
         for (i=0; i < max_i; i++) {
             j = i<<2;
-            (*packed_indexing)[i] = ( (*unpacked_indexing)[j] +
-                                     ((*unpacked_indexing)[j+1]<<2)+
-                                     ((*unpacked_indexing)[j+2]<<4)+
-                                     ((*unpacked_indexing)[j+3]<<6))&255;
+            packed_indexing[i] = (  unpacked_indexing[j] +
+                                   (unpacked_indexing[j+1]<<2)+
+                                   (unpacked_indexing[j+2]<<4)+
+                                   (unpacked_indexing[j+3]<<6))&255;
         }
     } else {
         for (i=0; i < max_i; i++) {
             j = i<<3;
-            (*packed_indexing)[i] = ( (*unpacked_indexing)[j] +
-                                     ((*unpacked_indexing)[j+1]<<1)+
-                                     ((*unpacked_indexing)[j+2]<<2)+
-                                     ((*unpacked_indexing)[j+3]<<3)+
-                                     ((*unpacked_indexing)[j+4]<<4)+
-                                     ((*unpacked_indexing)[j+5]<<5)+
-                                     ((*unpacked_indexing)[j+6]<<6)+
-                                     ((*unpacked_indexing)[j+7]<<7))&255;
+            packed_indexing[i] = ( unpacked_indexing[j] +
+                                   (unpacked_indexing[j+1]<<1)+
+                                   (unpacked_indexing[j+2]<<2)+
+                                   (unpacked_indexing[j+3]<<3)+
+                                   (unpacked_indexing[j+4]<<4)+
+                                   (unpacked_indexing[j+5]<<5)+
+                                   (unpacked_indexing[j+6]<<6)+
+                                   (unpacked_indexing[j+7]<<7))&255;
         }
     }
 }
