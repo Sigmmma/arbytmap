@@ -140,7 +140,11 @@ class Swizzler():
         #when calculating how much to bitshift the offsets
         c_blocks, x_blocks, y_blocks, z_blocks = (
             int(log(channels, 2)), int(log(width, 2)),
-            int(log(height, 2)), int(log(depth, 2)))
+            int(log(height, 2)),   int(log(depth, 2)))
+        if (2**c_blocks != channels or 2**x_blocks != width or
+            2**y_blocks != height   or 2**z_blocks != depth):
+            raise TypeError("Swizzle operations may only be performed on "
+                            "power-of-2 textures.")
 
         #these are the masks that will be used
         #for calculating the swizzled offsets.

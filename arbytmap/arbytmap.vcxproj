@@ -25,8 +25,8 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{BC2E1514-9F8C-435B-A8E3-E4AE0FDDE663}</ProjectGuid>
     <RootNamespace>arbytmap</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
     <ProjectName>arbytmap_ext</ProjectName>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
