@@ -13,12 +13,10 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 curr_dir = dirname(__file__)
 #               YYYY.MM.DD
-release_date = "2017.11.09"
-version = (0, 8, 8)
+release_date = "2017.11.14"
+version = (0, 9, 0)
 
 
-# Below here was copied from the setup file of simplejson.
-# I could rewrite it, but it is too simple to justify reinterpreting
 is_pypy = hasattr(sys, 'pypy_translation_info')
 ext_errors = None
 if sys.platform == 'win32':

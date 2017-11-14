@@ -8,3 +8,5 @@ __pycache__
 *Release\*
 Debug\*
 test_files/bitmaps/
+*.db
+*.suo
