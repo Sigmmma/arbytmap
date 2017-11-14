@@ -12,12 +12,6 @@ except Exception:
     fast_dds_defs = False
 
 
-def combine(base, **main):
-    for k, v in ((k, base[k]) for k in base if k not in main):
-        main[k] = v
-    return main
-
-
 def get_texel_pixel_count(width, height):
     return min(width, 4) * min(height, 4)
 
@@ -52,8 +46,14 @@ def initialize():
     ab.FORMAT_CTX1   = "CTX1"
     ab.FORMAT_V8U8   = "V8U8"
     ab.FORMAT_V16U16 = "V16U16"
-    ab.FORMAT_G8R8   = "G8R8"           #NOT YET IMPLEMENTED
-    ab.FORMAT_G16R16 = "G16R16"         #NOT YET IMPLEMENTED
+    ab.FORMAT_R8G8   = "R8G8"
+    ab.FORMAT_R16G16 = "R16G16"
+    ab.FORMAT_G8B8   = "G8B8"
+    ab.FORMAT_G16B16 = "G16B16"
+
+    combine = lambda base, **main: {
+        k: (base[k] if k not in main else main[k]) for k in
+        set(main.keys()).union(base.keys())}
 
     dxt_specs = dict(
         compressed=True, dds_format=True, raw_format=False,
@@ -94,24 +94,33 @@ def initialize():
         unpacker=unpack_ctx1, packer=pack_ctx1, masks=(0, 0xFF, 0xFF)))
 
     ab.register_format(ab.FORMAT_V8U8, bpp=16, dds_format=True,
-                     unpacker=unpack_v8u8, packer=pack_v8u8,
-                     depths=(8,8,8), offsets=(0,8,0), masks=(0, 0xFF, 0xFF))
+                       unpacker=unpack_v8u8, packer=pack_v8u8,
+                       depths=(8,8,8), offsets=(0,8,0), masks=(0, 0xFF, 0xFF))
 
     ab.register_format(ab.FORMAT_V16U16, bpp=32, dds_format=True,
-                     unpacker=unpack_v16u16, packer=pack_v16u16,
-                     depths=(16,16,16), offsets=(0,16,0),
-                     masks=(0, 0xFFff, 0xFFff))
-    return
+                       unpacker=unpack_v16u16, packer=pack_v16u16,
+                       depths=(16,16,16), offsets=(0,16,0),
+                       masks=(0, 0xFFff, 0xFFff))
 
-    # these aren't ready yet
-    ab.register_format(ab.FORMAT_G8R8, bpp=16, dds_format=True,
-                     unpacker=unpack_gr, packer=pack_gr,
-                     depths=(8,8,8), offsets=(0,8,0), masks=(0, 0xFF, 0xFF))
+    ab.register_format(ab.FORMAT_R8G8, bpp=16, dds_format=True,
+                       unpacker=unpack_r8g8, packer=pack_r8g8,
+                       depths=(8,8,8), offsets=(0,8,0),
+                       masks=(0, 0xFF, 0xFF))
 
-    ab.register_format(ab.FORMAT_G16R16, bpp=32, dds_format=True,
-                     unpacker=unpack_gr, packer=pack_gr,
-                     depths=(16,16,16), offsets=(0,16,0),
-                     masks=(0, 0xFFff, 0xFFff))
+    ab.register_format(ab.FORMAT_R16G16, bpp=32, dds_format=True,
+                       unpacker=unpack_r16g16, packer=pack_r16g16,
+                       depths=(16,16,16), offsets=(0,16,0),
+                       masks=(0, 0xFFff, 0xFFff))
+
+    ab.register_format(ab.FORMAT_G8B8, bpp=16, dds_format=True,
+                       unpacker=unpack_g8b8, packer=pack_g8b8,
+                       depths=(8,8,8), offsets=(8,0,0),
+                       masks=(0xFF, 0xFF, 0))
+
+    ab.register_format(ab.FORMAT_G16B16, bpp=32, dds_format=True,
+                       unpacker=unpack_g16b16, packer=pack_g16b16,
+                       depths=(16,16,16), offsets=(16,0,0),
+                       masks=(0xFFff, 0xFFff, 0))
 
 
 def unpack_dxt1(self, bitmap_index, width, height, depth=1):
@@ -131,18 +140,12 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     #create a new array to hold the pixels after we unpack them
     unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
 
-    chan0 = self.channel_mapping[0]
-    chan1 = self.channel_mapping[1]
-    chan2 = self.channel_mapping[2]
-    chan3 = self.channel_mapping[3]
+    chan0,   chan1,   chan2,   chan3   = self.channel_mapping[: 4]
+    a_scale, r_scale, g_scale, b_scale = self.channel_upscalers[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
-    a_scale = self.channel_upscalers[0]
-    r_scale = self.channel_upscalers[1]
-    g_scale = self.channel_upscalers[2]
-    b_scale = self.channel_upscalers[3]
     if fast_dds_defs:
         dds_defs_ext.unpack_dxt1(
             unpacked, packed, r_scale, g_scale, b_scale,
@@ -150,9 +153,6 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     else:
         channels_per_texel = ucc*pixels_per_texel
         pixel_indices = range(pixels_per_texel)
-
-        r_mask,  g_mask,  b_mask  = self.channel_masks[1:]
-        r_shift, g_shift, b_shift = self.channel_offsets[1:]
 
         #create the arrays to hold the color channel data
         c_0 = [unpack_max,0,0,0]
@@ -176,12 +176,12 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
             color_idx = packed[j+1]
 
             """unpack the colors"""
-            c_0[1] = r_scale[(color0>>r_shift) & r_mask]
-            c_1[1] = r_scale[(color1>>r_shift) & r_mask]
-            c_0[2] = g_scale[(color0>>g_shift) & g_mask]
-            c_1[2] = g_scale[(color1>>g_shift) & g_mask]
-            c_1[3] = b_scale[(color1>>b_shift) & b_mask]
-            c_0[3] = b_scale[(color0>>b_shift) & b_mask]
+            c_0[1] = r_scale[(color0>>11) & 31]
+            c_1[1] = r_scale[(color1>>11) & 31]
+            c_0[2] = g_scale[(color0>>5) & 63]
+            c_1[2] = g_scale[(color1>>5) & 63]
+            c_1[3] = b_scale[color1 & 31]
+            c_0[3] = b_scale[color0 & 31]
 
             #if the first color is a larger integer
             #then color key transparency is NOT used
@@ -246,20 +246,12 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan0 = self.channel_mapping[0]
-    chan1 = self.channel_mapping[1]
-    chan2 = self.channel_mapping[2]
-    chan3 = self.channel_mapping[3]
+    chan0,   chan1,   chan2,   chan3   = self.channel_mapping[: 4]
+    a_scale, r_scale, g_scale, b_scale = self.channel_upscalers[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
-    a_scale = self.channel_upscalers[chan0]
-    r_scale = self.channel_upscalers[chan1]
-    g_scale = self.channel_upscalers[chan2]
-    b_scale = self.channel_upscalers[chan3]
-    r_mask,  g_mask,  b_mask  = self.channel_masks[1:]
-    r_shift, g_shift, b_shift = self.channel_offsets[1:]
 
     if fast_dds_defs:
         dds_defs_ext.unpack_dxt2_3(
@@ -281,12 +273,12 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
             color_idx = packed[j+3]
 
             """unpack the colors"""
-            c_0[1] = r_scale[(color0>>r_shift) & r_mask]
-            c_1[1] = r_scale[(color1>>r_shift) & r_mask]
-            c_0[2] = g_scale[(color0>>g_shift) & g_mask]
-            c_1[2] = g_scale[(color1>>g_shift) & g_mask]
-            c_1[3] = b_scale[(color1>>b_shift) & b_mask]
-            c_0[3] = b_scale[(color0>>b_shift) & b_mask]
+            c_0[1] = r_scale[(color0>>11) & 31]
+            c_1[1] = r_scale[(color1>>11) & 31]
+            c_0[2] = g_scale[(color0>>5) & 63]
+            c_1[2] = g_scale[(color1>>5) & 63]
+            c_1[3] = b_scale[color1 & 31]
+            c_0[3] = b_scale[color0 & 31]
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -357,20 +349,12 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan0 = self.channel_mapping[0]
-    chan1 = self.channel_mapping[1]
-    chan2 = self.channel_mapping[2]
-    chan3 = self.channel_mapping[3]
+    chan0,   chan1,   chan2,   chan3   = self.channel_mapping[: 4]
+    a_scale, r_scale, g_scale, b_scale = self.channel_upscalers[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
-    a_scale = self.channel_upscalers[chan0]
-    r_scale = self.channel_upscalers[chan1]
-    g_scale = self.channel_upscalers[chan2]
-    b_scale = self.channel_upscalers[chan3]
-    r_mask,  g_mask,  b_mask  = self.channel_masks[1:]
-    r_shift, g_shift, b_shift = self.channel_offsets[1:]
 
     a_lookup = [0,0,0,0,0,0,0,0]
 
@@ -415,12 +399,12 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
             color_idx = packed[j+3]
 
             """unpack the colors"""
-            c_0[1] = r_scale[(color0>>r_shift) & r_mask]
-            c_1[1] = r_scale[(color1>>r_shift) & r_mask]
-            c_0[2] = g_scale[(color0>>g_shift) & g_mask]
-            c_1[2] = g_scale[(color1>>g_shift) & g_mask]
-            c_1[3] = b_scale[(color1>>b_shift) & b_mask]
-            c_0[3] = b_scale[(color0>>b_shift) & b_mask]
+            c_0[1] = r_scale[(color0>>11) & 31]
+            c_1[1] = r_scale[(color1>>11) & 31]
+            c_0[2] = g_scale[(color0>>5) & 63]
+            c_1[2] = g_scale[(color1>>5) & 63]
+            c_1[3] = b_scale[color1 & 31]
+            c_0[3] = b_scale[color0 & 31]
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -560,14 +544,11 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
     #create a new array to hold the pixels after we unpack them
     unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
 
-    chan1 = self.channel_mapping[1]
-    chan2 = self.channel_mapping[2]
-    chan3 = self.channel_mapping[3]
+    chan1,   chan2,   chan3 = self.channel_mapping[1: 4]
+    r_scale, g_scale, __    = self.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
-    r_scale = self.channel_upscalers[chan1]
-    g_scale = self.channel_upscalers[chan2]
 
     r_min = r_scale[0]
     g_min = g_scale[0]
@@ -697,14 +678,11 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan1 = self.channel_mapping[1]
-    chan2 = self.channel_mapping[2]
-    chan3 = self.channel_mapping[3]
+    chan1,   chan2,   chan3 = self.channel_mapping[1: 4]
+    r_scale, g_scale, __    = self.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
-    r_scale = self.channel_upscalers[chan1]
-    g_scale = self.channel_upscalers[chan2]
 
     if fast_dds_defs:
         dds_defs_ext.unpack_ctx1(
@@ -806,69 +784,197 @@ def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan1 = self.channel_mapping[1]
-    chan2 = self.channel_mapping[2]
-    chan3 = self.channel_mapping[3]
+    chan1,   chan2,   chan3   = self.channel_mapping[1: 4]
+    r_scale, g_scale, b_scale = self.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
-    r_scale = self.channel_upscalers[chan1]
-    g_scale = self.channel_upscalers[chan2]
-    b_scale = self.channel_upscalers[chan3]
 
     if fast_dds_defs:
         dds_defs_ext.unpack_vu(
             unpacked, packed, r_scale, g_scale, b_scale,
             ucc, chan1, chan2, chan3)
-    else:
-        sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
-        chan_mask = (1 << bpc) - 1   # == 255 for 8bpc
-        dist_max  = (sign_mask - 1)  # == 127 for 8bpc
-        dist_max_sq = dist_max**2    # == 16129 for 8bpc
+        return unpacked
 
-        # convert to tuples for faster access
-        r_scale, g_scale, b_scale = tuple(r_scale),\
-                                    tuple(g_scale), tuple(b_scale)
-        scales = (None, r_scale, g_scale, b_scale)
-        for i in range(0, len(packed)):
-            j = ucc*i
-            u = packed[i]&chan_mask
-            v = (packed[i]>>bpc)&chan_mask
-            '''
-            So an RGB normal map is [0, 255] and maps linearly to [-1, 1],
-            and V8U8 is [-127, 127] and does NOT map linearly to [-1, 1].
-            If read as unsigned, V8U8 maps [0, 127] to [-127, 0] and
-            [128, 255] to [0, 127]. Because of this, we may need to
-            subtract 255 from the r and g values. This is complicated
-            even more by the fact that the packed array isnt signed in
-            the form we are reading from it, so we need account for that.
-            '''
-            u = u-chan_mask if u&sign_mask else u
-            v = v-chan_mask if v&sign_mask else v
+    sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
+    chan_mask = (1 << bpc) - 1   # == 255 for 8bpc
+    dist_max  = (sign_mask - 1)  # == 127 for 8bpc
+    dist_max_sq = dist_max**2    # == 16129 for 8bpc
 
-            # we're normalizing the coordinates here, not just unpacking them
-            d = dist_max_sq - u**2 - v**2
-            if d > 0:
-                w = int(sqrt(d))
-            else:
-                n_len = sqrt(dist_max_sq - d)/dist_max
-                u = int(u/n_len)
-                v = int(v/n_len)
-                w = 0
+    # convert to tuples for faster access
+    r_scale, g_scale, b_scale = tuple(r_scale),\
+                                tuple(g_scale), tuple(b_scale)
+    scales = (None, r_scale, g_scale, b_scale)
+    for i in range(0, len(packed)):
+        # RGB normal maps use unsigned chars, which maps to:
+        #     [0, 255] -> [-1, 1]
+        # V8U8 uses signed chars, which maps(as unsigned chars) to:
+        #     [0, 127] -> [+0, 1]    and    [128, 255] -> [-1, -0]
+        # Ones compliment is used here to simplify math and to allow
+        # all components to have a zero point and to make both sides
+        # of the zero point have an equal numbers of points.
 
-            colors = [0,
-                      r_scale[u + sign_mask],
-                      g_scale[v + sign_mask],
-                      b_scale[w + sign_mask]]
-            if has_r: unpacked[j + 1] = colors[chan1]
-            if has_g: unpacked[j + 2] = colors[chan2]
-            if has_b: unpacked[j + 3] = colors[chan3]
+        j = ucc*i
+        u = packed[i]&chan_mask
+        v = (packed[i]>>bpc)&chan_mask
+        if u&sign_mask: u -= chan_mask
+        if v&sign_mask: v -= chan_mask
+
+        # we're normalizing the coordinates here, not just unpacking them
+        d = dist_max_sq - u**2 - v**2
+        if d > 0:
+            w = int(sqrt(d))
+        else:
+            n_len = sqrt(dist_max_sq - d)/dist_max
+            u = int(u/n_len)
+            v = int(v/n_len)
+            w = 0
+
+        colors = [0,
+                  r_scale[u + sign_mask],
+                  g_scale[v + sign_mask],
+                  b_scale[w + sign_mask]]
+        if has_r: unpacked[j + 1] = colors[chan1]
+        if has_g: unpacked[j + 2] = colors[chan2]
+        if has_b: unpacked[j + 3] = colors[chan3]
 
     return unpacked
 
 
-def unpack_gr(self, bitmap_index, width, height, depth=1):
-    pass
+def unpack_r8g8(self, bitmap_index, width, height, depth=1):
+    return unpack_rg(self, bitmap_index, width, height, depth, 8)
+
+
+def unpack_r16g16(self, bitmap_index, width, height, depth=1):
+    return unpack_rg(self, bitmap_index, width, height, depth, 16)
+
+
+def unpack_rg(self, bitmap_index, width, height, depth=1, bpc=8):
+    packed = self.texture_block[bitmap_index]
+
+    #create a new array to hold the pixels after we unpack them
+    unpack_code = self._UNPACK_ARRAY_CODE
+    ucc = self.unpacked_channel_count
+    bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
+    unpacked = ab.bitmap_io.make_array(
+        unpack_code, width*height, bytes_per_pixel)
+
+    chan1,   chan2,   chan3   = self.channel_mapping[1: 4]
+    r_scale, g_scale, b_scale = self.channel_upscalers[1: 4]
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED YET
+        dds_defs_ext.unpack_gr(
+            unpacked, packed, r_scale, g_scale, b_scale,
+            ucc, chan1, chan2, chan3)
+        return unpacked
+
+    sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
+    chan_mask = (1 << bpc) - 1   # == 255 for 8bpc
+    dist_max  = (sign_mask - 1)  # == 127 for 8bpc
+    dist_max_sq = dist_max**2    # == 16129 for 8bpc
+
+    # convert to tuples for faster access
+    r_scale, g_scale, b_scale = tuple(r_scale),\
+                                tuple(g_scale), tuple(b_scale)
+    scales = (None, r_scale, g_scale, b_scale)
+    for i in range(0, len(packed)):
+        j = ucc*i
+        u = ((packed[i]>>bpc)&chan_mask) - dist_max
+        v = (packed[i]&chan_mask) - dist_max
+        if u < 0: u += 1
+        if v < 0: v += 1
+
+        # we're normalizing the coordinates here, not just unpacking them
+        d = dist_max_sq - u**2 - v**2
+        if d > 0:
+            w = int(sqrt(d))
+        else:
+            n_len = sqrt(dist_max_sq - d)/dist_max
+            u = int(u/n_len)
+            v = int(v/n_len)
+            w = 0
+
+        colors = [0,
+                  r_scale[u + sign_mask],
+                  g_scale[v + sign_mask],
+                  b_scale[w + sign_mask]]
+        if has_r: unpacked[j + 1] = colors[chan1]
+        if has_g: unpacked[j + 2] = colors[chan2]
+        if has_b: unpacked[j + 3] = colors[chan3]
+
+    return unpacked
+
+
+def unpack_g8b8(self, bitmap_index, width, height, depth=1):
+    return unpack_gb(self, bitmap_index, width, height, depth, 8)
+
+
+def unpack_g16b16(self, bitmap_index, width, height, depth=1):
+    return unpack_gb(self, bitmap_index, width, height, depth, 16)
+
+
+def unpack_gb(self, bitmap_index, width, height, depth=1, bpc=8):
+    packed = self.texture_block[bitmap_index]
+
+    #create a new array to hold the pixels after we unpack them
+    unpack_code = self._UNPACK_ARRAY_CODE
+    ucc = self.unpacked_channel_count
+    bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
+    unpacked = ab.bitmap_io.make_array(
+        unpack_code, width*height, bytes_per_pixel)
+
+    chan1,   chan2,   chan3   = self.channel_mapping[1: 4]
+    r_scale, g_scale, b_scale = self.channel_upscalers[1: 4]
+    has_r = chan1 >= 0
+    has_g = chan2 >= 0
+    has_b = chan3 >= 0
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED YET
+        dds_defs_ext.unpack_gb(
+            unpacked, packed, r_scale, g_scale, b_scale,
+            ucc, chan1, chan2, chan3)
+        return unpacked
+
+    sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
+    chan_mask = (1 << bpc) - 1   # == 255 for 8bpc
+    dist_max  = (sign_mask - 1)  # == 127 for 8bpc
+    dist_max_sq = dist_max**2    # == 16129 for 8bpc
+
+    # convert to tuples for faster access
+    r_scale, g_scale, b_scale = tuple(r_scale),\
+                                tuple(g_scale), tuple(b_scale)
+    scales = (None, r_scale, g_scale, b_scale)
+    for i in range(0, len(packed)):
+        j = ucc*i
+        v = ((packed[i]>>bpc)&chan_mask) - dist_max
+        w = (packed[i]&chan_mask) - dist_max
+        if v < 0: v += 1
+        if w < 0: w += 1
+
+        # we're normalizing the coordinates here, not just unpacking them
+        d = dist_max_sq - v**2 - w**2
+        if d > 0:
+            u = int(sqrt(d))
+        else:
+            n_len = sqrt(dist_max_sq - d)/dist_max
+            v = int(v/n_len)
+            w = int(w/n_len)
+            u = 0
+
+        colors = [0,
+                  r_scale[u + sign_mask],
+                  g_scale[v + sign_mask],
+                  b_scale[w + sign_mask]]
+        if has_r: unpacked[j + 1] = colors[chan1]
+        if has_g: unpacked[j + 2] = colors[chan2]
+        if has_b: unpacked[j + 3] = colors[chan3]
+
+    return unpacked
 
 
 ########################################
@@ -1340,6 +1446,8 @@ def pack_dxt5a(self, unpacked, width, height, depth=1):
     ucc = self.unpacked_channel_count
     assert self.target_channel_count == ucc
     bpt = ucc*8
+
+    scales = list(self.channel_downscalers)
     repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
 
     if texel_width > 1:
@@ -1347,18 +1455,22 @@ def pack_dxt5a(self, unpacked, width, height, depth=1):
         unpacked = dxt_swizzler.swizzle_single_array(
             unpacked, True, ucc, width, height)
 
+    pixels_per_texel   = get_texel_pixel_count(width, height)
+    channels_per_texel = ucc*pixels_per_texel
+    pixel_indices = range(0, channels_per_texel, ucc)
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED
+        dds_defs_ext.pack_dxt5a(repacked, unpacked, pixels_per_texel, *scales)
+        return repacked
+
     #shorthand names
     rpa = repacked
     upa = unpacked
 
-    scales = list(self.channel_downscalers)
-
     # convert to tuples for faster access
     for i in range(len(scales)):
         scales[i] = tuple(scales[i])
-
-    channels_per_texel = ucc*get_texel_pixel_count(width, height)
-    pixel_indices = range(0, channels_per_texel, ucc)
 
     #loop for each texel
     for txl_i in range(0, len(repacked), 2):
@@ -1456,6 +1568,8 @@ def pack_dxn(self, unpacked, width, height, depth=1):
     #create a new array to hold the texels after we repack them
     bpt = 16
     ucc = self.unpacked_channel_count
+
+    scales = list(self.channel_downscalers)
     repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
 
     if texel_width > 1:
@@ -1463,18 +1577,22 @@ def pack_dxn(self, unpacked, width, height, depth=1):
         unpacked = dxt_swizzler.swizzle_single_array(
             unpacked, True, ucc, width, height)
 
+    pixels_per_texel   = get_texel_pixel_count(width, height)
+    channels_per_texel = ucc*pixels_per_texel
+    pixel_indices = range(0, channels_per_texel, ucc)
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED
+        dds_defs_ext.pack_dxn(repacked, unpacked, pixels_per_texel, *scales)
+        return repacked
+
     #shorthand names
     rpa = repacked
     upa = unpacked
 
-    scales = list(self.channel_downscalers)
-
     # convert to tuples for faster access
     for i in range(len(scales)):
         scales[i] = tuple(scales[i])
-
-    channels_per_texel = ucc*get_texel_pixel_count(width, height)
-    pixel_indices = range(0, channels_per_texel, ucc)
 
     #loop for each texel
     for txl_i in range(0, len(repacked), 2):
@@ -1584,16 +1702,24 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
         unpacked = dxt_swizzler.swizzle_single_array(
             unpacked, True, 4, width, height)
 
+    _, r_scale, g_scale, __ = self.channel_downscalers
+
+    pixels_per_texel   = get_texel_pixel_count(width, height)
+    channels_per_texel = ucc*pixels_per_texel
+    pixel_indices = range(0, channels_per_texel, ucc)
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED
+        dds_defs_ext.pack_ctx1(repacked, unpacked, r_scale, g_scale,
+                               pixels_per_texel)
+        return repacked
+
     #shorthand names
     rpa = repacked
     upa = unpacked
 
-    _, r_scale, g_scale, __ = self.channel_downscalers
-    channels_per_texel = 4*get_texel_pixel_count(width, height)
-
     # convert to tuples for faster access
     r_scale, g_scale = tuple(r_scale), tuple(g_scale)
-    pixel_indices = range(0, channels_per_texel, ucc)
 
     #loop for each texel
     for txl_i in range(0, len(repacked), 2):
@@ -1678,8 +1804,8 @@ def pack_v16u16(self, unpacked, width, height, depth=1):
 def pack_vu(self, unpacked, width, height, depth=1, bpc=8):
     ucc = self.unpacked_channel_count
     if ucc < 2:
-        raise TypeError(
-            "Cannot convert image with less than 2 channels to V8U8.")
+        raise TypeError("Cannot convert image with less than 2 channels "
+                        "to V%sU%s." % (bpc, bpc))
 
     bytes_per_pixel = (bpc * 2)//8
     typecode = ab.INVERSE_PIXEL_ENCODING_SIZES[bytes_per_pixel]
@@ -1701,15 +1827,90 @@ def pack_vu(self, unpacked, width, height, depth=1, bpc=8):
     sign_mask = 1 << (bpc - 1)
     sign_mask = sign_mask + (sign_mask << bpc)
     for i in range(0, len(unpacked), ucc):
-        '''
-        So an RGB normal map is [0, 255] and maps linearly to [-1, 1],
-        and V8U8 is [-127, 127] and does NOT map linearly to [-1, 1].
-        '''
+        # RGB normal maps use unsigned chars, which maps to:
+        #     [0, 255] -> [-1, 1]
+        # V8U8 uses signed chars, which maps(as unsigned chars) to:
+        #     [0, 127] -> [+0, 1]    and    [128, 255] -> [-1, -0]
+        # Ones compliment is used here to simplify math and to allow
+        # all components to have a zero point and to make both sides
+        # of the zero point have an equal numbers of points.
         packed[i//ucc] = (((v_scale[unpacked[i + chan1]]<<bpc) +
                             u_scale[unpacked[i + chan0]])^sign_mask)
 
     return packed
 
 
-def pack_gr(self, unpacked, width, height, depth=1):
-    pass
+def pack_r8g8(self, unpacked, width, height, depth=1):
+    return pack_rg(self, unpacked, width, height, depth, 8)
+
+
+def pack_r16g16(self, unpacked, width, height, depth=1):
+    return pack_rg(self, unpacked, width, height, depth, 16)
+
+
+def pack_rg(self, unpacked, width, height, depth=1, bpc=8):
+    ucc = self.unpacked_channel_count
+    if ucc < 2:
+        raise TypeError("Cannot convert image with less than 2 channels "
+                        "to R%sG%s." % (bpc, bpc))
+
+    bytes_per_pixel = (bpc * 2)//8
+    typecode = ab.INVERSE_PIXEL_ENCODING_SIZES[bytes_per_pixel]
+    packed = ab.bitmap_io.make_array(typecode, len(unpacked)//ucc)
+    _, r_scale, g_scale, __ = self.channel_downscalers
+    if ucc == 2:
+        chan0, chan1 = 0, 1
+    else:
+        chan0, chan1 = 1, 2
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED YET
+        dds_defs_ext.pack_rg(packed, unpacked, r_scale, g_scale,
+                             ucc, chan0, chan1)
+        return packed
+
+    # convert to tuples for faster access
+    r_scale, g_scale = tuple(r_scale), tuple(g_scale)
+    for i in range(0, len(unpacked), ucc):
+        packed[i//ucc] = ((g_scale[unpacked[i + chan1]]<<bpc) +
+                           r_scale[unpacked[i + chan0]])
+
+    return packed
+
+
+def pack_g8b8(self, unpacked, width, height, depth=1):
+    return pack_gb(self, unpacked, width, height, depth, 8)
+
+
+def pack_g16b16(self, unpacked, width, height, depth=1):
+    return pack_gb(self, unpacked, width, height, depth, 16)
+
+
+def pack_gb(self, unpacked, width, height, depth=1, bpc=8):
+    ucc = self.unpacked_channel_count
+    if ucc < 2:
+        raise TypeError("Cannot convert image with less than 2 channels "
+                        "to G%sB%s." % (bpc, bpc))
+
+    bytes_per_pixel = (bpc * 2)//8
+    typecode = ab.INVERSE_PIXEL_ENCODING_SIZES[bytes_per_pixel]
+    packed = ab.bitmap_io.make_array(typecode, len(unpacked)//ucc)
+    _, __, g_scale, b_scale = self.channel_downscalers
+    if ucc == 2:
+        chan0, chan1 = 0, 1
+    else:
+        chan0, chan1 = 1, 2
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED YET
+        dds_defs_ext.pack_gb(packed, unpacked, g_scale, b_scale,
+                             ucc, chan0, chan1)
+        return packed
+
+    # convert to tuples for faster access
+    g_scale, b_scale = tuple(g_scale), tuple(b_scale)
+    for i in range(0, len(unpacked), ucc):
+        packed[i//ucc] = ((b_scale[unpacked[i + chan1]]<<bpc) +
+                           g_scale[unpacked[i + chan0]])
+
+    return packed

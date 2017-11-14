@@ -396,7 +396,7 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     elif fmt in (ab.FORMAT_A1, ab.FORMAT_A4, ab.FORMAT_L4, ab.FORMAT_A4L4,
                  ab.FORMAT_L5V5U5, ab.FORMAT_X8L8V8U8, ab.FORMAT_Q8L8V8U8,
                  ab.FORMAT_Q8W8V8U8, ab.FORMAT_Q16W16V16U16,
-                 ab.FORMAT_G8R8, ab.FORMAT_G16R16, ab.FORMAT_A2W10V10U10,
+                 ab.FORMAT_R8G8, ab.FORMAT_R16G16, ab.FORMAT_A2W10V10U10,
                  ab.FORMAT_A2B10G10R10, ab.FORMAT_A2R10G10B10,
                  ab.FORMAT_A16B16G16R16):
         flags.linearsize = False

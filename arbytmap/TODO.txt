@@ -1,8 +1,1 @@
 fix conversions to A16 and A16L16 not working properly
-
-make functions to pad pixel data before swizzling and unpad
-after unswizzling so arbytmap is able to work with textures
-that aren't a power of 2.
-    this will require special care when calculating dimensions
-    of unpacked pixels as they will need to be rounded up to
-    the nearest power of 2.
