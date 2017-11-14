@@ -13,13 +13,13 @@
     color1 = packed_tex[x]>>16;\
     color_idx = packed_tex[x+1];\
     \
-    c_0[1] = r_scale[(color0>>r_shift) & r_mask];\
-    c_0[2] = g_scale[(color0>>g_shift) & g_mask];\
-    c_0[3] = b_scale[(color0>>b_shift) & b_mask];\
+    c_0[1] = r_scale[(color0>>11) & 31];\
+    c_0[2] = g_scale[(color0>>5)  & 63];\
+    c_0[3] = b_scale[ color0      & 31];\
     \
-    c_1[1] = r_scale[(color1>>r_shift) & r_mask];\
-    c_1[2] = g_scale[(color1>>g_shift) & g_mask];\
-    c_1[3] = b_scale[(color1>>b_shift) & b_mask];\
+    c_1[1] = r_scale[(color1>>11) & 31];\
+    c_1[2] = g_scale[(color1>>5)  & 63];\
+    c_1[3] = b_scale[ color1      & 31];\
     \
     if (color0 > color1) {\
         c_2[1] = (c_0[1]*2 + c_1[1])/3;\
@@ -268,10 +268,6 @@ static void unpack_dxt1_8(
                   c_2[4]={255,0,0,0}, c_3[4]={255,0,0,0};
     unsigned char transparent[4]={0,0,0,0};
     unsigned char *color, *colors[4];
-    char r_shift, g_shift, b_shift, shifts[4]={0,11,5,0};
-    char r_mask,  g_mask,  b_mask,   masks[4]={0,31,63,31};
-    r_shift = shifts[chan1], g_shift = shifts[chan2], b_shift = shifts[chan3];
-    r_mask  = masks[chan1],  g_mask  = masks[chan2],  b_mask  = masks[chan3];
 
     unpacked_pix = (unsigned char*)unpacked_pix_buf->buf;
     r_scale = (unsigned char *)r_scale_buf->buf;
@@ -321,10 +317,6 @@ static void unpack_dxt2_3_8(
                   c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
     unsigned char transparent[4]={0,0,0,0};
     unsigned char *color, *colors[4], a, unpack_max = 0xFF;
-    char r_shift, g_shift, b_shift, shifts[4]={0,11,5,0};
-    char r_mask,  g_mask,  b_mask,   masks[4]={0,31,63,31};
-    r_shift = shifts[chan1], g_shift = shifts[chan2], b_shift = shifts[chan3];
-    r_mask  = masks[chan1],  g_mask  = masks[chan2],  b_mask  = masks[chan3];
 
     unpacked_pix = (unsigned char *)unpacked_pix_buf->buf;
     a_scale = (unsigned char *)a_scale_buf->buf;
@@ -371,10 +363,6 @@ static void unpack_dxt4_5_8(
                   c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
     unsigned char transparent[4]={0,0,0,0}, alpha0, alpha1, a_lookup[8];
     unsigned char *color, *colors[4], a, unpack_max=0xFF;
-    char r_shift, g_shift, b_shift, shifts[4]={0,11,5,0};
-    char r_mask,  g_mask,  b_mask,   masks[4]={0,31,63,31};
-    r_shift = shifts[chan1], g_shift = shifts[chan2], b_shift = shifts[chan3];
-    r_mask  = masks[chan1],  g_mask  = masks[chan2],  b_mask  = masks[chan3];
 
     unpacked_pix = (unsigned char *)unpacked_pix_buf->buf;
     a_scale = (unsigned char *)a_scale_buf->buf;
@@ -877,10 +865,6 @@ static void unpack_dxt1_16(
                    c_2[4]={65535,0,0,0}, c_3[4]={65535,0,0,0};
     unsigned short transparent[4]={0,0,0,0};
     unsigned short *color, *colors[4];
-    char r_shift, g_shift, b_shift, shifts[4]={0,11,5,0};
-    char r_mask,  g_mask,  b_mask,   masks[4]={0,31,63,31};
-    r_shift = shifts[chan1], g_shift = shifts[chan2], b_shift = shifts[chan3];
-    r_mask  = masks[chan1],  g_mask  = masks[chan2],  b_mask  = masks[chan3];
 
     unpacked_pix = (unsigned short *)unpacked_pix_buf->buf;
     r_scale = (unsigned short *)r_scale_buf->buf;
@@ -929,10 +913,6 @@ static void unpack_dxt2_3_16(
                    c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
     unsigned short transparent[4]={0,0,0,0};
     unsigned short *color, *colors[4], a, unpack_max=0xFFff;
-    char r_shift, g_shift, b_shift, shifts[4]={0,11,5,0};
-    char r_mask,  g_mask,  b_mask,   masks[4]={0,31,63,31};
-    r_shift = shifts[chan1], g_shift = shifts[chan2], b_shift = shifts[chan3];
-    r_mask  = masks[chan1],  g_mask  = masks[chan2],  b_mask  = masks[chan3];
 
     unpacked_pix = (unsigned short *)unpacked_pix_buf->buf;
     a_scale = (unsigned short *)a_scale_buf->buf;
@@ -980,10 +960,6 @@ static void unpack_dxt4_5_16(
     unsigned short transparent[4]={0,0,0,0};
     unsigned short *color, *colors[4], a, unpack_max=0xFFff;
     unsigned char alpha0, alpha1, a_lookup[8];
-    char r_shift, g_shift, b_shift, shifts[4]={0,11,5,0};
-    char r_mask,  g_mask,  b_mask,   masks[4]={0,31,63,31};
-    r_shift = shifts[chan1], g_shift = shifts[chan2], b_shift = shifts[chan3];
-    r_mask  = masks[chan1],  g_mask  = masks[chan2],  b_mask  = masks[chan3];
 
     unpacked_pix = (unsigned short *)unpacked_pix_buf->buf;
     a_scale = (unsigned short *)a_scale_buf->buf;
