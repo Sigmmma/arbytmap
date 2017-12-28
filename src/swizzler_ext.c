@@ -180,7 +180,7 @@ static PyObject *py_swizzle_array(PyObject *self, PyObject *args) {
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*:swizzle_array",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     swizzle_char_array(
         bufs[0].len, bufs[0].buf, bufs[1].len, bufs[1].buf,
@@ -196,7 +196,7 @@ static PyObject *py_swizzle_array(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[4]);
     PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unswizzle_array(PyObject *self, PyObject *args) {
@@ -205,7 +205,7 @@ static PyObject *py_unswizzle_array(PyObject *self, PyObject *args) {
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*:swizzle_array",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     swizzle_char_array(
         bufs[0].len, bufs[0].buf, bufs[1].len, bufs[1].buf,
@@ -221,7 +221,7 @@ static PyObject *py_unswizzle_array(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[4]);
     PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 /* A list of all the methods defined by this module.

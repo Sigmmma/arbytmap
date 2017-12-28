@@ -1454,7 +1454,7 @@ static PyObject *py_unpack_dxt1(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*bhhhh:unpack_dxt1",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &pix_per_tex,
         &chans[0], &chans[1], &chans[2], &chans[3]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         unpack_dxt1_16(
@@ -1473,7 +1473,7 @@ static PyObject *py_unpack_dxt1(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[3]);
     PyBuffer_Release(&bufs[4]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_dxt2_3(PyObject *self, PyObject *args) {
@@ -1485,7 +1485,7 @@ static PyObject *py_unpack_dxt2_3(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bhhhh:unpack_dxt2_3",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
         &pix_per_tex, &chans[0], &chans[1], &chans[2], &chans[3]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         unpack_dxt2_3_16(
@@ -1505,7 +1505,7 @@ static PyObject *py_unpack_dxt2_3(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[4]);
     PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_dxt4_5(PyObject *self, PyObject *args) {
@@ -1517,7 +1517,7 @@ static PyObject *py_unpack_dxt4_5(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bhhhh:unpack_dxt4_5",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
         &pix_per_tex, &chans[0], &chans[1], &chans[2], &chans[3]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         unpack_dxt4_5_16(
@@ -1537,7 +1537,7 @@ static PyObject *py_unpack_dxt4_5(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[4]);
     PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_dxt5a(PyObject *self, PyObject *args) {
@@ -1549,7 +1549,7 @@ static PyObject *py_unpack_dxt5a(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbbhhhh:unpack_dxt5a",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
         &ucc, &scc, &pix_per_tex, &chans[0], &chans[1], &chans[2], &chans[3]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         unpack_dxt5a_16(
@@ -1569,7 +1569,7 @@ static PyObject *py_unpack_dxt5a(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[4]);
     PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_dxn(PyObject *self, PyObject *args) {
@@ -1581,7 +1581,7 @@ static PyObject *py_unpack_dxn(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*bbhhh:unpack_dxn",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3],
         &ucc, &pix_per_tex, &chans[0], &chans[1], &chans[2]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         unpack_dxn_16(
@@ -1599,7 +1599,7 @@ static PyObject *py_unpack_dxn(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[2]);
     PyBuffer_Release(&bufs[3]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_ctx1(PyObject *self, PyObject *args) {
@@ -1611,7 +1611,7 @@ static PyObject *py_unpack_ctx1(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*bbhhh:unpack_ctx1",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3],
         &ucc, &pix_per_tex, &chans[0], &chans[1], &chans[2]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         unpack_ctx1_16(
@@ -1629,7 +1629,7 @@ static PyObject *py_unpack_ctx1(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[2]);
     PyBuffer_Release(&bufs[3]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_vu(PyObject *self, PyObject *args) {
@@ -1641,7 +1641,7 @@ static PyObject *py_unpack_vu(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*bhhh:unpack_vu",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4],
         &ucc, &chans[0], &chans[1], &chans[2]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {  // unpacking v8u8
         if (bufs[0].itemsize == 2) {  // to a16r16g16b16
@@ -1672,7 +1672,7 @@ static PyObject *py_unpack_vu(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[3]);
     PyBuffer_Release(&bufs[4]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_dxt1(PyObject *self, PyObject *args) {
@@ -1684,7 +1684,7 @@ static PyObject *py_pack_dxt1(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*bbH:pack_dxt1",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4],
         &pix_per_tex, &can_have_alpha, &a_cutoff))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_dxt1_16(
@@ -1703,7 +1703,7 @@ static PyObject *py_pack_dxt1(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[3]);
     PyBuffer_Release(&bufs[4]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_dxt2_3(PyObject *self, PyObject *args) {
@@ -1714,7 +1714,7 @@ static PyObject *py_pack_dxt2_3(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*b:pack_dxt2_3",
         &bufs[0], &bufs[1],
         &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_dxt2_3_16(
@@ -1734,7 +1734,7 @@ static PyObject *py_pack_dxt2_3(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[4]);
     PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_dxt4_5(PyObject *self, PyObject *args) {
@@ -1745,7 +1745,7 @@ static PyObject *py_pack_dxt4_5(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*b:pack_dxt4_5",
         &bufs[0], &bufs[1],
         &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_dxt4_5_16(
@@ -1765,7 +1765,7 @@ static PyObject *py_pack_dxt4_5(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[4]);
     PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_vu(PyObject *self, PyObject *args) {
@@ -1775,7 +1775,7 @@ static PyObject *py_pack_vu(PyObject *self, PyObject *args) {
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*w*w*bhh:pack_vu",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &ucc, &u_chan, &v_chan))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {  // packing a16r16g16b16
         if (bufs[0].itemsize == 4) {  // to v16u16
@@ -1797,7 +1797,7 @@ static PyObject *py_pack_vu(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[2]);
     PyBuffer_Release(&bufs[3]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 
