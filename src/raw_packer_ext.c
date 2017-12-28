@@ -734,7 +734,7 @@ static PyObject *py_pack_raw_4_channel_merge(PyObject *self, PyObject *args) {
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
         &divs[0], &divs[1], &divs[2], &divs[3],
         &shifts[0], &shifts[1], &shifts[2], &shifts[3]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_raw_4_channel_merge_16bpp(
@@ -753,7 +753,7 @@ static PyObject *py_pack_raw_4_channel_merge(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
     PyBuffer_Release(&bufs[4]); PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_raw_2_channel_merge(PyObject *self, PyObject *args) {
@@ -765,7 +765,7 @@ static PyObject *py_pack_raw_2_channel_merge(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*LLbb:pack_raw_2_channel_merge",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3],
         &divs[0], &divs[1], &shifts[0], &shifts[1]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_raw_2_channel_merge_16bpp(
@@ -781,7 +781,7 @@ static PyObject *py_pack_raw_2_channel_merge(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]); PyBuffer_Release(&bufs[1]);
     PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_raw_4_channel(PyObject *self, PyObject *args) {
@@ -792,7 +792,7 @@ static PyObject *py_pack_raw_4_channel(PyObject *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbbb:pack_raw_4_channel",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
         &shifts[0], &shifts[1], &shifts[2], &shifts[3]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_raw_4_channel_16bpp(
@@ -809,7 +809,7 @@ static PyObject *py_pack_raw_4_channel(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
     PyBuffer_Release(&bufs[4]); PyBuffer_Release(&bufs[5]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_raw_2_channel(PyObject *self, PyObject *args) {
@@ -819,7 +819,7 @@ static PyObject *py_pack_raw_2_channel(PyObject *self, PyObject *args) {
     // Get the pointers to each of the arrays, masks, and shifts
     if (!PyArg_ParseTuple(args, "w*w*w*w*bb:pack_raw_2_channel",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &shifts[0], &shifts[1]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_raw_2_channel_16bpp(
@@ -833,7 +833,7 @@ static PyObject *py_pack_raw_2_channel(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]); PyBuffer_Release(&bufs[1]);
     PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_raw_1_channel(PyObject *self, PyObject *args) {
@@ -843,7 +843,7 @@ static PyObject *py_pack_raw_1_channel(PyObject *self, PyObject *args) {
     // Get the pointers to each of the arrays, mask, and shift
     if (!PyArg_ParseTuple(args, "w*w*w*b:pack_raw_1_channel",
         &bufs[0], &bufs[1], &bufs[2], &shift))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {
         pack_raw_1_channel_16bpp(&bufs[0], &bufs[1], &bufs[2], shift);
@@ -856,7 +856,7 @@ static PyObject *py_pack_raw_1_channel(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[1]);
     PyBuffer_Release(&bufs[2]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_indexing(PyObject *self, PyObject *args) {
@@ -866,7 +866,7 @@ static PyObject *py_pack_indexing(PyObject *self, PyObject *args) {
     // Get the pointers to each of the arrays and indexing size
     if (!PyArg_ParseTuple(args, "w*w*b:pack_indexing",
         &bufs[0], &bufs[1], &indexing_size))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     pack_indexing(&bufs[0], &bufs[1], indexing_size);
 
@@ -874,7 +874,7 @@ static PyObject *py_pack_indexing(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]);
     PyBuffer_Release(&bufs[1]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 /* A list of all the methods defined by this module.
