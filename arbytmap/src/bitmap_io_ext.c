@@ -127,7 +127,7 @@ static PyObject *py_pad_24bit_array(PyObject *self, PyObject *args) {
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*:pad_24bit_array", &bufs[0], &bufs[1]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     pad_24bit_array(&bufs[0], &bufs[1]);
 
@@ -135,7 +135,7 @@ static PyObject *py_pad_24bit_array(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]);
     PyBuffer_Release(&bufs[1]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pad_48bit_array(PyObject *self, PyObject *args) {
@@ -143,7 +143,7 @@ static PyObject *py_pad_48bit_array(PyObject *self, PyObject *args) {
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*:pad_48bit_array", &bufs[0], &bufs[1]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     pad_48bit_array(&bufs[0], &bufs[1]);
 
@@ -151,7 +151,7 @@ static PyObject *py_pad_48bit_array(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]);
     PyBuffer_Release(&bufs[1]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpad_24bit_array(PyObject *self, PyObject *args) {
@@ -159,7 +159,7 @@ static PyObject *py_unpad_24bit_array(PyObject *self, PyObject *args) {
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*:unpad_24bit_array", &bufs[0], &bufs[1]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     unpad_24bit_array(&bufs[0], &bufs[1]);
 
@@ -167,7 +167,7 @@ static PyObject *py_unpad_24bit_array(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]);
     PyBuffer_Release(&bufs[1]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
@@ -175,7 +175,7 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*:unpad_48bit_array", &bufs[0], &bufs[1]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     unpad_48bit_array(&bufs[0], &bufs[1]);
 
@@ -183,7 +183,7 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]);
     PyBuffer_Release(&bufs[1]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_swap_channels(PyObject *self, PyObject *args) {
@@ -194,14 +194,15 @@ static PyObject *py_swap_channels(PyObject *self, PyObject *args) {
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*:swap_channels", &bufs[0], &bufs[1]))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     pixels   = (unsigned char  *)bufs[0].buf;
     chan_map = (unsigned short *)bufs[1].buf;
     max_i = bufs[0].len;
     step  = bufs[1].len / 2;
     temp_pix = malloc(step);
-    if (temp_pix == NULL) return Py_None;
+    if (temp_pix == NULL)
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     for (i = 0; i < max_i; i += step) {
         memcpy(temp_pix, &(pixels[i]), step);
@@ -215,7 +216,7 @@ static PyObject *py_swap_channels(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[1]);
     free(temp_pix);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 // This was GOING to be a function to quickly make an array object and

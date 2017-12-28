@@ -131,7 +131,7 @@ static PyObject *py_depalettize_bitmap(PyObject *self, PyObject *args) {
     // Get the pointers to each of the array objects and channel count
     if (!PyArg_ParseTuple(args, "w*w*w*b:depalettize_bitmap",
         &bufs[0], &bufs[1], &bufs[2], &channel_count))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         depalettize_bitmap_16(&bufs[0], &bufs[1], &bufs[2], channel_count);
@@ -144,7 +144,7 @@ static PyObject *py_depalettize_bitmap(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[1]);
     PyBuffer_Release(&bufs[2]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
@@ -155,7 +155,7 @@ static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
     // Get the pointers to each of the array objects and channel count
     if (!PyArg_ParseTuple(args, "w*w*kb:downsample_bitmap",
         &bufs[0], &bufs[1], &merge_count, &channel_count))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
         downsample_bitmap_16(&bufs[0], &bufs[1], merge_count, channel_count);
@@ -167,7 +167,7 @@ static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
     PyBuffer_Release(&bufs[0]);
     PyBuffer_Release(&bufs[1]);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_populate_scaler_array(PyObject *self, PyObject *args) {
@@ -178,7 +178,7 @@ static PyObject *py_populate_scaler_array(PyObject *self, PyObject *args) {
     unsigned short *short_arr;
 
     if (!PyArg_ParseTuple(args, "w*d:populate_scaler_array", &buf, &scale))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
     max_i = buf.len;
     if (buf.itemsize == 2) {
@@ -195,7 +195,7 @@ static PyObject *py_populate_scaler_array(PyObject *self, PyObject *args) {
     // Release the buffer objects
     PyBuffer_Release(&buf);
 
-    return Py_None;
+    return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 /* A list of all the methods defined by this module.
