@@ -57,7 +57,7 @@ def initialize():
 
     dxt_specs = dict(
         compressed=True, dds_format=True, raw_format=False,
-        min_width=4, min_height=4, packed_typecode='L')
+        min_width=4, min_height=4, packed_typecode='I')
 
     ab.register_format(ab.FORMAT_DXT1, **combine(
         dxt_specs, bpp=4, depths=(5, 6, 5, 1),
@@ -125,7 +125,7 @@ def initialize():
 
 def unpack_dxt1(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
-    assert packed.typecode == 'L'
+    assert packed.typecode == 'I'
 
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
@@ -219,7 +219,7 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
 
 def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
-    assert packed.typecode == 'L'
+    assert packed.typecode == 'I'
 
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
@@ -322,7 +322,7 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
 
 def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
-    assert packed.typecode == 'L'
+    assert packed.typecode == 'I'
 
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
@@ -448,7 +448,7 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
 
 def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
-    assert packed.typecode == 'L'
+    assert packed.typecode == 'I'
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
@@ -525,7 +525,7 @@ def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
 
 def unpack_dxn(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
-    assert packed.typecode == 'L'
+    assert packed.typecode == 'I'
 
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
@@ -652,7 +652,7 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
 
 def unpack_ctx1(self, bitmap_index, width, height, depth=1):
     packed = self.texture_block[bitmap_index]
-    assert packed.typecode == 'L'
+    assert packed.typecode == 'I'
 
     # get all sorts of information we need
     unpack_code = self._UNPACK_ARRAY_CODE
@@ -995,7 +995,7 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
     a_cutoff = self.one_bit_bias
 
     _, r_scale, g_scale, b_scale = self.channel_downscalers
-    repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
+    repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
 
     """If the texture is more than 1 texel wide we need to have the swizzler
     rearrange the pixels so that each texel's pixels are adjacent each other.
@@ -1144,7 +1144,7 @@ def pack_dxt2_3(self, unpacked, width, height, depth=1):
     channels_per_texel = ucc*pixels_per_texel
 
     a_scale, r_scale, g_scale, b_scale = self.channel_downscalers
-    repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
+    repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
 
     """If the texture is more than 1 texel wide we need to have the swizzler
     rearrange the pixels so that each texel's pixels are adjacent each other.
@@ -1260,7 +1260,7 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
     channels_per_texel = ucc*pixels_per_texel
 
     a_scale, r_scale, g_scale, b_scale = self.channel_downscalers
-    repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
+    repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
 
     """If the texture is more than 1 texel wide we need to have the swizzler
     rearrange the pixels so that each texel's pixels are adjacent each other.
@@ -1452,7 +1452,7 @@ def pack_dxt5a(self, unpacked, width, height, depth=1):
     bpt = ucc*8
 
     scales = list(self.channel_downscalers)
-    repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
+    repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -1574,7 +1574,7 @@ def pack_dxn(self, unpacked, width, height, depth=1):
     ucc = self.unpacked_channel_count
 
     scales = list(self.channel_downscalers)
-    repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
+    repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -1696,7 +1696,7 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
     #create a new array to hold the texels after we repack them
     bpt = 8
     ucc = self.unpacked_channel_count
-    repacked = ab.bitmap_io.make_array("L", texel_width*texel_height, bpt)
+    repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
 
     """If the texture is more than 1 texel wide we need to have the swizzler
     rearrange the pixels so that each texel's pixels are adjacent each other.
