@@ -1,8 +1,4 @@
-//#include <stdio.h>
-#include "Python.h"
-#include "abstract.h"    // contains PyBuffer_Release
-#include "modsupport.h"  // contains PyArg_ParseTuple
-#include "object.h"      // contains Py_buffer
+#include "shared.h"
 
 //short-hand macros for unpacker routines
 #define UNPACK_ARGB(pixel_array)\
@@ -32,32 +28,32 @@ static void unpack_raw_4_channel_8bpp(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    unsigned long long a_mask, unsigned long long r_mask,
-    unsigned long long g_mask, unsigned long long b_mask,
-    char a_shift,  char r_shift,  char g_shift,  char b_shift)
+    uint64 a_mask, uint64 r_mask,
+    uint64 g_mask, uint64 b_mask,
+    sint8 a_shift,  sint8 r_shift,  sint8 g_shift,  sint8 b_shift)
 {
     Py_ssize_t packed_pix_size;
-    unsigned char *unpacked_pix;
-    unsigned char *a_scale, *r_scale, *g_scale, *b_scale;
-    unsigned long long i=0, j=0, max_i=0, pixel=0;
+    uint8 *unpacked_pix;
+    uint8 *a_scale, *r_scale, *g_scale, *b_scale;
+    uint64 i=0, j=0, max_i=0, pixel=0;
 
-    unsigned char  *packed_pix_8;
-    unsigned short *packed_pix_16;
-    unsigned long  *packed_pix_32;
-    unsigned long long *packed_pix_64;
+    uint8  *packed_pix_8;
+    uint16 *packed_pix_16;
+    uint32  *packed_pix_32;
+    uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (unsigned char*) packed_pix_buf->buf;
-    packed_pix_16 = (unsigned short*)packed_pix_buf->buf;
-    packed_pix_32 = (unsigned long*) packed_pix_buf->buf;
-    packed_pix_64 = (unsigned long long*)packed_pix_buf->buf;
+    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_16 = (uint16*)packed_pix_buf->buf;
+    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
-    unpacked_pix = (unsigned char*)unpacked_pix_buf->buf;
-    a_scale = (unsigned char*)a_scale_buf->buf;
-    r_scale = (unsigned char*)r_scale_buf->buf;
-    g_scale = (unsigned char*)g_scale_buf->buf;
-    b_scale = (unsigned char*)b_scale_buf->buf;
+    unpacked_pix = (uint8*)unpacked_pix_buf->buf;
+    a_scale = (uint8*)a_scale_buf->buf;
+    r_scale = (uint8*)r_scale_buf->buf;
+    g_scale = (uint8*)g_scale_buf->buf;
+    b_scale = (uint8*)b_scale_buf->buf;
 
     max_i = (unpacked_pix_buf->len)/4;
 
@@ -75,29 +71,29 @@ static void unpack_raw_4_channel_8bpp(
 static void unpack_raw_2_channel_8bpp(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *i_scale_buf,
-    unsigned long long a_mask, unsigned long long i_mask,
-    char a_shift,  char i_shift)
+    uint64 a_mask, uint64 i_mask,
+    sint8 a_shift,  sint8 i_shift)
 {
     Py_ssize_t packed_pix_size;
-    unsigned char *unpacked_pix;
-    unsigned char *a_scale, *i_scale;
-    unsigned long long i=0, j=0, max_i=0, pixel=0;
+    uint8 *unpacked_pix;
+    uint8 *a_scale, *i_scale;
+    uint64 i=0, j=0, max_i=0, pixel=0;
 
-    unsigned char  *packed_pix_8;
-    unsigned short *packed_pix_16;
-    unsigned long  *packed_pix_32;
-    unsigned long long *packed_pix_64;
+    uint8  *packed_pix_8;
+    uint16 *packed_pix_16;
+    uint32  *packed_pix_32;
+    uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (unsigned char*) packed_pix_buf->buf;
-    packed_pix_16 = (unsigned short*)packed_pix_buf->buf;
-    packed_pix_32 = (unsigned long*) packed_pix_buf->buf;
-    packed_pix_64 = (unsigned long long*) packed_pix_buf->buf;
+    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_16 = (uint16*)packed_pix_buf->buf;
+    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_64 = (uint64*) packed_pix_buf->buf;
 
-    unpacked_pix = (unsigned char*)unpacked_pix_buf->buf;
-    a_scale = (unsigned char*)a_scale_buf->buf;
-    i_scale = (unsigned char*)i_scale_buf->buf;
+    unpacked_pix = (uint8*)unpacked_pix_buf->buf;
+    a_scale = (uint8*)a_scale_buf->buf;
+    i_scale = (uint8*)i_scale_buf->buf;
 
     max_i = (unpacked_pix_buf->len)/2;
 
@@ -114,27 +110,27 @@ static void unpack_raw_2_channel_8bpp(
 
 static void unpack_raw_1_channel_8bpp(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
-    Py_buffer *scale_buf, unsigned long long mask,  char shift)
+    Py_buffer *scale_buf, uint64 mask,  sint8 shift)
 {
     Py_ssize_t packed_pix_size;
-    unsigned char *unpacked_pix;
-    unsigned char *scale;
-    unsigned long long i=0, max_i=0;
+    uint8 *unpacked_pix;
+    uint8 *scale;
+    uint64 i=0, max_i=0;
 
-    unsigned char  *packed_pix_8;
-    unsigned short *packed_pix_16;
-    unsigned long  *packed_pix_32;
-    unsigned long long *packed_pix_64;
+    uint8  *packed_pix_8;
+    uint16 *packed_pix_16;
+    uint32  *packed_pix_32;
+    uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (unsigned char*) packed_pix_buf->buf;
-    packed_pix_16 = (unsigned short*)packed_pix_buf->buf;
-    packed_pix_32 = (unsigned long*)packed_pix_buf->buf;
-    packed_pix_64 = (unsigned long long*)packed_pix_buf->buf;
+    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_16 = (uint16*)packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
-    unpacked_pix = (unsigned char*)unpacked_pix_buf->buf;
-    scale = (unsigned char*)scale_buf->buf;
+    unpacked_pix = (uint8*)unpacked_pix_buf->buf;
+    scale = (uint8*)scale_buf->buf;
 
     max_i = unpacked_pix_buf->len;
 
@@ -158,32 +154,32 @@ static void unpack_raw_4_channel_16bpp(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    unsigned long long a_mask, unsigned long long r_mask,
-    unsigned long long g_mask, unsigned long long b_mask,
-    char a_shift,  char r_shift,  char g_shift,  char b_shift)
+    uint64 a_mask, uint64 r_mask,
+    uint64 g_mask, uint64 b_mask,
+    sint8 a_shift,  sint8 r_shift,  sint8 g_shift,  sint8 b_shift)
 {
     Py_ssize_t packed_pix_size;
-    unsigned short *unpacked_pix;
-    unsigned short *a_scale, *r_scale, *g_scale, *b_scale;
-    unsigned long long i=0, j=0, max_i=0, pixel=0;
+    uint16 *unpacked_pix;
+    uint16 *a_scale, *r_scale, *g_scale, *b_scale;
+    uint64 i=0, j=0, max_i=0, pixel=0;
 
-    unsigned char  *packed_pix_8;
-    unsigned short *packed_pix_16;
-    unsigned long  *packed_pix_32;
-    unsigned long long *packed_pix_64;
+    uint8  *packed_pix_8;
+    uint16 *packed_pix_16;
+    uint32  *packed_pix_32;
+    uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (unsigned char*) packed_pix_buf->buf;
-    packed_pix_16 = (unsigned short*)packed_pix_buf->buf;
-    packed_pix_32 = (unsigned long*) packed_pix_buf->buf;
-    packed_pix_64 = (unsigned long long*)packed_pix_buf->buf;
+    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_16 = (uint16*)packed_pix_buf->buf;
+    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
-    unpacked_pix = (unsigned short*)unpacked_pix_buf->buf;
-    a_scale = (unsigned short*)a_scale_buf->buf;
-    r_scale = (unsigned short*)r_scale_buf->buf;
-    g_scale = (unsigned short*)g_scale_buf->buf;
-    b_scale = (unsigned short*)b_scale_buf->buf;
+    unpacked_pix = (uint16*)unpacked_pix_buf->buf;
+    a_scale = (uint16*)a_scale_buf->buf;
+    r_scale = (uint16*)r_scale_buf->buf;
+    g_scale = (uint16*)g_scale_buf->buf;
+    b_scale = (uint16*)b_scale_buf->buf;
 
     max_i = (unpacked_pix_buf->len)/8;
 
@@ -201,29 +197,29 @@ static void unpack_raw_4_channel_16bpp(
 static void unpack_raw_2_channel_16bpp(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *i_scale_buf,
-    unsigned long long a_mask, unsigned long long i_mask,
-    char a_shift,  char i_shift)
+    uint64 a_mask, uint64 i_mask,
+    sint8 a_shift,  sint8 i_shift)
 {
     Py_ssize_t packed_pix_size;
-    unsigned short *unpacked_pix;
-    unsigned short *a_scale, *i_scale;
-    unsigned long long i=0, j=0, max_i=0, pixel=0;
+    uint16 *unpacked_pix;
+    uint16 *a_scale, *i_scale;
+    uint64 i=0, j=0, max_i=0, pixel=0;
 
-    unsigned char  *packed_pix_8;
-    unsigned short *packed_pix_16;
-    unsigned long  *packed_pix_32;
-    unsigned long long *packed_pix_64;
+    uint8  *packed_pix_8;
+    uint16 *packed_pix_16;
+    uint32  *packed_pix_32;
+    uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (unsigned char*) packed_pix_buf->buf;
-    packed_pix_16 = (unsigned short*)packed_pix_buf->buf;
-    packed_pix_32 = (unsigned long*) packed_pix_buf->buf;
-    packed_pix_64 = (unsigned long long*) packed_pix_buf->buf;
+    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_16 = (uint16*)packed_pix_buf->buf;
+    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_64 = (uint64*) packed_pix_buf->buf;
 
-    unpacked_pix = (unsigned short*)unpacked_pix_buf->buf;
-    a_scale = (unsigned short*)a_scale_buf->buf;
-    i_scale = (unsigned short*)i_scale_buf->buf;
+    unpacked_pix = (uint16*)unpacked_pix_buf->buf;
+    a_scale = (uint16*)a_scale_buf->buf;
+    i_scale = (uint16*)i_scale_buf->buf;
 
     max_i = (unpacked_pix_buf->len)/4;
 
@@ -240,27 +236,27 @@ static void unpack_raw_2_channel_16bpp(
 
 static void unpack_raw_1_channel_16bpp(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
-    Py_buffer *scale_buf, unsigned long long mask,  char shift)
+    Py_buffer *scale_buf, uint64 mask,  sint8 shift)
 {
     Py_ssize_t packed_pix_size;
-    unsigned short *unpacked_pix;
-    unsigned short *scale;
-    unsigned long long i=0, max_i=0;
+    uint16 *unpacked_pix;
+    uint16 *scale;
+    uint64 i=0, max_i=0;
 
-    unsigned char  *packed_pix_8;
-    unsigned short *packed_pix_16;
-    unsigned long *packed_pix_32;
-    unsigned long long *packed_pix_64;
+    uint8  *packed_pix_8;
+    uint16 *packed_pix_16;
+    uint32 *packed_pix_32;
+    uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (unsigned char*) packed_pix_buf->buf;
-    packed_pix_16 = (unsigned short*)packed_pix_buf->buf;
-    packed_pix_32 = (unsigned long*)packed_pix_buf->buf;
-    packed_pix_64 = (unsigned long long*)packed_pix_buf->buf;
+    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_16 = (uint16*)packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
-    unpacked_pix = (unsigned short*)unpacked_pix_buf->buf;
-    scale = (unsigned short*)scale_buf->buf;
+    unpacked_pix = (uint16*)unpacked_pix_buf->buf;
+    scale = (uint16*)scale_buf->buf;
 
     max_i = (unpacked_pix_buf->len)/2;
 
@@ -278,16 +274,16 @@ static void unpack_raw_1_channel_16bpp(
 
 static void unpack_indexing(
     Py_buffer *unpacked_indexing_buf, Py_buffer *packed_indexing_buf,
-    char indexing_size)
+    sint8 indexing_size)
 {
     //THIS FUNCTION IS CURRENTLY UNTESTED.
-    unsigned char *packed_indexing;
-    unsigned char *unpacked_indexing;
-    unsigned char index_chunk;
-    unsigned long long i=0, max_i=0;
+    uint8 *packed_indexing;
+    uint8 *unpacked_indexing;
+    uint8 index_chunk;
+    uint64 i=0, max_i=0;
 
-    packed_indexing = (unsigned char*) packed_indexing_buf->buf;
-    unpacked_indexing = (unsigned char*) unpacked_indexing_buf->buf;
+    packed_indexing = (uint8*) packed_indexing_buf->buf;
+    unpacked_indexing = (uint8*) unpacked_indexing_buf->buf;
 
     max_i = unpacked_indexing_buf->len;
 
@@ -323,8 +319,8 @@ static void unpack_indexing(
 
 static PyObject *py_unpack_raw_4_channel(PyObject *self, PyObject *args) {
     Py_buffer bufs[6];
-    unsigned long long masks[4];
-    char shifts[4];
+    uint64 masks[4];
+    sint8 shifts[4];
 
     // Get the pointers to each of the arrays, masks, and shifts
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*KKKKbbbb:unpack_raw_4_channel",
@@ -355,8 +351,8 @@ static PyObject *py_unpack_raw_4_channel(PyObject *self, PyObject *args) {
 
 static PyObject *py_unpack_raw_2_channel(PyObject *self, PyObject *args) {
     Py_buffer bufs[4];
-    unsigned long long masks[2];
-    char shifts[2];
+    uint64 masks[2];
+    sint8 shifts[2];
 
     // Get the pointers to each of the arrays, masks, and shifts
     if (!PyArg_ParseTuple(args, "w*w*w*w*KKbb:unpack_raw_2_channel",
@@ -383,8 +379,8 @@ static PyObject *py_unpack_raw_2_channel(PyObject *self, PyObject *args) {
 
 static PyObject *py_unpack_raw_1_channel(PyObject *self, PyObject *args) {
     Py_buffer bufs[3];
-    unsigned long long mask;
-    char shift;
+    uint64 mask;
+    sint8 shift;
 
     // Get the pointers to each of the arrays, mask, and shift
     if (!PyArg_ParseTuple(args, "w*w*w*Kb:unpack_raw_1_channel",
@@ -407,7 +403,7 @@ static PyObject *py_unpack_raw_1_channel(PyObject *self, PyObject *args) {
 
 static PyObject *py_unpack_indexing(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
-    char indexing_size;
+    sint8 indexing_size;
 
     // Get the pointers to each of the arrays and indexing size
     if (!PyArg_ParseTuple(args, "w*w*b:unpack_indexing",

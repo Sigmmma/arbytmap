@@ -1,20 +1,18 @@
-#include <stdio.h>
-#include "Python.h"
-#include "modsupport.h"
+#include "shared.h"
 
 
 static void depalettize_bitmap_8(
     Py_buffer *unpacked_pix_buf, Py_buffer *unpacked_idx_buf,
-    Py_buffer *unpacked_pal_buf, char channel_count)
+    Py_buffer *unpacked_pal_buf, sint8 channel_count)
 {
-    unsigned long long i=0, j=0, max_i=0;
-    unsigned char *unpacked_pix;
-    unsigned char *unpacked_pal;
-    unsigned char *unpacked_idx;
+    uint64 i=0, j=0, max_i=0;
+    uint8 *unpacked_pix;
+    uint8 *unpacked_pal;
+    uint8 *unpacked_idx;
 
-    unpacked_pix = (unsigned char*)unpacked_pix_buf->buf;
-    unpacked_pal = (unsigned char*)unpacked_pal_buf->buf;
-    unpacked_idx = (unsigned char*)unpacked_idx_buf->buf;
+    unpacked_pix = (uint8*)unpacked_pix_buf->buf;
+    unpacked_pal = (uint8*)unpacked_pal_buf->buf;
+    unpacked_idx = (uint8*)unpacked_idx_buf->buf;
     max_i = unpacked_pix_buf->len;
 
     if (channel_count == 4) {
@@ -40,15 +38,15 @@ static void depalettize_bitmap_8(
 
 static void downsample_bitmap_8(
     Py_buffer *downsamp_pix_buf, Py_buffer *swizzled_pix_buf,
-    unsigned long merge_count, char channel_count)
+    uint32 merge_count, sint8 channel_count)
 {
-    unsigned long long i=0, j=0, max_i=0, swizz_i=0;
-    unsigned long long merge_val=0;
-    unsigned char *downsamp_pix;
-    unsigned char *swizzled_pix;
+    uint64 i=0, j=0, max_i=0, swizz_i=0;
+    uint64 merge_val=0;
+    uint8 *downsamp_pix;
+    uint8 *swizzled_pix;
 
-    downsamp_pix = (unsigned char*)downsamp_pix_buf->buf;
-    swizzled_pix = (unsigned char*)swizzled_pix_buf->buf;
+    downsamp_pix = (uint8*)downsamp_pix_buf->buf;
+    swizzled_pix = (uint8*)swizzled_pix_buf->buf;
     max_i = downsamp_pix_buf->len;
 
     for (i=0; i < max_i; i++) {
@@ -67,16 +65,16 @@ static void downsample_bitmap_8(
 
 static void depalettize_bitmap_16(
     Py_buffer *unpacked_pix_buf, Py_buffer *unpacked_idx_buf,
-    Py_buffer *unpacked_pal_buf, char channel_count)
+    Py_buffer *unpacked_pal_buf, sint8 channel_count)
 {
-    unsigned long long i=0, j=0, max_i=0;
-    unsigned short *unpacked_pix;
-    unsigned short *unpacked_pal;
-    unsigned char *unpacked_idx;
+    uint64 i=0, j=0, max_i=0;
+    uint16 *unpacked_pix;
+    uint16 *unpacked_pal;
+    uint8 *unpacked_idx;
 
-    unpacked_pix = (unsigned short*)unpacked_pix_buf->buf;
-    unpacked_pal = (unsigned short*)unpacked_pal_buf->buf;
-    unpacked_idx = (unsigned char*)unpacked_idx_buf->buf;
+    unpacked_pix = (uint16*)unpacked_pix_buf->buf;
+    unpacked_pal = (uint16*)unpacked_pal_buf->buf;
+    unpacked_idx = (uint8*)unpacked_idx_buf->buf;
     max_i = unpacked_pix_buf->len;
 
     if (channel_count == 4) {
@@ -102,15 +100,15 @@ static void depalettize_bitmap_16(
 
 static void downsample_bitmap_16(
     Py_buffer *downsamp_pix_buf, Py_buffer *swizzled_pix_buf,
-    unsigned long merge_count, char channel_count)
+    uint32 merge_count, sint8 channel_count)
 {
-    unsigned long long i=0, j=0, max_i=0, swizz_i=0;
-    unsigned long long merge_val=0;
-    unsigned short *downsamp_pix;
-    unsigned short *swizzled_pix;
+    uint64 i=0, j=0, max_i=0, swizz_i=0;
+    uint64 merge_val=0;
+    uint16 *downsamp_pix;
+    uint16 *swizzled_pix;
 
-    downsamp_pix = (unsigned short*)downsamp_pix_buf->buf;
-    swizzled_pix = (unsigned short*)swizzled_pix_buf->buf;
+    downsamp_pix = (uint16*)downsamp_pix_buf->buf;
+    swizzled_pix = (uint16*)swizzled_pix_buf->buf;
     max_i = downsamp_pix_buf->len;
 
     for (i=0; i < max_i; i++) {
@@ -126,7 +124,7 @@ static void downsample_bitmap_16(
 
 static PyObject *py_depalettize_bitmap(PyObject *self, PyObject *args) {
     Py_buffer bufs[3];
-    char channel_count;
+    sint8 channel_count;
 
     // Get the pointers to each of the array objects and channel count
     if (!PyArg_ParseTuple(args, "w*w*w*b:depalettize_bitmap",
@@ -149,8 +147,8 @@ static PyObject *py_depalettize_bitmap(PyObject *self, PyObject *args) {
 
 static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
-    unsigned long merge_count;
-    char channel_count;
+    uint32 merge_count;
+    sint8 channel_count;
 
     // Get the pointers to each of the array objects and channel count
     if (!PyArg_ParseTuple(args, "w*w*kb:downsample_bitmap",
@@ -173,23 +171,23 @@ static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
 static PyObject *py_populate_scaler_array(PyObject *self, PyObject *args) {
     Py_buffer buf;
     double scale;
-    unsigned long long i=0, max_i=0;
-    unsigned char  *char_arr;
-    unsigned short *short_arr;
+    uint64 i=0, max_i=0;
+    uint8  *char_arr;
+    uint16 *short_arr;
 
     if (!PyArg_ParseTuple(args, "w*d:populate_scaler_array", &buf, &scale))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     max_i = buf.len;
     if (buf.itemsize == 2) {
-        short_arr = (unsigned short *)buf.buf;
+        short_arr = (uint16 *)buf.buf;
         max_i /= 2;
         for (i=0; i < max_i; i++)
-            short_arr[i] = (unsigned short)(i*scale + 0.5);
+            short_arr[i] = (uint16)(i*scale + 0.5);
     } else {
-        char_arr = (unsigned char  *)buf.buf;
+        char_arr = (uint8  *)buf.buf;
         for (i=0; i < max_i; i++)
-            char_arr[i] = (unsigned char)(i*scale + 0.5);
+            char_arr[i] = (uint8)(i*scale + 0.5);
     }
 
     // Release the buffer objects
