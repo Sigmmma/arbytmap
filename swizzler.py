@@ -159,10 +159,10 @@ class Swizzler():
 
         #swizzle the bits of the offsets. supports up to
         #2^32 array elements(4GB if each element is 1 byte)
-        c_block_offs = array("L", map(bs, range(channels), (c_mask,)*channels))
-        x_block_offs = array("L", map(bs, range(width), (x_mask,)*width))
-        y_block_offs = array("L", map(bs, range(height), (y_mask,)*height))
-        z_block_offs = array("L", map(bs, range(depth), (z_mask,)*depth))
+        c_block_offs = array("I", map(bs, range(channels), (c_mask,)*channels))
+        x_block_offs = array("I", map(bs, range(width), (x_mask,)*width))
+        y_block_offs = array("I", map(bs, range(height), (y_mask,)*height))
+        z_block_offs = array("I", map(bs, range(depth), (z_mask,)*depth))
         
         if fast_swizzler:
             if mode:

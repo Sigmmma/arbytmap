@@ -881,7 +881,8 @@ def bitmap_bytes_to_array(rawdata, offset, texture_block, fmt,
         #print("WARNING: PIXEL DATA SUPPLIED DID NOT MEET "+
         #      "THE SIZE EXPECTED. PADDING WITH ZEROS.")
         pixel_array.extend(
-            make_array(pixel_array.typecode, bitmap_size - len(pixel_array), 1))
+            make_array(pixel_array.typecode, 
+                       bitmap_size - len(pixel_array)*pixel_size, 1))
     
     #add the pixel array to the current texture block
     texture_block.append(pixel_array)
@@ -913,12 +914,12 @@ def pad_24bit_array(unpadded):
             unpadded.typecode)
 
     if fast_bitmap_io:
-        padded = make_array("L", len(unpadded)//3)
+        padded = make_array("I", len(unpadded)//3)
         bitmap_io_ext.pad_24bit_array(padded, unpadded)
         return padded
 
     return array(
-        "L", map(lambda x:(
+        "I", map(lambda x:(
             unpadded[x] + (unpadded[x+1]<<8)+ (unpadded[x+2]<<16)),
                  range(0, len(unpadded), 3)))
 
@@ -947,7 +948,7 @@ def unpad_24bit_array(padded):
     32BPP, this will return an unpadded, unpacked, array copy.
     The endianness of the data will be little."""
     
-    if padded.typecode == "L":
+    if padded.typecode == "I":
         # pixels have been packed
         unpadded = make_array("B", len(padded), 3)
         if fast_bitmap_io:
@@ -974,7 +975,7 @@ def unpad_24bit_array(padded):
                 unpadded[i*3+2] = padded[i*4+3]
     else:
         raise TypeError(
-            "Bad typecode for padded 24bit array. Expected B or L, got %s" %
+            "Bad typecode for padded 24bit array. Expected B or I, got %s" %
             padded.typecode)
         
     return unpadded

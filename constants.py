@@ -20,11 +20,11 @@ C_ORDER_BGRA = "BGRA"  # <---DEFAULT MOST IMAGE FORMATS PACK TO
 '''
 C_ORDER_DEFAULT = C_ORDER_ARGB
 
-PIXEL_ENCODING_SIZES = {"B":1, "H":2, "L":4, "Q":8, "b":1, "h":2, "l":4, "q":8}
+PIXEL_ENCODING_SIZES = {"B":1, "H":2, "I":4, "Q":8, "b":1, "h":2, "i":4, "q":8}
 INVERSE_PIXEL_ENCODING_SIZES = {
     0:"B", 1:"B",
     2:"H",
-    3:"L", 4:"L",
+    3:"I", 4:"I",
     5:"Q", 6:"Q", 7:"Q", 8:"Q"}
 
 # if a channel has this in it's divisor it
