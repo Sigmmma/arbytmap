@@ -14,7 +14,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 curr_dir = dirname(__file__)
 #               YYYY.MM.DD
 release_date = "2018.01.20"
-version = (0, 9, 3)
+version = (0, 9, 4)
 
 
 is_pypy = hasattr(sys, 'pypy_translation_info')
@@ -67,21 +67,16 @@ setup_kwargs = dict(
         'arbytmap.ext',
         ],
     ext_modules = [
-        Extension("arbytmap.ext.arbytmap_ext",
-            ["arbytmap/src/arbytmap_ext.c", "arbytmap/src/shared.h"]),
-        Extension("arbytmap.ext.bitmap_io_ext",
-            ["arbytmap/src/bitmap_io_ext.c", "arbytmap/src/shared.h"]),
-        Extension("arbytmap.ext.dds_defs_ext",
-            ["arbytmap/src/dds_defs_ext.c", "arbytmap/src/shared.h"]),
-        Extension("arbytmap.ext.raw_packer_ext",
-            ["arbytmap/src/raw_packer_ext.c", "arbytmap/src/shared.h"]),
-        Extension("arbytmap.ext.raw_unpacker_ext",
-            ["arbytmap/src/raw_unpacker_ext.c", "arbytmap/src/shared.h"]),
-        Extension("arbytmap.ext.swizzler_ext",
-            ["arbytmap/src/swizzler_ext.c", "arbytmap/src/shared.h"])
+        Extension("arbytmap.ext.arbytmap_ext",     ["arbytmap/src/arbytmap_ext.c"]),
+        Extension("arbytmap.ext.bitmap_io_ext",    ["arbytmap/src/bitmap_io_ext.c"]),
+        Extension("arbytmap.ext.dds_defs_ext",     ["arbytmap/src/dds_defs_ext.c"]),
+        Extension("arbytmap.ext.raw_packer_ext",   ["arbytmap/src/raw_packer_ext.c"]),
+        Extension("arbytmap.ext.raw_unpacker_ext", ["arbytmap/src/raw_unpacker_ext.c"]),
+        Extension("arbytmap.ext.swizzler_ext",     ["arbytmap/src/swizzler_ext.c"])
         ],
     package_data={
         '': ['*.txt', '*.md', '*.rst'],
+        'arbytmap': ["src/*"]
         },
     platforms=["POSIX", "Windows"],
     keywords="arbytmap, texture, bitmap, converter, image, editing",
