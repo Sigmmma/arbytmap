@@ -498,23 +498,22 @@ def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
             """depending on which value is larger
             the indexing is calculated differently"""
             if val0 > val1:
-                lookup[2] = (val0*6 + val1)//7
-                lookup[3] = (val0*5 + val1*2)//7
-                lookup[4] = (val0*4 + val1*3)//7
-                lookup[5] = (val0*3 + val1*4)//7
-                lookup[6] = (val0*2 + val1*5)//7
-                lookup[7] = (val0   + val1*6)//7
+                lookup[2] = scale[(val0*6 + val1)//7]
+                lookup[3] = scale[(val0*5 + val1*2)//7]
+                lookup[4] = scale[(val0*4 + val1*3)//7]
+                lookup[5] = scale[(val0*3 + val1*4)//7]
+                lookup[6] = scale[(val0*2 + val1*5)//7]
+                lookup[7] = scale[(val0   + val1*6)//7]
             else:
-                lookup[2] = (val0*4 + val1)//5
-                lookup[3] = (val0*3 + val1*2)//5
-                lookup[4] = (val0*2 + val1*3)//5
-                lookup[5] = (val0   + val1*4)//5
-                lookup[6] = 0
-                lookup[7] = 255
+                lookup[2] = scale[(val0*4 + val1)//5]
+                lookup[3] = scale[(val0*3 + val1*2)//5]
+                lookup[4] = scale[(val0*2 + val1*3)//5]
+                lookup[5] = scale[(val0   + val1*4)//5]
+                lookup[6] = scale[0]
+                lookup[7] = scale[-1]
 
             for j in pixel_indices:
-                unpacked[pxl_i + j*ucc] = scale[
-                    lookup[(idx >> (j*3))&7]]
+                unpacked[pxl_i + j*ucc] = lookup[(idx >> (j*3))&7]
 
     if texel_width > 1:
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
@@ -545,7 +544,7 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
     unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
 
     chan1,   chan2,   chan3 = self.channel_mapping[1: 4]
-    r_scale, g_scale, __    = self.channel_upscalers[1: 4]
+    r_scale, g_scale, _     = self.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -571,49 +570,53 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
             pxl_i = i*channels_per_texel
             j = i*4
 
-            g0 = g_lookup[0] = packed[j]&255
-            g1 = g_lookup[1] = (packed[j]>>8)&255
+            g0 = packed[j]&255
+            g1 = (packed[j]>>8)&255
             g_idx = ((packed[j]>>16)&65535) + (packed[j+1]<<16)
 
-            r0 = r_lookup[0] = packed[j+2]&255
-            r1 = r_lookup[1] = (packed[j+2]>>8)&255
+            r0 = packed[j+2]&255
+            r1 = (packed[j+2]>>8)&255
             r_idx = ((packed[j+2]>>16)&65535) + (packed[j+3]<<16)
 
             #depending on which alpha value is larger
             #the indexing is calculated differently
-            if r0 > r1:
-                r_lookup[2] = (r0*6 + r1  )//7
-                r_lookup[3] = (r0*5 + r1*2)//7
-                r_lookup[4] = (r0*4 + r1*3)//7
-                r_lookup[5] = (r0*3 + r1*4)//7
-                r_lookup[6] = (r0*2 + r1*5)//7
-                r_lookup[7] = (r0   + r1*6)//7
-            else:
-                r_lookup[2] = (r0*4 + r1  )//5
-                r_lookup[3] = (r0*3 + r1*2)//5
-                r_lookup[4] = (r0*2 + r1*3)//5
-                r_lookup[5] = (r0   + r1*4)//5
-                r_lookup[6] = r_min
-                r_lookup[7] = r_max
-
+            g_lookup[0] = g_scale[g0]
+            g_lookup[1] = g_scale[g1]
             if g0 > g1:
-                g_lookup[2] = (g0*6 + g1  )//7
-                g_lookup[3] = (g0*5 + g1*2)//7
-                g_lookup[4] = (g0*4 + g1*3)//7
-                g_lookup[5] = (g0*3 + g1*4)//7
-                g_lookup[6] = (g0*2 + g1*5)//7
-                g_lookup[7] = (g0   + g1*6)//7
+                g_lookup[2] = g_scale[(g0*6 + g1  )//7]
+                g_lookup[3] = g_scale[(g0*5 + g1*2)//7]
+                g_lookup[4] = g_scale[(g0*4 + g1*3)//7]
+                g_lookup[5] = g_scale[(g0*3 + g1*4)//7]
+                g_lookup[6] = g_scale[(g0*2 + g1*5)//7]
+                g_lookup[7] = g_scale[(g0   + g1*6)//7]
             else:
-                g_lookup[2] = (g0*4 + g1  )//5
-                g_lookup[3] = (g0*3 + g1*2)//5
-                g_lookup[4] = (g0*2 + g1*3)//5
-                g_lookup[5] = (g0   + g1*4)//5
+                g_lookup[2] = g_scale[(g0*4 + g1  )//5]
+                g_lookup[3] = g_scale[(g0*3 + g1*2)//5]
+                g_lookup[4] = g_scale[(g0*2 + g1*3)//5]
+                g_lookup[5] = g_scale[(g0   + g1*4)//5]
                 g_lookup[6] = g_min
                 g_lookup[7] = g_max
 
+            r_lookup[0] = r_scale[r0]
+            r_lookup[1] = r_scale[r1]
+            if r0 > r1:
+                r_lookup[2] = r_scale[(r0*6 + r1  )//7]
+                r_lookup[3] = r_scale[(r0*5 + r1*2)//7]
+                r_lookup[4] = r_scale[(r0*4 + r1*3)//7]
+                r_lookup[5] = r_scale[(r0*3 + r1*4)//7]
+                r_lookup[6] = r_scale[(r0*2 + r1*5)//7]
+                r_lookup[7] = r_scale[(r0   + r1*6)//7]
+            else:
+                r_lookup[2] = r_scale[(r0*4 + r1  )//5]
+                r_lookup[3] = r_scale[(r0*3 + r1*2)//5]
+                r_lookup[4] = r_scale[(r0*2 + r1*3)//5]
+                r_lookup[5] = r_scale[(r0   + r1*4)//5]
+                r_lookup[6] = r_min
+                r_lookup[7] = r_max
+
             for k in pixel_indices:
-                g = y = g_scale[g_lookup[(g_idx>>(k*3))&7]]
-                r = x = r_scale[r_lookup[(r_idx>>(k*3))&7]]
+                g = y = g_lookup[(g_idx>>(k*3))&7]
+                r = x = r_lookup[(r_idx>>(k*3))&7]
 
                 off = k*ucc + pxl_i
 
@@ -643,6 +646,7 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
         dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
         unpacked = dxt_swizzler.swizzle_single_array(
             unpacked, False, 4, width, height)
+
     return unpacked
 
 

@@ -1,27 +1,23 @@
-//#include <stdio.h>
-#include "Python.h"
-#include "abstract.h"    // contains PyBuffer_Release
-#include "modsupport.h"  // contains PyArg_ParseTuple
-#include "object.h"      // contains Py_buffer
+#include "shared.h"
 
 static void swizzle_char_array(
-    Py_ssize_t c_size, char *c_offs_chars,
-    Py_ssize_t x_size, char *x_offs_chars,
-    Py_ssize_t y_size, char *y_offs_chars,
-    Py_ssize_t z_size, char *z_offs_chars,
-    Py_ssize_t swizz_size,   char *swizz_arr_chars,
-    Py_ssize_t unswizz_size, char *unswizz_arr_chars,
-    Py_ssize_t stride, char swizz)
+    Py_ssize_t c_size, sint8 *c_offs_sint8s,
+    Py_ssize_t x_size, sint8 *x_offs_sint8s,
+    Py_ssize_t y_size, sint8 *y_offs_sint8s,
+    Py_ssize_t z_size, sint8 *z_offs_sint8s,
+    Py_ssize_t swizz_size,   sint8 *swizz_arr_sint8s,
+    Py_ssize_t unswizz_size, sint8 *unswizz_arr_sint8s,
+    Py_ssize_t stride, sint8 swizz)
 {
-    int i=0, zi=0, yi=0, xi=0, ci=0;
-    unsigned long z=0, y=0, x=0, c=0, yz=0, xyz=0, cxyz=0;
-    unsigned long max_i=0;
-    unsigned long *c_offs = (unsigned long(*)[])c_offs_chars;
-    unsigned long *x_offs = (unsigned long(*)[])x_offs_chars;
-    unsigned long *y_offs = (unsigned long(*)[])y_offs_chars;
-    unsigned long *z_offs = (unsigned long(*)[])z_offs_chars;
-    unsigned char *swizz_arr = (unsigned char*)swizz_arr_chars;
-    unsigned char *unswizz_arr = (unsigned char*)unswizz_arr_chars;
+    sint32 i=0, zi=0, yi=0, xi=0, ci=0;
+    uint32 z=0, y=0, x=0, c=0, yz=0, xyz=0, cxyz=0;
+    uint32 max_i=0;
+    uint32 *c_offs = (uint32(*)[])c_offs_sint8s;
+    uint32 *x_offs = (uint32(*)[])x_offs_sint8s;
+    uint32 *y_offs = (uint32(*)[])y_offs_sint8s;
+    uint32 *z_offs = (uint32(*)[])z_offs_sint8s;
+    uint8 *swizz_arr = (uint8*)swizz_arr_sint8s;
+    uint8 *unswizz_arr = (uint8*)unswizz_arr_sint8s;
     c_size /= 4; x_size /= 4; y_size /= 4; z_size /= 4;
     swizz_size /= stride; unswizz_size /= stride;
     max_i = c_size * x_size * y_size * z_size;
