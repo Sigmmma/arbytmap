@@ -1,20 +1,16 @@
-//#include <stdio.h>
-#include "Python.h"
-#include "abstract.h"    // contains PyBuffer_Release
-#include "modsupport.h"  // contains PyArg_ParseTuple
-#include "object.h"      // contains Py_buffer
+#include "shared.h"
 
 
 static void pad_24bit_array(
     Py_buffer *padded_pix_buf, Py_buffer *unpadded_pix_buf)
 {
-    unsigned long long i=0, j=0, max_i=0;
+    uint64 i=0, j=0, max_i=0;
 
-    unsigned long *padded_pix;
-    unsigned char *unpadded_pix;
+    uint32 *padded_pix;
+    uint8 *unpadded_pix;
 
-    padded_pix   = (unsigned long*) padded_pix_buf->buf;
-    unpadded_pix = (unsigned char*) unpadded_pix_buf->buf;
+    padded_pix   = (uint32*) padded_pix_buf->buf;
+    unpadded_pix = (uint8*) unpadded_pix_buf->buf;
 
     max_i = (padded_pix_buf->len)/4;
 
@@ -27,16 +23,16 @@ static void pad_24bit_array(
 static void unpad_24bit_array(
     Py_buffer *unpadded_pix_buf, Py_buffer *padded_pix_buf)
 {
-    unsigned long long i=0, j=0, k=0, max_i=0;
-    unsigned long pixel=0;
+    uint64 i=0, j=0, k=0, max_i=0;
+    uint32 pixel=0;
 
-    unsigned char *unpadded_pix;
-    unsigned char *padded_pix_8;
-    unsigned long *padded_pix_32;
+    uint8 *unpadded_pix;
+    uint8 *padded_pix_8;
+    uint32 *padded_pix_32;
 
-    unpadded_pix  = (unsigned char*) unpadded_pix_buf->buf;
-    padded_pix_8  = (unsigned char*) padded_pix_buf->buf;
-    padded_pix_32 = (unsigned long*) padded_pix_buf->buf;
+    unpadded_pix  = (uint8*) unpadded_pix_buf->buf;
+    padded_pix_8  = (uint8*) padded_pix_buf->buf;
+    padded_pix_32 = (uint32*) padded_pix_buf->buf;
 
     max_i = (unpadded_pix_buf->len)/3;
 
@@ -66,36 +62,36 @@ static void unpad_24bit_array(
 static void pad_48bit_array(
     Py_buffer *padded_pix_buf, Py_buffer *unpadded_pix_buf)
 {
-    unsigned long long i=0, j=0, max_i=0;
+    uint64 i=0, j=0, max_i=0;
 
-    unsigned long long *padded_pix;
-    unsigned short *unpadded_pix;
+    uint64 *padded_pix;
+    uint16 *unpadded_pix;
 
-    padded_pix   = (unsigned long long*) padded_pix_buf->buf;
-    unpadded_pix = (unsigned short*) unpadded_pix_buf->buf;
+    padded_pix   = (uint64*) padded_pix_buf->buf;
+    unpadded_pix = (uint16*) unpadded_pix_buf->buf;
 
     max_i = (padded_pix_buf->len)/8;
 
     for (i=0; i < max_i; i++) {
         j = i*3;
-        padded_pix[i] = ((unsigned long long)unpadded_pix[j] +
-                        ((unsigned long long)unpadded_pix[j+1]<<16) +
-                        ((unsigned long long)unpadded_pix[j+2]<<32));
+        padded_pix[i] = ((uint64)unpadded_pix[j] +
+                        ((uint64)unpadded_pix[j+1]<<16) +
+                        ((uint64)unpadded_pix[j+2]<<32));
     }
 }
 
 static void unpad_48bit_array(
     Py_buffer *unpadded_pix_buf, Py_buffer *padded_pix_buf)
 {
-    unsigned long long i=0, j=0, k=0, max_i=0, pixel=0;
+    uint64 i=0, j=0, k=0, max_i=0, pixel=0;
 
-    unsigned short *unpadded_pix;
-    unsigned short *padded_pix_16;
-    unsigned long long *padded_pix_64;
+    uint16 *unpadded_pix;
+    uint16 *padded_pix_16;
+    uint64 *padded_pix_64;
 
-    unpadded_pix  = (unsigned short*) unpadded_pix_buf->buf;
-    padded_pix_16 = (unsigned short*) padded_pix_buf->buf;
-    padded_pix_64 = (unsigned long long*) padded_pix_buf->buf;
+    unpadded_pix  = (uint16*) unpadded_pix_buf->buf;
+    padded_pix_16 = (uint16*) padded_pix_buf->buf;
+    padded_pix_64 = (uint64*) padded_pix_buf->buf;
 
     max_i = (unpadded_pix_buf->len)/6;
 
@@ -188,16 +184,16 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
 
 static PyObject *py_swap_channels(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
-    unsigned char  *pixels, *temp_pix;
-    unsigned short *chan_map, step;
-    unsigned long long max_i, i, j;
+    uint8  *pixels, *temp_pix;
+    uint16 *chan_map, step;
+    uint64 max_i, i, j;
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*:swap_channels", &bufs[0], &bufs[1]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
-    pixels   = (unsigned char  *)bufs[0].buf;
-    chan_map = (unsigned short *)bufs[1].buf;
+    pixels   = (uint8  *)bufs[0].buf;
+    chan_map = (uint16 *)bufs[1].buf;
     max_i = bufs[0].len;
     step  = bufs[1].len / 2;
     temp_pix = malloc(step);
@@ -226,9 +222,9 @@ static PyObject *py_make_array(PyObject *self, PyObject *args) {
     PyObject *obj;
     Py_buffer array_buffer;
     Py_ssize_t len, itemsize;
-    int format_len;
-    char *format;
-    char *buf = calloc(len, 1);
+    sint32 format_len;
+    sint8 *format;
+    sint8 *buf = calloc(len, 1);
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "u#k:make_array", format, &format_len, &len))
@@ -240,22 +236,22 @@ static PyObject *py_make_array(PyObject *self, PyObject *args) {
 
     switch (*format) {
         case 'b': case 'B':
-            itemsize = sizeof(char);
+            itemsize = sizeof(sint8);
             break;
         case 'h': case 'H':
-            itemsize = sizeof(short);
+            itemsize = sizeof(sint16);
             break;
         case 'u':
             itemsize = sizeof(Py_UNICODE);
             break;
         case 'i': case 'I':
-            itemsize = sizeof(int);
+            itemsize = sizeof(sint32);
             break;
         case 'l': case 'L':
-            itemsize = sizeof(long);
+            itemsize = sizeof(sint32);
             break;
         case 'q': case 'Q':
-            itemsize = sizeof(long long);
+            itemsize = sizeof(sint64);
             break;
         case 'f':
             itemsize = sizeof(float);
@@ -268,7 +264,7 @@ static PyObject *py_make_array(PyObject *self, PyObject *args) {
     array_buffer.buf = buf;
     array_buffer.obj = obj;
     array_buffer.len = len;
-    array_buffer.readonly = (int)0;
+    array_buffer.readonly = (sint32)0;
     array_buffer.itemsize = itemsize;
     array_buffer.format = format;
 

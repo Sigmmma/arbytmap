@@ -10,3 +10,4 @@ Debug\*
 test_files/bitmaps/
 *.db
 *.suo
+*.pyd
