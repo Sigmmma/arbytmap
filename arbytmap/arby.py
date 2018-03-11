@@ -1200,7 +1200,9 @@ class Arbytmap():
                     # unpack the bitmap's palette and indexing
                     new_pal, new_pix = self.palettized_unpacker(all_pal[i],
                                                                 all_pix[i])
-                    if not new_pal: new_pix = None
+                    if not new_pal and self.palettize:
+                        new_pix = None
+
                     new_all_pix[i] = new_pix
                     new_all_pal[i] = new_pal
                 else:

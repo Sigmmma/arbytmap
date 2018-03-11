@@ -13,8 +13,8 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 curr_dir = dirname(__file__)
 #               YYYY.MM.DD
-release_date = "2018.01.20"
-version = (0, 9, 4)
+release_date = "2018.03.10"
+version = (0, 9, 5)
 
 
 is_pypy = hasattr(sys, 'pypy_translation_info')
