@@ -137,8 +137,8 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
         dds_data, off = dds_file.data.pixel_data, 0
         for sb in range(sub_bitmap_count):
             for m in range(mipmap_count + 1):
-                dims = ab.clip_dimensions(
-                    head.width>>m, head.height>>m, max(head.depth>>m, 1), fmt)
+                dims = ab.get_mipmap_dimensions(
+                    head.width, head.height, head.depth, m)
                 off = bitmap_bytes_to_array(dds_data, off, temp, fmt, *dims)
 
         # rearrange the images so they are sorted by [mip][bitmap]
@@ -202,7 +202,7 @@ def load_from_tga_file(convertor, input_path, ext, **kwargs):
     tex_info["format"] = fmt
     if image_desc.interleaving.data:
         err += "Unable to load Targa images with interleaved pixels."
-        
+
     if err:
         print(err)
         return
@@ -220,13 +220,13 @@ def load_from_tga_file(convertor, input_path, ext, **kwargs):
             palette = pad_48bit_array(palette)
         else:
             palette = array(typecode, palette)
-        
+
         #if the color map doesn't start at zero
         #then we need to shift around the palette
         if head.color_map_origin:
             palette = (palette[head.color_map_origin: ] +
                        palette[: head.color_map_origin])
-        
+
         tex_info.update(palette=[palette], palettize=1, indexing_size=bpp)
         pixel_array = array("B", pixels)
     elif bpp == 24:
@@ -289,7 +289,7 @@ def save_to_rawdata_file(convertor, output_path, ext, **kwargs):
             final_output_path = mip_output_path
             if sub_bitmap_ct > 1:
                 final_output_path = "%s_tex%s" % (final_output_path, sb)
-            
+
             final_output_path = "%s.%s" % (final_output_path, ext)
 
             if not overwrite and os.path.exists(final_output_path):
@@ -303,7 +303,7 @@ def save_to_rawdata_file(convertor, output_path, ext, **kwargs):
                     if pixel_array is None:
                         print("ERROR: UNABLE TO PACK IMAGE DATA.\n")
                         continue
-                
+
                 if ab.BITS_PER_PIXEL[fmt] == 24:
                     raw_file.write(unpad_24bit_array(pixel_array))
                 elif ab.BITS_PER_PIXEL[fmt] == 48:
@@ -373,7 +373,6 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
 
     flags.linearsize = True
     fmt_flags.four_cc = True
-    min_w, _, __ = ab.clip_dimensions(w, h, d, fmt)
     line_size = min_w * bpp
 
     # compute this for the block compressed formats
@@ -463,9 +462,8 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
             # get the index of the bitmap we'll be working with
             i = m*convertor.sub_bitmap_count + sb
             pixels = convertor.texture_block[i]
-            w, h, d = ab.clip_dimensions(convertor.width  // (1<<m),
-                                         convertor.height // (1<<m),
-                                         convertor.depth  // (1<<m))
+            w, h, d = ab.get_mipmap_dimensions(
+                convertor.width, convertor.height, convertor.depth, m)
 
             if convertor.is_palettized():
                 pal = convertor.palette[i]
@@ -582,7 +580,7 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
                 idx = tex_block[index]
                 if not convertor.palette_packed:
                     pal = convertor.palette_packer(pal)
-                    
+
                 '''need to pack the indexing and make sure it's 8-bit
                    since TGA doesn't support less than 8 bit indexing'''
 
@@ -613,7 +611,7 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
 
                 if ab.BITS_PER_PIXEL[fmt] == 24:
                     pixel_array = unpad_24bit_array(pixel_array)
-                
+
                 tga_file.data.pixels_wrapper.pixels = pixel_array
 
             tga_file.serialize(temp=False, backup=False, calc_pointers=False)
@@ -812,14 +810,11 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
 
 
 def get_pixel_bytes_size(fmt, width, height, depth=1):
-    bpp = ab.BITS_PER_PIXEL[fmt]
+    if ab.PACKED_SIZE_CALCS.get(fmt):
+        return ab.PACKED_SIZE_CALCS[fmt](fmt, width, height, depth)
 
-    #make sure the dimensions for the format are correct
-    width, height, depth = ab.clip_dimensions(width, height, depth, fmt)
-    return (bpp*height*width*depth)//8
-    #pixel_size = ab.PIXEL_ENCODING_SIZES[ab.PACKED_TYPECODES[fmt]]
-    #return ab.pixel_count_to_array_length(
-    #    height*width*depth, pixel_size, fmt)*pixel_size
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    return (ab.BITS_PER_PIXEL[fmt] * height * width * depth)//8
 
 
 def make_array(typecode, item_ct, item_size=None, fill=0):
@@ -830,11 +825,74 @@ def make_array(typecode, item_ct, item_size=None, fill=0):
     return array(typecode, bytes([fill])*item_ct*item_size)
 
 
+def crop_pixel_data(pix, chan_ct, width, height, depth,
+                    x0=0, new_width=-1, y0=0, new_height=-1, z0=0, new_depth=-1):
+    if new_width  < 0: new_width  = width
+    if new_height < 0: new_height = height
+    if new_depth  < 0: new_depth  = depth
+
+    new_pix = make_array(
+        pix.typecode,
+        new_width*new_height*new_depth*chan_ct,
+        pix.itemsize)
+
+    if len(pix) == 0:
+        return new_pix
+
+    src_x_skip0, src_y_skip0, src_z_skip0 = max(x0, 0), max(y0, 0), max(z0, 0)
+
+    src_x_skip1 = max(width  - src_x_skip0 - new_width,  0)
+    src_y_skip1 = max(height - src_y_skip0 - new_height, 0)
+    src_z_skip1 = max(depth  - src_z_skip0 - new_depth,  0)
+
+    x_stride = width  - src_x_skip0 - src_x_skip1
+    y_stride = height - src_y_skip0 - src_y_skip1
+    z_stride = depth  - src_z_skip0 - src_z_skip1
+
+    if 0 in (x_stride, y_stride, z_stride):
+        return new_pix
+
+    dst_x_skip0, dst_y_skip0, dst_z_skip0 = max(-x0, 0), max(-y0, 0), max(-z0, 0)
+
+    dst_x_skip1 = max(new_width  - dst_x_skip0 - x_stride, 0)
+    dst_y_skip1 = max(new_height - dst_y_skip0 - y_stride, 0)
+
+    src_x_skip0 *= chan_ct
+    dst_x_skip0 *= chan_ct
+    src_x_skip1 *= chan_ct
+    dst_x_skip1 *= chan_ct
+    x_stride *= chan_ct
+
+    src_x_skip1 += x_stride
+    dst_x_skip1 += x_stride
+    src_y_skip1 += y_stride
+    dst_y_skip1 += y_stride
+
+    src_i = src_z_skip0
+    dst_i = dst_z_skip0
+    for z in range(z_stride):
+        src_i += src_y_skip0
+        dst_i += dst_y_skip0
+        for y in range(y_stride):
+            src_i += src_x_skip0
+            dst_i += dst_x_skip0
+            new_pix[dst_i: dst_i + x_stride] = pix[src_i: src_i + x_stride]
+            src_i += src_x_skip1
+            dst_i += dst_x_skip1
+
+        src_i += src_y_skip1
+        dst_i += dst_y_skip1
+
+    return new_pix
+
+
 def swap_channels(pix, channel_map):
     step = len(channel_map)
     channel_map = tuple(channel_map)
     src_map     = tuple(range(step))
-    if channel_map == src_map: return
+    if channel_map == src_map:
+        return
+
     assert set(channel_map) == set(src_map)
 
     if fast_bitmap_io:
@@ -862,7 +920,7 @@ def bitmap_bytes_to_array(rawdata, offset, texture_block, fmt,
         bitmap_size = bitmap_data_end = get_pixel_bytes_size(
             fmt, width, height, depth)
     bitmap_data_end = bitmap_size
-    
+
     '''24 bit images are handled a bit differently since lots of
     things work on whole powers of 2. "2" can not be raised to an
     integer power to yield "24", whereas it can be for 8, 16, and 32.
@@ -881,9 +939,9 @@ def bitmap_bytes_to_array(rawdata, offset, texture_block, fmt,
         #print("WARNING: PIXEL DATA SUPPLIED DID NOT MEET "+
         #      "THE SIZE EXPECTED. PADDING WITH ZEROS.")
         pixel_array.extend(
-            make_array(pixel_array.typecode, 
+            make_array(pixel_array.typecode,
                        bitmap_size - len(pixel_array)*pixel_size, 1))
-    
+
     #add the pixel array to the current texture block
     texture_block.append(pixel_array)
     return offset + bitmap_data_end
@@ -896,11 +954,6 @@ def bitmap_palette_to_array(rawdata, offset, palette_block, fmt, palette_count):
 
 def bitmap_indexing_to_array(rawdata, offset, indexing_block,
                              width, height, depth=1):
-    """This function will create an array of pixels of width*height*depth from
-       an iterable, sliceable, object. Since indexing never seems to be more
-       than 8 bit, we won't worry about higher bit counts. Appends indexing
-       array to supplied indexing_block and returns the end offset
-    """
     indexing_block.append(array("B", rawdata[offset:offset+width*height*depth]))
     return offset + width*height*depth
 
@@ -947,7 +1000,7 @@ def unpad_24bit_array(padded):
     """given a 24BPP pixel data array that has been padded to
     32BPP, this will return an unpadded, unpacked, array copy.
     The endianness of the data will be little."""
-    
+
     if padded.typecode == "I":
         # pixels have been packed
         unpadded = make_array("B", len(padded), 3)
@@ -977,7 +1030,7 @@ def unpad_24bit_array(padded):
         raise TypeError(
             "Bad typecode for padded 24bit array. Expected B or I, got %s" %
             padded.typecode)
-        
+
     return unpadded
 
 
@@ -985,7 +1038,7 @@ def unpad_48bit_array(padded):
     """given a 48BPP pixel data array that has been padded to
     64BPP, this will return an unpadded, unpacked, array copy.
     The endianness of the data will be little."""
-    
+
     if padded.typecode == "Q":
         # pixels have been packed
         unpadded = make_array("H", len(padded), 6)
@@ -1018,7 +1071,7 @@ def unpad_48bit_array(padded):
         raise TypeError(
             "Bad typecode for padded 48bit array. Expected H or Q, got %s" %
             padded.typecode)
-        
+
     return unpadded
 
 

@@ -1,6 +1,5 @@
 import os
 import sys
-import tempfile
 import time
 
 from traceback import format_exc
@@ -785,7 +784,7 @@ class Arbytmap():
                 # divide the dimensions in half and make
                 # sure they don't go below the minimum
                 self.width, self.height, self.depth = clip_dimensions(
-                    self.width//2, self.height//2, self.depth//2, fmt)
+                    self.width//2, self.height//2, self.depth//2)
                 self.downres_amount -= 1
                 self.mipmap_count   -= 1
                 tex_info.update(
@@ -889,10 +888,8 @@ class Arbytmap():
             self.deswizzler.swizzle_texture(True)
 
         # get the current smallest dimensions so we can change them
-        mw, mh, md = clip_dimensions(
-            self.width//(2**self.mipmap_count),
-            self.height//(2**self.mipmap_count),
-            self.depth//(2**self.mipmap_count))
+        mw, mh, md = get_mipmap_dimensions(
+            self.width, self.height, self.depth, self.mipmap_count)
 
         tex_block = self.texture_block
 
@@ -972,9 +969,9 @@ class Arbytmap():
 
         # calculate the new dimensions of the bitmap
         new_width, new_height, new_depth = clip_dimensions(
-            width//2**sample_size,
-            height//2**sample_size,
-            depth//2**sample_size)
+            width>>sample_size,
+            height>>sample_size,
+            depth>>sample_size)
 
         # These are the log2 of each dimension
         log_w, log_h, log_d = (

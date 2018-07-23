@@ -77,13 +77,9 @@ UNPACKERS = {}
 
 PACKERS = {}
 
+PACKED_SIZE_CALCS = {}
+
 SUB_BITMAP_COUNTS = {TYPE_2D:1, TYPE_3D:1, TYPE_CUBEMAP:6}
-
-MINIMUM_W = {}
-
-MINIMUM_H = {}
-
-MINIMUM_D = {}
 
 # this is how many BITS(NOT BYTES) each format's pixels take up
 BITS_PER_PIXEL = {}
@@ -109,10 +105,9 @@ ALL_FORMAT_COLLECTIONS = {
     "VALID_FORMAT":VALID_FORMATS, "BITS_PER_PIXEL":BITS_PER_PIXEL,
     "RAW_FORMAT":RAW_FORMATS, "THREE_CHANNEL_FORMAT":THREE_CHANNEL_FORMATS,
     "COMPRESSED_FORMAT":COMPRESSED_FORMATS, "DDS_FORMAT":DDS_FORMATS,
-    "MINIMUM_W":MINIMUM_W, "MINIMUM_H":MINIMUM_H, "MINIMUM_D":MINIMUM_D,
     "PACKED_TYPECODES":PACKED_TYPECODES, "UNPACKER":UNPACKERS,
     "CHANNEL_COUNT":CHANNEL_COUNTS, "PACKER":PACKERS,
-    "CHANNEL_OFFSETS":CHANNEL_OFFSETS,
+    "CHANNEL_OFFSETS":CHANNEL_OFFSETS, "PACKED_SIZE_CALCS": PACKED_SIZE_CALCS,
     "CHANNEL_MASKS":CHANNEL_MASKS,
     "CHANNEL_DEPTHS":CHANNEL_DEPTHS}
 
@@ -180,12 +175,12 @@ def register_format(format_id, **kwargs):
         if kwargs.get("dds_format", False): DDS_FORMATS.add(format_id)
         if kwargs.get("compressed", False): COMPRESSED_FORMATS.add(format_id)
 
-        if kwargs.get("unpacker"): UNPACKERS[format_id] = kwargs["unpacker"]
-        if kwargs.get("packer"):   PACKERS[format_id]   = kwargs["packer"]
-
-        MINIMUM_W[format_id] = kwargs.get("min_width", 1)
-        MINIMUM_H[format_id] = kwargs.get("min_height", 1)
-        MINIMUM_D[format_id] = kwargs.get("min_depth", 1)
+        if kwargs.get("unpacker"):
+            UNPACKERS[format_id] = kwargs["unpacker"]
+        if kwargs.get("packer"):
+            PACKERS[format_id]   = kwargs["packer"]
+        if kwargs.get("packed_size_calc"):
+            PACKED_SIZE_CALCS[format_id] = kwargs["packed_size_calc"]
 
         BITS_PER_PIXEL[format_id] = bpp
         PACKED_TYPECODES[format_id] = packed_typecode
@@ -229,35 +224,14 @@ def print_format(format_id, printout=True):
     return out_str
 
 
-def array_length_to_pixel_count(array_len, pixel_size, format):
-    '''used to figure out the number of pixels in an array
-    of a certain length, with each pixel of a certain
-    integer size per pixel, and a certain texture format'''
-    return (array_len*8*pixel_size)//BITS_PER_PIXEL[format]
-
-
-def pixel_count_to_array_length(pixel_count, pixel_size, format):
-    '''used to figure out the length of an array that will
-    hold a certain number of pixels which will take up a
-    certain number of bytes each and are of a certain format'''
-    return ((pixel_count*BITS_PER_PIXEL[format])//8)//pixel_size
-
-
-def get_mipmap_dimensions(width, height, depth, mipmap_level, format):
+def get_mipmap_dimensions(width, height, depth, mip):
     '''This function will give the dimensions of the
     specified mipmap level, format, and fullsize dimensions'''
-    #since the dimensions change per mipmap we need to calculate them
-    return clip_dimensions(width//(2**mipmap_level),
-                           height//(2**mipmap_level),
-                           depth//(2**mipmap_level), format)
+    return clip_dimensions(width>>mip, height>>mip, depth>>mip)
 
 
-def clip_dimensions(width, height, depth=1, fmt=FORMAT_A8R8G8B8):
-    '''clips the supplied width, height, and depth to
-    what the minimum is defined for the format'''
-    return(max(width,  MINIMUM_W[fmt]),
-           max(height, MINIMUM_H[fmt]),
-           max(depth,  MINIMUM_D[fmt]))
+def clip_dimensions(width, height, depth=1):
+    return max(1, width), max(1, height), max(1, depth)
 
 # Need to implement unpacking more than 1 pixel
 # per byte for the formats i've commented out.

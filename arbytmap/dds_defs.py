@@ -57,6 +57,7 @@ def initialize():
 
     dxt_specs = dict(
         compressed=True, dds_format=True, raw_format=False,
+        packed_size_calc=dxt_packed_size_calc,
         min_width=4, min_height=4, packed_typecode='I')
 
     ab.register_format(ab.FORMAT_DXT1, **combine(
@@ -121,27 +122,107 @@ def initialize():
                        unpacker=unpack_g16b16, packer=pack_g16b16,
                        depths=(16,16,16), offsets=(16,0,0),
                        masks=(0xFFff, 0xFFff, 0))
+    
+
+def _dxt_swizzle(pixels, orig_width, orig_height, channel_ct, swizz=False):
+    width, height = clip_dxt_dimensions(orig_width, orig_height)
+    txl_ct_x = 1 if width  < 4 else width  // 4
+    txl_ct_y = 1 if height < 4 else height // 4
+
+    txl_w = 4 if txl_ct_x > 1 else orig_width
+    txl_h = 4 if txl_ct_y > 1 else orig_height
+
+    if swizz and (orig_width != width or orig_height != height):
+        pixels = ab.bitmap_io.crop_pixel_data(
+            pixels, channel_ct, orig_width, orig_height, 1,
+            0, width, 0, height)
+
+    assert len(pixels) % channel_ct == 0
+    swizz_pix = ab.bitmap_io.make_array(pixels.typecode, len(pixels))
+
+    # 4 channels per pixel, 16 pixels per texel
+    tx_block_offs = tuple(range(0, width * channel_ct, txl_w * channel_ct))
+    y_block_offs  = tuple(y * width * channel_ct for y in range(txl_h))
+    x_block_offs  = tuple(range(0, txl_w * channel_ct, channel_ct))
+    txl_stride = txl_h * width * channel_ct
+
+    if False and fast_dds_defs:
+        dds_defs_ext.dxt_swizzle(
+            pixels, swizz_pix, channel_ct, swizz, txl_stride,
+            tx_block_offs, y_block_offs, x_block_offs)
+    else:
+        c_block_offs = tuple(range(channel_ct))
+        i = j = 0
+        for tx_y in range(txl_ct_y):
+            if swizz:
+                for tx in tx_block_offs:
+                    i_tx = i + tx
+                    for y in y_block_offs:
+                        i_tx_y = i_tx + y
+                        for x in x_block_offs:
+                            i_tx_yx = i_tx_y + x
+                            for c in c_block_offs:
+                                swizz_pix[j] = pixels[i_tx_yx + c]
+                                j += 1
+            else:
+                for tx in tx_block_offs:
+                    i_tx = i + tx
+                    for y in y_block_offs:
+                        i_tx_y = i_tx + y
+                        for x in x_block_offs:
+                            i_tx_yx = i_tx_y + x
+                            for c in c_block_offs:
+                                swizz_pix[i_tx_yx + c] = pixels[j]
+                                j += 1
+
+            i += txl_stride
+
+    if not swizz and (orig_width != width or orig_height != height):
+        swizz_pix = ab.bitmap_io.crop_pixel_data(
+            swizz_pix, channel_ct, width, height, 1,
+            0, orig_width, 0, orig_height)
+
+    return swizz_pix
 
 
-def unpack_dxt1(self, bitmap_index, width, height, depth=1):
-    packed = self.texture_block[bitmap_index]
+def unswizzle_dxt(pixels, orig_width, orig_height, channel_ct):
+    return _dxt_swizzle(pixels, orig_width, orig_height, channel_ct, False)
+
+
+def swizzle_dxt(pixels, orig_width, orig_height, channel_ct):
+    return _dxt_swizzle(pixels, orig_width, orig_height, channel_ct, True)
+
+
+def dxt_packed_size_calc(fmt, width, height, depth=1):
+    width, height = clip_dxt_dimensions(width, height)
+    return (ab.BITS_PER_PIXEL[fmt] * height * width * depth)//8
+
+
+def clip_dxt_dimensions(width, height):
+    width  = max(4, width)
+    height = max(4, height)
+    return (width  + (4 - (width  % 4)) % 4,
+            height + (4 - (height % 4)) % 4)
+
+
+def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
     assert packed.typecode == 'I'
 
-    # get all sorts of information we need
-    unpack_code = self._UNPACK_ARRAY_CODE
+    unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
     unpack_max = (1<<(unpack_size*8)) - 1
 
-    ucc = self.unpacked_channel_count
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    #create a new array to hold the pixels after we unpack them
-    unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
-
-    chan0,   chan1,   chan2,   chan3   = self.channel_mapping[: 4]
-    a_scale, r_scale, g_scale, b_scale = self.channel_upscalers[: 4]
+    chan0,   chan1,   chan2,   chan3   = arby.channel_mapping[: 4]
+    a_scale, r_scale, g_scale, b_scale = arby.channel_upscalers[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
@@ -209,24 +290,21 @@ def unpack_dxt1(self, bitmap_index, width, height, depth=1):
                 if has_g: unpacked[off + 2] = color[chan2]
                 if has_b: unpacked[off + 3] = color[chan3]
 
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, False, ucc, width, height)
+    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
 
     return unpacked
 
 
-def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
-    packed = self.texture_block[bitmap_index]
+def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
     assert packed.typecode == 'I'
 
-    # get all sorts of information we need
-    unpack_code = self._UNPACK_ARRAY_CODE
+    unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
     unpack_max = (1<<(unpack_size*8)) - 1
 
-    ucc = self.unpacked_channel_count
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
@@ -235,7 +313,8 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
     pixel_indices = range(pixels_per_texel)
 
     #create a new array to hold the pixels after we unpack them
-    unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
     #create the arrays to hold the color channel data
     c_0 = [unpack_max,0,0,0]
@@ -246,8 +325,8 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan0,   chan1,   chan2,   chan3   = self.channel_mapping[: 4]
-    a_scale, r_scale, g_scale, b_scale = self.channel_upscalers[: 4]
+    chan0,   chan1,   chan2,   chan3   = arby.channel_mapping[: 4]
+    a_scale, r_scale, g_scale, b_scale = arby.channel_upscalers[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
@@ -312,24 +391,21 @@ def unpack_dxt2_3(self, bitmap_index, width, height, depth=1):
                 elif has_b:    unpacked[off + 3] = color[chan3]
                 else:          unpacked[off + 3] = unpack_max
 
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, False, ucc, width, height)
+    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
 
     return unpacked
 
 
-def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
-    packed = self.texture_block[bitmap_index]
+def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
     assert packed.typecode == 'I'
 
-    # get all sorts of information we need
-    unpack_code = self._UNPACK_ARRAY_CODE
+    unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
     unpack_max = (1<<(unpack_size*8)) - 1
 
-    ucc = self.unpacked_channel_count
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
@@ -338,7 +414,8 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     pixel_indices = range(pixels_per_texel)
 
     #create a new array to hold the pixels after we unpack them
-    unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
     #create the arrays to hold the color channel data
     c_0 = [unpack_max,0,0,0]
@@ -349,8 +426,8 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan0,   chan1,   chan2,   chan3   = self.channel_mapping[: 4]
-    a_scale, r_scale, g_scale, b_scale = self.channel_upscalers[: 4]
+    chan0,   chan1,   chan2,   chan3   = arby.channel_mapping[: 4]
+    a_scale, r_scale, g_scale, b_scale = arby.channel_upscalers[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
@@ -438,33 +515,32 @@ def unpack_dxt4_5(self, bitmap_index, width, height, depth=1):
                 elif has_b:    unpacked[off + 3] = color[chan3]
                 else:          unpacked[off + 3] = unpack_max
 
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, False, ucc, width, height)
+    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
 
     return unpacked
 
 
-def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
-    packed = self.texture_block[bitmap_index]
+def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
     assert packed.typecode == 'I'
-    # get all sorts of information we need
-    unpack_code = self._UNPACK_ARRAY_CODE
+
+    unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
 
-    ucc = self.unpacked_channel_count
-    scc = self.source_channel_count
+    ucc = arby.unpacked_channel_count
+    scc = arby.source_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
     channels_per_texel = ucc*pixels_per_texel
 
     #create a new array to hold the pixels after we unpack them
-    unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    scales = list(self.channel_upscalers)
-    chans  = list(self.channel_mapping)
+    scales = list(arby.channel_upscalers)
+    chans  = list(arby.channel_mapping)
 
     if fast_dds_defs:
         make_ct = 4 - len(scales)
@@ -515,36 +591,34 @@ def unpack_dxt5a(self, bitmap_index, width, height, depth=1):
             for j in pixel_indices:
                 unpacked[pxl_i + j*ucc] = lookup[(idx >> (j*3))&7]
 
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, False, ucc, width, height)
+    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
 
     return unpacked
 
 
-def unpack_dxn(self, bitmap_index, width, height, depth=1):
-    packed = self.texture_block[bitmap_index]
+def unpack_dxn(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
     assert packed.typecode == 'I'
 
-    # get all sorts of information we need
-    unpack_code = self._UNPACK_ARRAY_CODE
+    unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
     zero_point = sign_mask = 1 << ((unpack_size*8) - 1)
     mask = sign_mask - 1
     mask_sq = mask**2
 
-    ucc = self.unpacked_channel_count
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
     channels_per_texel = ucc*pixels_per_texel
 
     #create a new array to hold the pixels after we unpack them
-    unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    chan1,   chan2,   chan3 = self.channel_mapping[1: 4]
-    r_scale, g_scale, _     = self.channel_upscalers[1: 4]
+    chan1,   chan2,   chan3 = arby.channel_mapping[1: 4]
+    r_scale, g_scale, _     = arby.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -642,27 +716,24 @@ def unpack_dxn(self, bitmap_index, width, height, depth=1):
                 if has_g: unpacked[off + 2] = colors[chan2]
                 if has_b: unpacked[off + 3] = colors[chan3]
 
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, False, 4, width, height)
+    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
 
     return unpacked
 
 
-def unpack_ctx1(self, bitmap_index, width, height, depth=1):
-    packed = self.texture_block[bitmap_index]
+def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
     assert packed.typecode == 'I'
 
-    # get all sorts of information we need
-    unpack_code = self._UNPACK_ARRAY_CODE
+    unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
     zero_point = sign_mask = 1 << ((unpack_size*8) - 1)
     unpack_max = (sign_mask<<1) - 1
     mask = sign_mask - 1
     mask_sq = mask**2
 
-    ucc = self.unpacked_channel_count
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
@@ -671,7 +742,8 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
     pixel_indices = range(pixels_per_texel)
 
     #create a new array to hold the pixels after we unpack them
-    unpacked = ab.bitmap_io.make_array(unpack_code, width*height*ucc)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
     #create the arrays to hold the color channel data
     c_0 = [unpack_max,0,0,0]
@@ -682,8 +754,8 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan1,   chan2,   chan3 = self.channel_mapping[1: 4]
-    r_scale, g_scale, __    = self.channel_upscalers[1: 4]
+    chan1,   chan2,   chan3 = arby.channel_mapping[1: 4]
+    r_scale, g_scale, __    = arby.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -762,34 +834,31 @@ def unpack_ctx1(self, bitmap_index, width, height, depth=1):
                 if has_g: unpacked[off + 2] = color[chan2]
                 if has_b: unpacked[off + 3] = color[chan3]
 
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, False, ucc, width, height)
+    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
 
     return unpacked
 
 
-def unpack_v8u8(self, bitmap_index, width, height, depth=1):
-    return unpack_vu(self, bitmap_index, width, height, depth, 8)
+def unpack_v8u8(arby, bitmap_index, width, height, depth=1):
+    return unpack_vu(arby, bitmap_index, width, height, depth, 8)
 
 
-def unpack_v16u16(self, bitmap_index, width, height, depth=1):
-    return unpack_vu(self, bitmap_index, width, height, depth, 16)
+def unpack_v16u16(arby, bitmap_index, width, height, depth=1):
+    return unpack_vu(arby, bitmap_index, width, height, depth, 16)
 
 
-def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
-    packed = self.texture_block[bitmap_index]
+def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
+    packed = arby.texture_block[bitmap_index]
 
     #create a new array to hold the pixels after we unpack them
-    unpack_code = self._UNPACK_ARRAY_CODE
-    ucc = self.unpacked_channel_count
+    unpack_code = arby._UNPACK_ARRAY_CODE
+    ucc = arby.unpacked_channel_count
     bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan1,   chan2,   chan3   = self.channel_mapping[1: 4]
-    r_scale, g_scale, b_scale = self.channel_upscalers[1: 4]
+    chan1,   chan2,   chan3   = arby.channel_mapping[1: 4]
+    r_scale, g_scale, b_scale = arby.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -845,26 +914,26 @@ def unpack_vu(self, bitmap_index, width, height, depth=1, bpc=8):
     return unpacked
 
 
-def unpack_r8g8(self, bitmap_index, width, height, depth=1):
-    return unpack_rg(self, bitmap_index, width, height, depth, 8)
+def unpack_r8g8(arby, bitmap_index, width, height, depth=1):
+    return unpack_rg(arby, bitmap_index, width, height, depth, 8)
 
 
-def unpack_r16g16(self, bitmap_index, width, height, depth=1):
-    return unpack_rg(self, bitmap_index, width, height, depth, 16)
+def unpack_r16g16(arby, bitmap_index, width, height, depth=1):
+    return unpack_rg(arby, bitmap_index, width, height, depth, 16)
 
 
-def unpack_rg(self, bitmap_index, width, height, depth=1, bpc=8):
-    packed = self.texture_block[bitmap_index]
+def unpack_rg(arby, bitmap_index, width, height, depth=1, bpc=8):
+    packed = arby.texture_block[bitmap_index]
 
     #create a new array to hold the pixels after we unpack them
-    unpack_code = self._UNPACK_ARRAY_CODE
-    ucc = self.unpacked_channel_count
+    unpack_code = arby._UNPACK_ARRAY_CODE
+    ucc = arby.unpacked_channel_count
     bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan1,   chan2,   chan3   = self.channel_mapping[1: 4]
-    r_scale, g_scale, b_scale = self.channel_upscalers[1: 4]
+    chan1,   chan2,   chan3   = arby.channel_mapping[1: 4]
+    r_scale, g_scale, b_scale = arby.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -913,26 +982,26 @@ def unpack_rg(self, bitmap_index, width, height, depth=1, bpc=8):
     return unpacked
 
 
-def unpack_g8b8(self, bitmap_index, width, height, depth=1):
-    return unpack_gb(self, bitmap_index, width, height, depth, 8)
+def unpack_g8b8(arby, bitmap_index, width, height, depth=1):
+    return unpack_gb(arby, bitmap_index, width, height, depth, 8)
 
 
-def unpack_g16b16(self, bitmap_index, width, height, depth=1):
-    return unpack_gb(self, bitmap_index, width, height, depth, 16)
+def unpack_g16b16(arby, bitmap_index, width, height, depth=1):
+    return unpack_gb(arby, bitmap_index, width, height, depth, 16)
 
 
-def unpack_gb(self, bitmap_index, width, height, depth=1, bpc=8):
-    packed = self.texture_block[bitmap_index]
+def unpack_gb(arby, bitmap_index, width, height, depth=1, bpc=8):
+    packed = arby.texture_block[bitmap_index]
 
     #create a new array to hold the pixels after we unpack them
-    unpack_code = self._UNPACK_ARRAY_CODE
-    ucc = self.unpacked_channel_count
+    unpack_code = arby._UNPACK_ARRAY_CODE
+    ucc = arby.unpacked_channel_count
     bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan1,   chan2,   chan3   = self.channel_mapping[1: 4]
-    r_scale, g_scale, b_scale = self.channel_upscalers[1: 4]
+    chan1,   chan2,   chan3   = arby.channel_mapping[1: 4]
+    r_scale, g_scale, b_scale = arby.channel_upscalers[1: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -986,24 +1055,19 @@ def unpack_gb(self, bitmap_index, width, height, depth=1, bpc=8):
 ########################################
 
 
-def pack_dxt1(self, unpacked, width, height, depth=1):
-    ucc, bpt = self.unpacked_channel_count, 8
-    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+def pack_dxt1(arby, unpacked, width, height, depth=1):
+    ucc, bpt = arby.unpacked_channel_count, 8
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    texel_width, texel_height, _ = ab.clip_dimensions(dxt_width//4, dxt_height//4)
     pixels_per_texel = get_texel_pixel_count(width, height)
     channels_per_texel = ucc*pixels_per_texel
-    can_have_alpha = self.color_key_transparency
-    a_cutoff = self.one_bit_bias
+    can_have_alpha = arby.color_key_transparency
+    a_cutoff = arby.one_bit_bias
 
-    _, r_scale, g_scale, b_scale = self.channel_downscalers
+    _, r_scale, g_scale, b_scale = arby.channel_downscalers
     repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
-
-    """If the texture is more than 1 texel wide we need to have the swizzler
-    rearrange the pixels so that each texel's pixels are adjacent each other.
-    This will allow us to easily group each texel's pixels nicely together."""
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, True, ucc, width, height)
+    unpacked = swizzle_dxt(unpacked, width, height * depth, ucc)
 
     if fast_dds_defs:
         dds_defs_ext.pack_dxt1(
@@ -1136,23 +1200,18 @@ def pack_dxt1(self, unpacked, width, height, depth=1):
     return repacked
 
 
-def pack_dxt2_3(self, unpacked, width, height, depth=1):
-    ucc, bpt = self.unpacked_channel_count, 16
-    ucc = self.unpacked_channel_count
-    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+def pack_dxt2_3(arby, unpacked, width, height, depth=1):
+    ucc, bpt = arby.unpacked_channel_count, 16
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    texel_width, texel_height, _ = ab.clip_dimensions(dxt_width//4, dxt_height//4)
     pixels_per_texel = get_texel_pixel_count(width, height)
     channels_per_texel = ucc*pixels_per_texel
 
-    a_scale, r_scale, g_scale, b_scale = self.channel_downscalers
+    a_scale, r_scale, g_scale, b_scale = arby.channel_downscalers
     repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
-
-    """If the texture is more than 1 texel wide we need to have the swizzler
-    rearrange the pixels so that each texel's pixels are adjacent each other.
-    This will allow us to easily group each texel's pixels nicely together."""
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, True, ucc, width, height)
+    unpacked = swizzle_dxt(unpacked, width, height * depth, ucc)
 
     if fast_dds_defs:
         dds_defs_ext.pack_dxt2_3(
@@ -1252,23 +1311,18 @@ def pack_dxt2_3(self, unpacked, width, height, depth=1):
     return repacked
 
 
-def pack_dxt4_5(self, unpacked, width, height, depth=1):
-    ucc, bpt = self.unpacked_channel_count, 16
-    ucc = self.unpacked_channel_count
-    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+def pack_dxt4_5(arby, unpacked, width, height, depth=1):
+    ucc, bpt = arby.unpacked_channel_count, 16
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    texel_width, texel_height, _ = ab.clip_dimensions(dxt_width//4, dxt_height//4)
     pixels_per_texel = get_texel_pixel_count(width, height)
     channels_per_texel = ucc*pixels_per_texel
 
-    a_scale, r_scale, g_scale, b_scale = self.channel_downscalers
+    a_scale, r_scale, g_scale, b_scale = arby.channel_downscalers
     repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
-
-    """If the texture is more than 1 texel wide we need to have the swizzler
-    rearrange the pixels so that each texel's pixels are adjacent each other.
-    This will allow us to easily group each texel's pixels nicely together."""
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, True, ucc, width, height)
+    unpacked = swizzle_dxt(unpacked, width, height * depth, ucc)
 
     if fast_dds_defs:
         dds_defs_ext.pack_dxt4_5(
@@ -1442,22 +1496,20 @@ def pack_dxt4_5(self, unpacked, width, height, depth=1):
     return repacked
 
 
-def pack_dxt5a(self, unpacked, width, height, depth=1):
+def pack_dxt5a(arby, unpacked, width, height, depth=1):
+    width, height, depth = ab.clip_dimensions(width, height, depth)
     #this is how many texels wide/tall the texture is
-    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    texel_width, texel_height, _ = ab.clip_dimensions(dxt_width//4, dxt_height//4)
 
     #create a new array to hold the texels after we repack them
-    ucc = self.unpacked_channel_count
-    assert self.target_channel_count == ucc
+    ucc = arby.unpacked_channel_count
+    assert arby.target_channel_count == ucc
     bpt = ucc*8
 
-    scales = list(self.channel_downscalers)
+    scales = list(arby.channel_downscalers)
     repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
-
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, True, ucc, width, height)
+    unpacked = swizzle_dxt(unpacked, width, height * depth, ucc)
 
     pixels_per_texel   = get_texel_pixel_count(width, height)
     channels_per_texel = ucc*pixels_per_texel
@@ -1565,21 +1617,18 @@ def pack_dxt5a(self, unpacked, width, height, depth=1):
     return repacked
 
 
-def pack_dxn(self, unpacked, width, height, depth=1):
-    #this is how many texels wide/tall the texture is
-    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+def pack_dxn(arby, unpacked, width, height, depth=1):
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    texel_width, texel_height, _ = ab.clip_dimensions(dxt_width//4, dxt_height//4)
 
     #create a new array to hold the texels after we repack them
     bpt = 16
-    ucc = self.unpacked_channel_count
+    ucc = arby.unpacked_channel_count
 
-    scales = list(self.channel_downscalers)
+    scales = list(arby.channel_downscalers)
     repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
-
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, True, ucc, width, height)
+    unpacked = swizzle_dxt(unpacked, width, height * depth, ucc)
 
     pixels_per_texel   = get_texel_pixel_count(width, height)
     channels_per_texel = ucc*pixels_per_texel
@@ -1689,24 +1738,18 @@ def pack_dxn(self, unpacked, width, height, depth=1):
     return repacked
 
 
-def pack_ctx1(self, unpacked, width, height, depth=1):
-    #this is how many texels wide/tall the texture is
-    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+def pack_ctx1(arby, unpacked, width, height, depth=1):
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    texel_width, texel_height, _ = ab.clip_dimensions(dxt_width//4, dxt_height//4)
 
     #create a new array to hold the texels after we repack them
     bpt = 8
-    ucc = self.unpacked_channel_count
+    ucc = arby.unpacked_channel_count
     repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
+    unpacked = swizzle_dxt(unpacked, width, height * depth, ucc)
 
-    """If the texture is more than 1 texel wide we need to have the swizzler
-    rearrange the pixels so that each texel's pixels are adjacent each other.
-    This will allow us to easily group each texel's pixels nicely together."""
-    if texel_width > 1:
-        dxt_swizzler = ab.swizzler.Swizzler(converter=self, mask_type="DXT")
-        unpacked = dxt_swizzler.swizzle_single_array(
-            unpacked, True, 4, width, height)
-
-    _, r_scale, g_scale, __ = self.channel_downscalers
+    _, r_scale, g_scale, __ = arby.channel_downscalers
 
     pixels_per_texel   = get_texel_pixel_count(width, height)
     channels_per_texel = ucc*pixels_per_texel
@@ -1797,16 +1840,16 @@ def pack_ctx1(self, unpacked, width, height, depth=1):
     return repacked
 
 
-def pack_v8u8(self, unpacked, width, height, depth=1):
-    return pack_vu(self, unpacked, width, height, depth, 8)
+def pack_v8u8(arby, unpacked, width, height, depth=1):
+    return pack_vu(arby, unpacked, width, height, depth, 8)
 
 
-def pack_v16u16(self, unpacked, width, height, depth=1):
-    return pack_vu(self, unpacked, width, height, depth, 16)
+def pack_v16u16(arby, unpacked, width, height, depth=1):
+    return pack_vu(arby, unpacked, width, height, depth, 16)
 
 
-def pack_vu(self, unpacked, width, height, depth=1, bpc=8):
-    ucc = self.unpacked_channel_count
+def pack_vu(arby, unpacked, width, height, depth=1, bpc=8):
+    ucc = arby.unpacked_channel_count
     if ucc < 2:
         raise TypeError("Cannot convert image with less than 2 channels "
                         "to V%sU%s." % (bpc, bpc))
@@ -1814,7 +1857,7 @@ def pack_vu(self, unpacked, width, height, depth=1, bpc=8):
     bytes_per_pixel = (bpc * 2)//8
     typecode = ab.INVERSE_PIXEL_ENCODING_SIZES[bytes_per_pixel]
     packed = ab.bitmap_io.make_array(typecode, len(unpacked)//ucc)
-    _, u_scale, v_scale, __ = self.channel_downscalers
+    _, u_scale, v_scale, __ = arby.channel_downscalers
     if ucc == 2:
         chan0, chan1 = 0, 1
     else:
@@ -1844,16 +1887,16 @@ def pack_vu(self, unpacked, width, height, depth=1, bpc=8):
     return packed
 
 
-def pack_r8g8(self, unpacked, width, height, depth=1):
-    return pack_rg(self, unpacked, width, height, depth, 8)
+def pack_r8g8(arby, unpacked, width, height, depth=1):
+    return pack_rg(arby, unpacked, width, height, depth, 8)
 
 
-def pack_r16g16(self, unpacked, width, height, depth=1):
-    return pack_rg(self, unpacked, width, height, depth, 16)
+def pack_r16g16(arby, unpacked, width, height, depth=1):
+    return pack_rg(arby, unpacked, width, height, depth, 16)
 
 
-def pack_rg(self, unpacked, width, height, depth=1, bpc=8):
-    ucc = self.unpacked_channel_count
+def pack_rg(arby, unpacked, width, height, depth=1, bpc=8):
+    ucc = arby.unpacked_channel_count
     if ucc < 2:
         raise TypeError("Cannot convert image with less than 2 channels "
                         "to R%sG%s." % (bpc, bpc))
@@ -1861,7 +1904,7 @@ def pack_rg(self, unpacked, width, height, depth=1, bpc=8):
     bytes_per_pixel = (bpc * 2)//8
     typecode = ab.INVERSE_PIXEL_ENCODING_SIZES[bytes_per_pixel]
     packed = ab.bitmap_io.make_array(typecode, len(unpacked)//ucc)
-    _, r_scale, g_scale, __ = self.channel_downscalers
+    _, r_scale, g_scale, __ = arby.channel_downscalers
     if ucc == 2:
         chan0, chan1 = 0, 1
     else:
@@ -1882,16 +1925,16 @@ def pack_rg(self, unpacked, width, height, depth=1, bpc=8):
     return packed
 
 
-def pack_g8b8(self, unpacked, width, height, depth=1):
-    return pack_gb(self, unpacked, width, height, depth, 8)
+def pack_g8b8(arby, unpacked, width, height, depth=1):
+    return pack_gb(arby, unpacked, width, height, depth, 8)
 
 
-def pack_g16b16(self, unpacked, width, height, depth=1):
-    return pack_gb(self, unpacked, width, height, depth, 16)
+def pack_g16b16(arby, unpacked, width, height, depth=1):
+    return pack_gb(arby, unpacked, width, height, depth, 16)
 
 
-def pack_gb(self, unpacked, width, height, depth=1, bpc=8):
-    ucc = self.unpacked_channel_count
+def pack_gb(arby, unpacked, width, height, depth=1, bpc=8):
+    ucc = arby.unpacked_channel_count
     if ucc < 2:
         raise TypeError("Cannot convert image with less than 2 channels "
                         "to G%sB%s." % (bpc, bpc))
@@ -1899,7 +1942,7 @@ def pack_gb(self, unpacked, width, height, depth=1, bpc=8):
     bytes_per_pixel = (bpc * 2)//8
     typecode = ab.INVERSE_PIXEL_ENCODING_SIZES[bytes_per_pixel]
     packed = ab.bitmap_io.make_array(typecode, len(unpacked)//ucc)
-    _, __, g_scale, b_scale = self.channel_downscalers
+    _, __, g_scale, b_scale = arby.channel_downscalers
     if ucc == 2:
         chan0, chan1 = 0, 1
     else:
