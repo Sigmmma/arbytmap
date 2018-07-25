@@ -182,6 +182,53 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
+static PyObject *py_crop_pixel_data(PyObject *self, PyObject *args) {
+    Py_buffer bufs[2];
+    uint8  *pixels, *new_pixels;
+    uint64 z_stride, y_stride, x_stride, src_i, dst_i,
+        src_y_skip0, dst_y_skip0, src_x_skip0, dst_x_skip0,
+        src_y_skip1, dst_y_skip1, src_x_skip1, dst_x_skip1;
+    uint64 max_src_i, max_dst_i, x, y, z;
+
+    // Get the pointers to each of the array objects
+    if (!PyArg_ParseTuple(args, "w*w*KKKKKKKKKKKKK:crop_pixel_data",
+        &bufs[0], &bufs[1], &z_stride, &y_stride, &x_stride, &src_i, &dst_i,
+        &src_y_skip0, &dst_y_skip0, &src_x_skip0, &dst_x_skip0,
+        &src_y_skip1, &dst_y_skip1, &src_x_skip1, &dst_x_skip1))
+        return Py_BuildValue("");  // return Py_None while incrementing it
+
+    src_x_skip1 += x_stride;
+    dst_x_skip1 += x_stride;
+
+    max_src_i = src_i + (src_y_skip0 + (src_x_skip0 + src_x_skip1) * y_stride + src_y_skip1) * z_stride;
+    max_dst_i = dst_i + (dst_y_skip0 + (dst_x_skip0 + dst_x_skip1) * y_stride + dst_y_skip1) * z_stride;
+
+    if (bufs[0].len == bufs[1].len && (max_src_i < bufs[0].len &&
+                                       max_dst_i < bufs[1].len)) {
+        pixels     = (uint8*)bufs[0].buf;
+        new_pixels = (uint8*)bufs[1].buf;
+        for (z = 0; z < z_stride; z++) {
+            src_i += src_y_skip0;
+            dst_i += dst_y_skip0;
+            for (y = 0; y < y_stride; y++) {
+                src_i += src_x_skip0;
+                dst_i += dst_x_skip0;
+                memcpy(&(new_pixels[dst_i]), &(pixels[src_i]), x_stride);
+                src_i += src_x_skip1;
+                dst_i += dst_x_skip1;
+            }
+            src_i += src_y_skip1;
+            dst_i += dst_y_skip1;
+        }
+    }
+
+    // Release the buffer objects
+    PyBuffer_Release(&bufs[0]);
+    PyBuffer_Release(&bufs[1]);
+
+    return Py_BuildValue("");  // return Py_None while incrementing it
+}
+
 static PyObject *py_swap_channels(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
     uint8  *pixels, *temp_pix;
@@ -282,6 +329,7 @@ static PyMethodDef bitmap_io_ext_methods[] = {
     {"unpad_24bit_array", py_unpad_24bit_array, METH_VARARGS, ""},
     {"unpad_48bit_array", py_unpad_48bit_array, METH_VARARGS, ""},
     {"swap_channels", py_swap_channels, METH_VARARGS, ""},
+    {"crop_pixel_data", py_crop_pixel_data, METH_VARARGS, ""},
     //{"make_array", py_make_array, METH_VARARGS, ""},
     //{"uncompress_rle", py_uncompress_rle, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}      /* sentinel */
