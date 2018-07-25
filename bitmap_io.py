@@ -857,31 +857,42 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
     dst_x_skip1 = max(new_width  - dst_x_skip0 - x_stride, 0)
     dst_y_skip1 = max(new_height - dst_y_skip0 - y_stride, 0)
 
+    src_z_skip0 *= width * height * chan_ct
+    src_y_skip0 *= width * chan_ct
+    src_y_skip1 *= width * chan_ct
+    dst_z_skip0 *= new_width * new_height * chan_ct
+    dst_y_skip0 *= new_width * chan_ct
+    dst_y_skip1 *= new_width * chan_ct
+
     src_x_skip0 *= chan_ct
     dst_x_skip0 *= chan_ct
     src_x_skip1 *= chan_ct
     dst_x_skip1 *= chan_ct
     x_stride *= chan_ct
+    
+    if fast_bitmap_io:
+        bitmap_io_ext.crop_pixel_data(
+            pix, new_pix, z_stride, y_stride, x_stride,
+            src_z_skip0, dst_z_skip0,
+            src_y_skip0, dst_y_skip0, src_x_skip0, dst_x_skip0,
+            src_y_skip1, dst_y_skip1, src_x_skip1, dst_x_skip1)
+    else:
+        src_i = src_z_skip0
+        dst_i = dst_z_skip0
+        src_x_skip1 += x_stride
+        dst_x_skip1 += x_stride
+        for z in range(z_stride):
+            src_i += src_y_skip0
+            dst_i += dst_y_skip0
+            for y in range(y_stride):
+                src_i += src_x_skip0
+                dst_i += dst_x_skip0
+                new_pix[dst_i: dst_i + x_stride] = pix[src_i: src_i + x_stride]
+                src_i += src_x_skip1
+                dst_i += dst_x_skip1
 
-    src_x_skip1 += x_stride
-    dst_x_skip1 += x_stride
-    src_y_skip1 += y_stride
-    dst_y_skip1 += y_stride
-
-    src_i = src_z_skip0
-    dst_i = dst_z_skip0
-    for z in range(z_stride):
-        src_i += src_y_skip0
-        dst_i += dst_y_skip0
-        for y in range(y_stride):
-            src_i += src_x_skip0
-            dst_i += dst_x_skip0
-            new_pix[dst_i: dst_i + x_stride] = pix[src_i: src_i + x_stride]
-            src_i += src_x_skip1
-            dst_i += dst_x_skip1
-
-        src_i += src_y_skip1
-        dst_i += dst_y_skip1
+            src_i += src_y_skip1
+            dst_i += dst_y_skip1
 
     return new_pix
 
