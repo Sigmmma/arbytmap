@@ -124,7 +124,7 @@ def initialize():
                        masks=(0xFFff, 0xFFff, 0))
     
 
-def _dxt_swizzle(pixels, orig_width, orig_height, channel_ct, swizz=False):
+def _dxt_swizzle(src_pixels, orig_width, orig_height, channel_ct, swizz=False):
     width, height = clip_dxt_dimensions(orig_width, orig_height)
     txl_ct_x = 1 if width  < 4 else width  // 4
     txl_ct_y = 1 if height < 4 else height // 4
@@ -133,24 +133,23 @@ def _dxt_swizzle(pixels, orig_width, orig_height, channel_ct, swizz=False):
     txl_h = 4 if txl_ct_y > 1 else orig_height
 
     if swizz and (orig_width != width or orig_height != height):
-        pixels = ab.bitmap_io.crop_pixel_data(
-            pixels, channel_ct, orig_width, orig_height, 1,
+        src_pixels = ab.bitmap_io.crop_pixel_data(
+            src_pixels, channel_ct, orig_width, orig_height, 1,
             0, width, 0, height)
 
-    assert len(pixels) % channel_ct == 0
-    swizz_pix = ab.bitmap_io.make_array(pixels.typecode, len(pixels))
+    assert len(src_pixels) % channel_ct == 0
+    dst_pixels = ab.bitmap_io.make_array(src_pixels.typecode, len(src_pixels))
 
     # 4 channels per pixel, 16 pixels per texel
-    tx_block_offs = tuple(range(0, width * channel_ct, txl_w * channel_ct))
-    y_block_offs  = tuple(y * width * channel_ct for y in range(txl_h))
-    x_block_offs  = tuple(range(0, txl_w * channel_ct, channel_ct))
-    txl_stride = txl_h * width * channel_ct
-
-    if False and fast_dds_defs:
+    if fast_dds_defs:
         dds_defs_ext.dxt_swizzle(
-            pixels, swizz_pix, channel_ct, swizz, txl_stride,
-            tx_block_offs, y_block_offs, x_block_offs)
+            src_pixels, dst_pixels, swizz, channel_ct,
+            txl_ct_y, txl_ct_x, width, height, txl_w, txl_h)
     else:
+        txl_stride = txl_h * width * channel_ct
+        tx_block_offs = tuple(range(0, width * channel_ct, txl_w * channel_ct))
+        y_block_offs  = tuple(y * width * channel_ct for y in range(txl_h))
+        x_block_offs  = tuple(range(0, txl_w * channel_ct, channel_ct))
         c_block_offs = tuple(range(channel_ct))
         i = j = 0
         for tx_y in range(txl_ct_y):
@@ -162,7 +161,7 @@ def _dxt_swizzle(pixels, orig_width, orig_height, channel_ct, swizz=False):
                         for x in x_block_offs:
                             i_tx_yx = i_tx_y + x
                             for c in c_block_offs:
-                                swizz_pix[j] = pixels[i_tx_yx + c]
+                                dst_pixels[j] = src_pixels[i_tx_yx + c]
                                 j += 1
             else:
                 for tx in tx_block_offs:
@@ -172,17 +171,17 @@ def _dxt_swizzle(pixels, orig_width, orig_height, channel_ct, swizz=False):
                         for x in x_block_offs:
                             i_tx_yx = i_tx_y + x
                             for c in c_block_offs:
-                                swizz_pix[i_tx_yx + c] = pixels[j]
+                                dst_pixels[i_tx_yx + c] = src_pixels[j]
                                 j += 1
 
             i += txl_stride
 
     if not swizz and (orig_width != width or orig_height != height):
-        swizz_pix = ab.bitmap_io.crop_pixel_data(
-            swizz_pix, channel_ct, width, height, 1,
+        dst_pixels = ab.bitmap_io.crop_pixel_data(
+            dst_pixels, channel_ct, width, height, 1,
             0, orig_width, 0, orig_height)
 
-    return swizz_pix
+    return dst_pixels
 
 
 def unswizzle_dxt(pixels, orig_width, orig_height, channel_ct):
