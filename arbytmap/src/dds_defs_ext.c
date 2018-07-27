@@ -1800,29 +1800,28 @@ static PyObject *py_dxt_swizzle(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
     uint8 *src_pixels, *dst_pixels;
     uint8 ucc;
-    uint64 txl_stride, single_txl_stride, swizzle;
+    uint64 txl_stride, single_txl_stride;
+    int swizzle;
 
     uint64 txl_ct_y, txl_ct_x, txl_w, txl_h;
-    uint64 tx_y_idx, tx_idx, x_idx, y_idx;
+    uint64 tx_y_idx, tx_idx, y_idx;
     uint64 i = 0, j = 0, i_tx, i_tx_y, i_tx_yx, k;
     uint64 max_i, max_y_idx, max_x_idx, max_k;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*pbkkkkkk:dxt_swizzle",
+    if (!PyArg_ParseTuple(args, "w*w*pbKKKK:dxt_swizzle",
         &bufs[0], &bufs[1], &swizzle, &ucc, &txl_ct_y, &txl_ct_x, &txl_w, &txl_h))
-        return Py_BuildValue("");  // return Py_None while incrementing it
-
-    if (bufs[0].len != bufs[1].len || bufs[0].itemsize != bufs[1].itemsize)
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     src_pixels = (uint8*)bufs[0].buf;
     dst_pixels = (uint8*)bufs[1].buf;
 
-    single_txl_stride = ucc * txl_w * bufs[0].itemsize;
+    single_txl_stride = txl_w * ucc * bufs[0].itemsize;
     txl_stride = txl_h * txl_ct_x * single_txl_stride;
-    max_k = txl_w * ucc * bufs[0].itemsize;
 
-    if (txl_stride * txl_ct_y >= bufs[0].len)
+    if (bufs[0].len != bufs[1].len || bufs[0].itemsize != bufs[1].itemsize)
+        return Py_BuildValue("");  // return Py_None while incrementing it
+    else if (txl_stride * txl_ct_y > bufs[0].len)
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     for (tx_y_idx = 0; tx_y_idx < txl_ct_y; tx_y_idx++) {
@@ -1835,13 +1834,10 @@ static PyObject *py_dxt_swizzle(PyObject *self, PyObject *args) {
                 for (y_idx = 0; y_idx < txl_h; y_idx++) {
                     i_tx_yx = i_tx_y;
 
-                    for (x_idx = 0; x_idx < txl_w; x_idx++) {
-
-                        for (k = 0; k < max_k; k++) {
-                            dst_pixels[j] = src_pixels[i_tx_yx + k];
-                            j++;
-                        }
-                        i_tx_yx += single_txl_stride;
+                    for (k = 0; k < single_txl_stride; k++) {
+                        dst_pixels[j] = src_pixels[i_tx_yx];
+                        j++;
+                        i_tx_yx++;
                     }
                     i_tx_y += txl_ct_x * single_txl_stride;
                 }
@@ -1854,13 +1850,10 @@ static PyObject *py_dxt_swizzle(PyObject *self, PyObject *args) {
                 for (y_idx = 0; y_idx < txl_h; y_idx++) {
                     i_tx_yx = i_tx_y;
 
-                    for (x_idx = 0; x_idx < txl_w; x_idx++) {
-
-                        for (k = 0; k < max_k; k++) {
-                            dst_pixels[i_tx_yx + k] = src_pixels[j];
-                            j++;
-                        }
-                        i_tx_yx += single_txl_stride;
+                    for (k = 0; k < single_txl_stride; k++) {
+                        dst_pixels[i_tx_yx] = src_pixels[j];
+                        j++;
+                        i_tx_yx++;
                     }
                     i_tx_y += txl_ct_x * single_txl_stride;
                 }
@@ -1890,8 +1883,6 @@ static PyMethodDef dds_defs_ext_methods[] = {
     {"unpack_ctx1", py_unpack_ctx1, METH_VARARGS, ""},
     {"unpack_vu", py_unpack_vu, METH_VARARGS, ""},
 
-    {"dxt_swizzle", py_dxt_swizzle, METH_VARARGS, ""},
-
     {"pack_dxt1", py_pack_dxt1, METH_VARARGS, ""},
     {"pack_dxt2_3", py_pack_dxt2_3, METH_VARARGS, ""},
     {"pack_dxt4_5", py_pack_dxt4_5, METH_VARARGS, ""},
@@ -1899,6 +1890,8 @@ static PyMethodDef dds_defs_ext_methods[] = {
     //{"pack_dxn", py_pack_dxn, METH_VARARGS, ""},
     //{"pack_ctx1", py_pack_ctx1, METH_VARARGS, ""},
     {"pack_vu", py_pack_vu, METH_VARARGS, ""},
+
+    {"dxt_swizzle", py_dxt_swizzle, METH_VARARGS, ""},
     {NULL, NULL, 0, NULL}      /* sentinel */
 };
 

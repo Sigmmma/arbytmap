@@ -144,7 +144,7 @@ def _dxt_swizzle(src_pixels, orig_width, orig_height, channel_ct, swizz=False):
     if fast_dds_defs:
         dds_defs_ext.dxt_swizzle(
             src_pixels, dst_pixels, swizz, channel_ct,
-            txl_ct_y, txl_ct_x, width, height, txl_w, txl_h)
+            txl_ct_y, txl_ct_x, txl_w, txl_h)
     else:
         txl_stride = txl_h * width * channel_ct
         tx_block_offs = tuple(range(0, width * channel_ct, txl_w * channel_ct))
