@@ -344,9 +344,9 @@ class Arbytmap():
             print("ERROR: SWIZZLER MODULE NOT LOADED. " +
                   "CANNOT SWIZZLE/UNSWIZZLE WITHOUT SWIZZLER.")
 
+        if kwargs.get("palette_picker"):
+            self.palette_picker = kwargs["palette_picker"]
         self.palettize = kwargs.get("palettize", self.palettize)
-        self.palette_picker = kwargs.get(
-            "palette_picker", self.palette_picker)
         self.target_indexing_size = kwargs.get(
             "target_indexing_size", self.target_indexing_size)
 
@@ -1424,7 +1424,8 @@ class Arbytmap():
                 else:
                     pal, pix = self.palette_picker(all_pix[i])
 
-                if self.palettize and not pal: pix = None
+                if self.palettize and not pal:
+                    pix = None
 
                 if not pix:
                     raise TypeError("Unable to pack bitmap data.")
