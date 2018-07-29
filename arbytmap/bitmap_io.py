@@ -373,7 +373,7 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
 
     flags.linearsize = True
     fmt_flags.four_cc = True
-    line_size = min_w * bpp
+    line_size = (w if w > 0 else 1) * bpp
 
     # compute this for the block compressed formats
     head.pitch_or_linearsize = (line_size * 4) // (8 * 16)
