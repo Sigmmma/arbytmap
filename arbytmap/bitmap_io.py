@@ -1086,7 +1086,7 @@ def unpad_48bit_array(padded):
     return unpadded
 
 
-file_writers = {"raw":save_to_rawdata_file}
+file_writers = {"raw":save_to_rawdata_file, "bin":save_to_rawdata_file}
 file_readers = {}
 
 if tga_def is not None:
