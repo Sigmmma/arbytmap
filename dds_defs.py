@@ -220,8 +220,12 @@ def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    chan0,   chan1,   chan2,   chan3   = arby.channel_mapping[: 4]
-    a_scale, r_scale, g_scale, b_scale = arby.channel_upscalers[: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
@@ -324,8 +328,12 @@ def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan0,   chan1,   chan2,   chan3   = arby.channel_mapping[: 4]
-    a_scale, r_scale, g_scale, b_scale = arby.channel_upscalers[: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
@@ -425,8 +433,12 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan0,   chan1,   chan2,   chan3   = arby.channel_mapping[: 4]
-    a_scale, r_scale, g_scale, b_scale = arby.channel_upscalers[: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
     has_a = chan0 >= 0
     has_r = chan1 >= 0
     has_g = chan2 >= 0
@@ -616,8 +628,12 @@ def unpack_dxn(arby, bitmap_index, width, height, depth=1):
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    chan1,   chan2,   chan3 = arby.channel_mapping[1: 4]
-    r_scale, g_scale, _     = arby.channel_upscalers[1: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -753,8 +769,12 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan1,   chan2,   chan3 = arby.channel_mapping[1: 4]
-    r_scale, g_scale, __    = arby.channel_upscalers[1: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -856,8 +876,13 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan1,   chan2,   chan3   = arby.channel_mapping[1: 4]
-    r_scale, g_scale, b_scale = arby.channel_upscalers[1: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
+
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -931,8 +956,13 @@ def unpack_rg(arby, bitmap_index, width, height, depth=1, bpc=8):
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan1,   chan2,   chan3   = arby.channel_mapping[1: 4]
-    r_scale, g_scale, b_scale = arby.channel_upscalers[1: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
+
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
@@ -999,8 +1029,12 @@ def unpack_gb(arby, bitmap_index, width, height, depth=1, bpc=8):
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan1,   chan2,   chan3   = arby.channel_mapping[1: 4]
-    r_scale, g_scale, b_scale = arby.channel_upscalers[1: 4]
+    chan_map = tuple(arby.channel_mapping)
+    upscales = tuple(arby.channel_upscalers)
+    chan_map += (-1, ) * (4 - len(chan_map))
+    upscales += (array("b"), ) * (4 - len(upscales))
+    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
+    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
     has_r = chan1 >= 0
     has_g = chan2 >= 0
     has_b = chan3 >= 0
