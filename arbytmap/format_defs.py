@@ -33,22 +33,22 @@ FORMAT_A1R5G5B5 = "A1R5G5B5"
 FORMAT_X8R8G8B8 = "X8R8G8B8"
 FORMAT_A8R8G8B8 = "A8R8G8B8"
 
-FORMAT_L5V5U5   = "L5V5U5"  # NOT FULLY SUPPORTED
-FORMAT_Y8U8V8   = "Y8U8V8"  # NOT FULLY SUPPORTED
-FORMAT_X8L8V8U8 = "X8L8V8U8"  # NOT FULLY SUPPORTED
-FORMAT_Q8L8V8U8 = "Q8L8V8U8"  # NOT FULLY SUPPORTED
+FORMAT_L5V5U5   = "L5V5U5"  # NOT PROPERLY IMPLEMENTED
+FORMAT_Y8U8V8   = "Y8U8V8"  # NOT PROPERLY IMPLEMENTED
+FORMAT_X8L8V8U8 = "X8L8V8U8"  # NOT PROPERLY IMPLEMENTED
+FORMAT_Q8L8V8U8 = "Q8L8V8U8"  # NOT PROPERLY IMPLEMENTED
 
-FORMAT_Q8W8V8U8 = "Q8W8V8U8"  # NOT FULLY SUPPORTED
+FORMAT_Q8W8V8U8 = "Q8W8V8U8"  # NOT PROPERLY IMPLEMENTED
 
 #DEEP COLOR SUPPORT
 FORMAT_A2B10G10R10  = "A2B10G10R10"
 FORMAT_A2R10G10B10  = "A2R10G10B10"
-FORMAT_A2W10V10U10  = "A2W10V10U10"  # NOT FULLY SUPPORTED
+FORMAT_A2W10V10U10  = "A2W10V10U10"  # NOT PROPERLY IMPLEMENTED
 
 FORMAT_R16G16B16    = "R16G16B16"
 FORMAT_A16B16G16R16 = "A16B16G16R16"
 FORMAT_A16R16G16B16 = "A16R16G16B16"
-FORMAT_Q16W16V16U16 = "Q16W16V16U16"  # NOT FULLY SUPPORTED
+FORMAT_Q16W16V16U16 = "Q16W16V16U16"  # NOT PROPERLY IMPLEMENTED
 
 
 #FLOATING POINT SUPPORT
@@ -64,20 +64,23 @@ FORMAT_A32R32G32B32F = "A32R32G32B32F"
 DEFAULT_UNPACK_FORMAT = FORMAT_A8R8G8B8
 
 VALID_FORMATS = set()
-
 RAW_FORMATS = set()
-
 COMPRESSED_FORMATS = set()
-
 DDS_FORMATS = set()
-
 THREE_CHANNEL_FORMATS = set()
 
 UNPACKERS = {}
-
 PACKERS = {}
 
+BITS_PER_BLOCK = {}
+BLOCK_WIDTHS = {}
+BLOCK_HEIGHTS = {}
+
+PACKED_WIDTH_CALCS = {}
+PACKED_HEIGHT_CALCS = {}
+PACKED_DEPTH_CALCS = {}
 PACKED_SIZE_CALCS = {}
+PACKED_FIELD_SIZES = {}
 
 SUB_BITMAP_COUNTS = {TYPE_2D:1, TYPE_3D:1, TYPE_CUBEMAP:6}
 
@@ -108,11 +111,17 @@ ALL_FORMAT_COLLECTIONS = {
     "PACKED_TYPECODES":PACKED_TYPECODES, "UNPACKER":UNPACKERS,
     "CHANNEL_COUNT":CHANNEL_COUNTS, "PACKER":PACKERS,
     "CHANNEL_OFFSETS":CHANNEL_OFFSETS, "PACKED_SIZE_CALCS": PACKED_SIZE_CALCS,
-    "CHANNEL_MASKS":CHANNEL_MASKS,
-    "CHANNEL_DEPTHS":CHANNEL_DEPTHS}
+    "CHANNEL_MASKS":CHANNEL_MASKS, "CHANNEL_DEPTHS":CHANNEL_DEPTHS,
+    "PACKED_WIDTH_CALCS": PACKED_WIDTH_CALCS,
+    "PACKED_HEIGHT_CALCS": PACKED_HEIGHT_CALCS,
+    "PACKED_DEPTH_CALCS": PACKED_DEPTH_CALCS,
+    "PACKED_FIELD_SIZES": PACKED_FIELD_SIZES,
+    "BITS_PER_BLOCK": BITS_PER_BLOCK,
+    "BLOCK_WIDTHS": BLOCK_WIDTHS, "BLOCK_HEIGHTS": BLOCK_HEIGHTS,
+    }
 
 
-def register_format(format_id, **kwargs):
+def register_format(format_id, silence_redefine=False, **kwargs):
     """
     Registers a texture format based on the provided information.
     """
@@ -129,6 +138,9 @@ def register_format(format_id, **kwargs):
                 "No identifier supplied for format.\n" +
                 "This must be a hashable type, such as an int or str.")
         elif format_id in VALID_FORMATS:
+            if silence_redefine:
+                return
+
             raise TypeError((
                 "Cannot add '%s' format definition to Arbytmap as " +
                 "that format identifier is already in use.") % format_id)
@@ -182,7 +194,23 @@ def register_format(format_id, **kwargs):
         if kwargs.get("packed_size_calc"):
             PACKED_SIZE_CALCS[format_id] = kwargs["packed_size_calc"]
 
-        BITS_PER_PIXEL[format_id] = bpp
+        BLOCK_WIDTHS[format_id]  = kwargs.get("block_width", 1)
+        BLOCK_HEIGHTS[format_id] = kwargs.get("block_height", 1)
+        bpb = kwargs.get("bpb", bpp * (BLOCK_WIDTHS[format_id] *
+                                       BLOCK_HEIGHTS[format_id]))
+            
+        PACKED_WIDTH_CALCS[format_id] = kwargs.get("packed_width_calc",
+                                                   packed_dimension_calc)
+        PACKED_HEIGHT_CALCS[format_id] = kwargs.get("packed_height_calc",
+                                                    packed_dimension_calc)
+        PACKED_DEPTH_CALCS[format_id] = kwargs.get("packed_depth_calc",
+                                                   packed_dimension_calc)
+        PACKED_FIELD_SIZES[format_id] = kwargs.get("packed_field_sizes",
+                                                   (bpp // 8, ))
+
+
+        BITS_PER_PIXEL[format_id]   = bpp
+        BITS_PER_BLOCK[format_id]   = bpb
         PACKED_TYPECODES[format_id] = packed_typecode
         CHANNEL_COUNTS[format_id]   = channel_count
         # we unpack to ARGB, not BGRA. Reverse the tuples
@@ -230,53 +258,58 @@ def get_mipmap_dimensions(width, height, depth, mip):
     return clip_dimensions(width>>mip, height>>mip, depth>>mip)
 
 
+def packed_dimension_calc(dim, mip_level):
+    return max(1, dim >> mip_level)
+
+
 def clip_dimensions(width, height, depth=1):
     return max(1, width), max(1, height), max(1, depth)
 
+
 # Need to implement unpacking more than 1 pixel
 # per byte for the formats i've commented out.
-#register_format(format_id=FORMAT_A1, depths=(1,))
-#register_format(format_id=FORMAT_L1, depths=(1,))
-#register_format(format_id=FORMAT_A2, depths=(2,))
-#register_format(format_id=FORMAT_L2, depths=(2,))
-#register_format(format_id=FORMAT_A4, depths=(4,))
-#register_format(format_id=FORMAT_L4, depths=(4,))
-register_format(format_id=FORMAT_A8, depths=(8,))
-register_format(format_id=FORMAT_L8, depths=(8,))
-register_format(format_id=FORMAT_AL8, depths=(8,8),
+#register_format(FORMAT_A1, 1, depths=(1,))
+#register_format(FORMAT_L1, 1, depths=(1,))
+#register_format(FORMAT_A2, 1, depths=(2,))
+#register_format(FORMAT_L2, 1, depths=(2,))
+#register_format(FORMAT_A4, 1, depths=(4,))
+#register_format(FORMAT_L4, 1, depths=(4,))
+register_format(FORMAT_A8, 1, depths=(8,))
+register_format(FORMAT_L8, 1, depths=(8,))
+register_format(FORMAT_AL8, 1, depths=(8,8),
                 offsets=(0,0), masks=(255, 255), bpp=8)
-register_format(format_id=FORMAT_A16, depths=(16,))
-register_format(format_id=FORMAT_L16, depths=(16,))
-#register_format(format_id=FORMAT_A2L2, depths=(2,2))
-register_format(format_id=FORMAT_A4L4, depths=(4,4))
-register_format(format_id=FORMAT_A8L8, depths=(8,8))
-register_format(format_id=FORMAT_A16L16, depths=(16,16))
+register_format(FORMAT_A16, 1, depths=(16,))
+register_format(FORMAT_L16, 1, depths=(16,))
+#register_format(FORMAT_A2L2, 1, depths=(2,2))
+register_format(FORMAT_A4L4, 1, depths=(4,4))
+register_format(FORMAT_A8L8, 1, depths=(8,8))
+register_format(FORMAT_A16L16, 1, depths=(16,16))
 
-register_format(format_id=FORMAT_R3G3B2,   depths=(2,3,3))
-register_format(format_id=FORMAT_R5G6B5,   depths=(5,6,5))
-register_format(format_id=FORMAT_R8G8B8,   depths=(8,8,8))
-register_format(format_id=FORMAT_A1R5G5B5, depths=(5,5,5,1))
-register_format(format_id=FORMAT_A4R4G4B4, depths=(4,4,4,4))
-register_format(format_id=FORMAT_A8R3G3B2, depths=(2,3,3,8))
-register_format(format_id=FORMAT_X8R8G8B8, depths=(8,8,8), bpp=32)
-register_format(format_id=FORMAT_A8R8G8B8, depths=(8,8,8,8))
-register_format(format_id=FORMAT_R16G16B16, depths=(16,16,16))
-register_format(format_id=FORMAT_A16R16G16B16, depths=(16,16,16,16))
-register_format(format_id=FORMAT_A16B16G16R16, depths=(16,16,16,16),
+register_format(FORMAT_R3G3B2,   1, depths=(2,3,3))
+register_format(FORMAT_R5G6B5,   1, depths=(5,6,5))
+register_format(FORMAT_R8G8B8,   1, depths=(8,8,8))
+register_format(FORMAT_A1R5G5B5, 1, depths=(5,5,5,1))
+register_format(FORMAT_A4R4G4B4, 1, depths=(4,4,4,4))
+register_format(FORMAT_A8R3G3B2, 1, depths=(2,3,3,8))
+register_format(FORMAT_X8R8G8B8, 1, depths=(8,8,8), bpp=32)
+register_format(FORMAT_A8R8G8B8, 1, depths=(8,8,8,8))
+register_format(FORMAT_R16G16B16, 1, depths=(16,16,16))
+register_format(FORMAT_A16R16G16B16, 1, depths=(16,16,16,16))
+register_format(FORMAT_A16B16G16R16, 1, depths=(16,16,16,16),
                 offsets=(32,16,0,48), masks=(65535, 65535, 65535, 65535))
-register_format(format_id=FORMAT_A2R10G10B10,  depths=(10,10,10,2))
-register_format(format_id=FORMAT_A2B10G10R10,  depths=(10,10,10,2),
+register_format(FORMAT_A2R10G10B10,  1, depths=(10,10,10,2))
+register_format(FORMAT_A2B10G10R10,  1, depths=(10,10,10,2),
                 offsets=(20,10,0,30), masks=(1023, 1023, 1023, 3))
 
 # will need a converter to go between RGB and YUV color spaces
-register_format(format_id=FORMAT_Y8U8V8, depths=(8,8,8))
+register_format(FORMAT_Y8U8V8, 1, depths=(8,8,8))
 
 # will need a converter to go between RGB and LUV color spaces
-register_format(format_id=FORMAT_L5V5U5,   depths=(5,5,5))
-register_format(format_id=FORMAT_X8L8V8U8, depths=(8,8,8), bpp=32)
-register_format(format_id=FORMAT_Q8L8V8U8, depths=(8,8,8,8))
+register_format(FORMAT_L5V5U5,   1, depths=(5,5,5))
+register_format(FORMAT_X8L8V8U8, 1, depths=(8,8,8), bpp=32)
+register_format(FORMAT_Q8L8V8U8, 1, depths=(8,8,8,8))
 
-register_format(format_id=FORMAT_Q8W8V8U8, depths=(8,8,8,8))
+register_format(FORMAT_Q8W8V8U8, 1, depths=(8,8,8,8))
 
-register_format(format_id=FORMAT_A2W10V10U10,  depths=(10,10,10,2))
-register_format(format_id=FORMAT_Q16W16V16U16, depths=(16,16,16,16))
+register_format(FORMAT_A2W10V10U10,  1, depths=(10,10,10,2))
+register_format(FORMAT_Q16W16V16U16, 1, depths=(16,16,16,16))
