@@ -325,7 +325,8 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     if channel_map is not None or convertor.swizzled != swizzle_mode:
         conv_cpy = deepcopy(convertor)
         conv_cpy.load_new_conversion_settings(
-            swizzle_mode=swizzle_mode, channel_mapping=channel_map)
+            swizzle_mode=swizzle_mode, channel_mapping=channel_map,
+            target_big_endian=False)
         conv_cpy.convert_texture()
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
@@ -373,10 +374,9 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
 
     flags.linearsize = True
     fmt_flags.four_cc = True
-    line_size = (w if w > 0 else 1) * bpp
 
     # compute this for the block compressed formats
-    head.pitch_or_linearsize = (line_size * 4) // (8 * 16)
+    head.pitch_or_linearsize = max(1, (w + 3) // 4) * ((bpp * 16) // 8)
 
     if fmt in (ab.FORMAT_DXT3A, ab.FORMAT_DXT3Y, ab.FORMAT_DXT3AY,
                ab.FORMAT_DXT5A, ab.FORMAT_DXT5Y, ab.FORMAT_DXT5AY,
@@ -405,7 +405,7 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
         # non-fourcc format
         flags.linearsize = False
         flags.pitch = True
-        head.pitch_or_linearsize = (line_size + 7) // 8
+        head.pitch_or_linearsize = (w * bpp + 7) // 8
 
         fmt_flags.four_cc = False
         fmt_head.rgb_bitcount = bpp
@@ -506,7 +506,8 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
         # are the mip_levels and sub_bitmaps that were requested to be saved
         conv_cpy.load_new_conversion_settings(
             target_format=ab.FORMAT_A8R8G8B8, swizzle_mode=swizzle_mode,
-            channel_mapping=kwargs.pop("channel_mapping", None))
+            channel_mapping=kwargs.pop("channel_mapping", None),
+            target_big_endian=False)
         conv_cpy.convert_texture()
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
@@ -671,7 +672,7 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
 
         conv_cpy.load_new_conversion_settings(
             target_format=fmt_to_save_as, swizzle_mode=convertor.swizzle_mode,
-            channel_mapping=channel_map)
+            channel_mapping=channel_map, target_big_endian=False)
         if not conv_cpy.convert_texture():
             return []
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
@@ -833,7 +834,7 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
 
     new_pix = make_array(
         pix.typecode,
-        new_width*new_height*new_depth*chan_ct,
+        (new_width - x0) * (new_height - y0) * (new_depth - z0) * chan_ct,
         pix.itemsize)
 
     if len(pix) == 0:
@@ -902,6 +903,7 @@ def swap_channels(pix, channel_map):
     channel_map = tuple(channel_map)
     src_map     = tuple(range(step))
     if channel_map == src_map:
+        # no mapping difference. return without doing anything
         return
 
     assert set(channel_map) == set(src_map)
@@ -1084,6 +1086,16 @@ def unpad_48bit_array(padded):
             padded.typecode)
 
     return unpadded
+
+
+def byteswap_packed_bitmap(packed_pixel_data, fmt):
+    channel_map = []
+    i = 0
+    for size in ab.PACKED_FIELD_SIZES[fmt]:
+        channel_map.extend(list(range(i, i + size))[::-1])
+        i += size
+
+    swap_channels(packed_pixel_data, channel_map)
 
 
 file_writers = {"raw":save_to_rawdata_file, "bin":save_to_rawdata_file}
