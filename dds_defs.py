@@ -58,70 +58,75 @@ def initialize():
     dxt_specs = dict(
         compressed=True, dds_format=True, raw_format=False,
         packed_size_calc=dxt_packed_size_calc,
-        min_width=4, min_height=4, packed_typecode='I')
+        packed_width_calc=packed_dxt_dimension_calc,
+        packed_height_calc=packed_dxt_dimension_calc,
+        packed_typecode='I', packed_field_sizes=(2, ),
+        block_width=4, block_height=4, 
+        )
 
-    ab.register_format(ab.FORMAT_DXT1, **combine(
+    ab.register_format(ab.FORMAT_DXT1, 1, **combine(
         dxt_specs, bpp=4, depths=(5, 6, 5, 1),
         offsets=(0, 5, 11, 0), masks=(31, 63, 31, 0),
         unpacker=unpack_dxt1, packer=pack_dxt1))
 
     for fmt in (ab.FORMAT_DXT2, ab.FORMAT_DXT3):
-        ab.register_format(fmt, **combine(
+        ab.register_format(fmt, 1, **combine(
             dxt_specs, bpp=8, depths=(5, 6, 5, 4),
             offsets=(0, 5, 11, 0), masks=(31, 63, 31, 0),
             unpacker=unpack_dxt2_3, packer=pack_dxt2_3))
 
     for fmt in (ab.FORMAT_DXT4, ab.FORMAT_DXT5):
-        ab.register_format(fmt, **combine(
+        ab.register_format(fmt, 1, **combine(
             dxt_specs, bpp=8, depths=(5, 6, 5, 8),
             offsets=(0, 5, 11, 0), masks=(31, 63, 31, 0),
             unpacker=unpack_dxt4_5, packer=pack_dxt4_5))
 
     for fmt in (ab.FORMAT_DXT5A, ab.FORMAT_DXT5Y):
-        ab.register_format(fmt, **combine(
+        ab.register_format(fmt, 1, **combine(
             dxt_specs, bpp=4, depths=(8,)),
             unpacker=unpack_dxt5a, packer=pack_dxt5a)
 
-    ab.register_format(ab.FORMAT_DXT5AY, **combine(
+    ab.register_format(ab.FORMAT_DXT5AY, 1, **combine(
         dxt_specs, bpp=8, depths=(8, 8), offsets=(0, 0),
         unpacker=unpack_dxt5a, packer=pack_dxt5a))
 
-    ab.register_format(ab.FORMAT_DXN, **combine(
+    ab.register_format(ab.FORMAT_DXN, 1, **combine(
         dxt_specs, bpp=8, depths=(8, 8, 8), offsets=(0, 8, 16),
         unpacker=unpack_dxn, packer=pack_dxn, masks=(0, 0xFF, 0xFF)))
 
-    ab.register_format(ab.FORMAT_CTX1, **combine(
+    ab.register_format(ab.FORMAT_CTX1, 1, **combine(
         dxt_specs, bpp=4, depths=(8, 8, 8), offsets=(0, 8, 16),
         unpacker=unpack_ctx1, packer=pack_ctx1, masks=(0, 0xFF, 0xFF)))
 
-    ab.register_format(ab.FORMAT_V8U8, bpp=16, dds_format=True,
+    ab.register_format(ab.FORMAT_V8U8, 1, bpp=16, dds_format=True,
                        unpacker=unpack_v8u8, packer=pack_v8u8,
-                       depths=(8,8,8), offsets=(0,8,0), masks=(0, 0xFF, 0xFF))
+                       depths=(8,8,8), offsets=(0,8,0),
+                       masks=(0, 0xFF, 0xFF), packed_field_sizes=(2, ))
 
-    ab.register_format(ab.FORMAT_V16U16, bpp=32, dds_format=True,
+    ab.register_format(ab.FORMAT_V16U16, 1, bpp=32, dds_format=True,
                        unpacker=unpack_v16u16, packer=pack_v16u16,
                        depths=(16,16,16), offsets=(0,16,0),
-                       masks=(0, 0xFFff, 0xFFff))
+                       masks=(0, 0xFFff, 0xFFff), packed_field_sizes=(4, ))
 
-    ab.register_format(ab.FORMAT_R8G8, bpp=16, dds_format=True,
+    ab.register_format(ab.FORMAT_R8G8, 1, bpp=16, dds_format=True,
                        unpacker=unpack_r8g8, packer=pack_r8g8,
                        depths=(8,8,8), offsets=(0,8,0),
-                       masks=(0, 0xFF, 0xFF))
+                       masks=(0, 0xFF, 0xFF), packed_field_sizes=(2, ))
 
-    ab.register_format(ab.FORMAT_R16G16, bpp=32, dds_format=True,
+    ab.register_format(ab.FORMAT_R16G16, 1, bpp=32, dds_format=True,
                        unpacker=unpack_r16g16, packer=pack_r16g16,
                        depths=(16,16,16), offsets=(0,16,0),
-                       masks=(0, 0xFFff, 0xFFff))
+                       masks=(0, 0xFFff, 0xFFff), packed_field_sizes=(4, ))
 
-    ab.register_format(ab.FORMAT_G8B8, bpp=16, dds_format=True,
+    ab.register_format(ab.FORMAT_G8B8, 1, bpp=16, dds_format=True,
                        unpacker=unpack_g8b8, packer=pack_g8b8,
                        depths=(8,8,8), offsets=(8,0,0),
-                       masks=(0xFF, 0xFF, 0))
+                       masks=(0xFF, 0xFF, 0), packed_field_sizes=(2, ))
 
-    ab.register_format(ab.FORMAT_G16B16, bpp=32, dds_format=True,
+    ab.register_format(ab.FORMAT_G16B16, 1, bpp=32, dds_format=True,
                        unpacker=unpack_g16b16, packer=pack_g16b16,
                        depths=(16,16,16), offsets=(16,0,0),
-                       masks=(0xFFff, 0xFFff, 0))
+                       masks=(0xFFff, 0xFFff, 0), packed_field_sizes=(4, ))
     
 
 def _dxt_swizzle(src_pixels, orig_width, orig_height, channel_ct, swizz=False):
@@ -131,11 +136,6 @@ def _dxt_swizzle(src_pixels, orig_width, orig_height, channel_ct, swizz=False):
 
     txl_w = 4 if txl_ct_x > 1 else orig_width
     txl_h = 4 if txl_ct_y > 1 else orig_height
-
-    if swizz and (orig_width != width or orig_height != height):
-        src_pixels = ab.bitmap_io.crop_pixel_data(
-            src_pixels, channel_ct, orig_width, orig_height, 1,
-            0, width, 0, height)
 
     assert len(src_pixels) % channel_ct == 0
     dst_pixels = ab.bitmap_io.make_array(src_pixels.typecode, len(src_pixels))
@@ -150,7 +150,7 @@ def _dxt_swizzle(src_pixels, orig_width, orig_height, channel_ct, swizz=False):
         tx_block_offs = tuple(range(0, width * channel_ct, txl_w * channel_ct))
         y_block_offs  = tuple(y * width * channel_ct for y in range(txl_h))
         x_block_offs  = tuple(range(0, txl_w * channel_ct, channel_ct))
-        c_block_offs = tuple(range(channel_ct))
+        c_block_offs  = tuple(range(channel_ct))
         i = j = 0
         for tx_y in range(txl_ct_y):
             if swizz:
@@ -176,11 +176,6 @@ def _dxt_swizzle(src_pixels, orig_width, orig_height, channel_ct, swizz=False):
 
             i += txl_stride
 
-    if not swizz and (orig_width != width or orig_height != height):
-        dst_pixels = ab.bitmap_io.crop_pixel_data(
-            dst_pixels, channel_ct, width, height, 1,
-            0, orig_width, 0, orig_height)
-
     return dst_pixels
 
 
@@ -197,11 +192,15 @@ def dxt_packed_size_calc(fmt, width, height, depth=1):
     return (ab.BITS_PER_PIXEL[fmt] * height * width * depth)//8
 
 
+def packed_dxt_dimension_calc(dim, mip_level):
+    dim = dim >> mip_level
+    if dim <= 4: return 4
+    return dim + (4 - (dim  % 4)) % 4
+
+
 def clip_dxt_dimensions(width, height):
-    width  = max(4, width)
-    height = max(4, height)
-    return (width  + (4 - (width  % 4)) % 4,
-            height + (4 - (height % 4)) % 4)
+    return (packed_dxt_dimension_calc(width, 0),
+            packed_dxt_dimension_calc(height, 0))
 
 
 def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
@@ -552,11 +551,11 @@ def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
 
     scales = list(arby.channel_upscalers)
     chans  = list(arby.channel_mapping)
+    print(chans, len(scales))
 
-    if fast_dds_defs:
-        make_ct = 4 - len(scales)
-        scales.extend([array(scales[0].typecode)] * make_ct)
-        chans.extend([-1] * make_ct)
+    if False and fast_dds_defs:
+        scales.extend([array(scales[0].typecode)] * ((4 - (len(scales)%4))%4))
+        chans.extend([-1] * ((4 - (len(scales)%4))%4))
         dds_defs_ext.unpack_dxt5a(
             unpacked, packed, scales[0], scales[1], scales[2], scales[3],
             ucc, scc, pixels_per_texel, chans[0], chans[1], chans[2], chans[3])
@@ -570,7 +569,7 @@ def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
         #loop through each texel
         for i in range(len(packed)//2):
             #chan = chans[i%ucc]
-            chan = i%ucc
+            chan = i % ucc
             # TODO: Modify this with an inner loop so
             # it can unpack the texel's channels in the
             # order specified by the channel mapping.
@@ -603,6 +602,8 @@ def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
                 unpacked[pxl_i + j*ucc] = lookup[(idx >> (j*3))&7]
 
     unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
+    print(chans)
+    print(unpacked[:32])
 
     return unpacked
 
