@@ -3,7 +3,7 @@
 
 static void depalettize_bitmap_8(
     Py_buffer *unpacked_pix_buf, Py_buffer *unpacked_idx_buf,
-    Py_buffer *unpacked_pal_buf, sint8 channel_count)
+    Py_buffer *unpacked_pal_buf, sint8 ucc)
 {
     uint64 i=0, j=0, max_i=0;
     uint8 *unpacked_pix;
@@ -15,7 +15,7 @@ static void depalettize_bitmap_8(
     unpacked_idx = (uint8*)unpacked_idx_buf->buf;
     max_i = unpacked_pix_buf->len;
 
-    if (channel_count == 4) {
+    if (ucc == 4) {
         for (i=0; i < max_i; i += 4) {
             j = unpacked_idx[i>>2]<<2;
             unpacked_pix[i]   = unpacked_pal[j];
@@ -23,7 +23,7 @@ static void depalettize_bitmap_8(
             unpacked_pix[i+2] = unpacked_pal[j+2];
             unpacked_pix[i+3] = unpacked_pal[j+3];
         }
-    } else if (channel_count == 2) {
+    } else if (ucc == 2) {
         for (i=0; i < max_i; i += 2) {
             j = unpacked_idx[i>>1]<<1;
             unpacked_pix[i]   = unpacked_pal[j];
@@ -38,7 +38,7 @@ static void depalettize_bitmap_8(
 
 static void downsample_bitmap_8(
     Py_buffer *downsamp_pix_buf, Py_buffer *swizzled_pix_buf,
-    uint32 merge_count, sint8 channel_count)
+    uint32 merge_count, sint8 ucc)
 {
     uint64 i=0, j=0, max_i=0, swizz_i=0;
     uint64 merge_val=0;
@@ -65,7 +65,7 @@ static void downsample_bitmap_8(
 
 static void depalettize_bitmap_16(
     Py_buffer *unpacked_pix_buf, Py_buffer *unpacked_idx_buf,
-    Py_buffer *unpacked_pal_buf, sint8 channel_count)
+    Py_buffer *unpacked_pal_buf, sint8 ucc)
 {
     uint64 i=0, j=0, max_i=0;
     uint16 *unpacked_pix;
@@ -77,7 +77,7 @@ static void depalettize_bitmap_16(
     unpacked_idx = (uint8*)unpacked_idx_buf->buf;
     max_i = unpacked_pix_buf->len;
 
-    if (channel_count == 4) {
+    if (ucc == 4) {
         for (i=0; i < max_i; i += 4) {
             j = unpacked_idx[i>>2]<<2;
             unpacked_pix[i]   = unpacked_pal[j];
@@ -85,7 +85,7 @@ static void depalettize_bitmap_16(
             unpacked_pix[i+2] = unpacked_pal[j+2];
             unpacked_pix[i+3] = unpacked_pal[j+3];
         }
-    } else if (channel_count == 2) {
+    } else if (ucc == 2) {
         for (i=0; i < max_i; i += 2) {
             j = unpacked_idx[i>>1]<<1;
             unpacked_pix[i]   = unpacked_pal[j];
@@ -100,7 +100,7 @@ static void depalettize_bitmap_16(
 
 static void downsample_bitmap_16(
     Py_buffer *downsamp_pix_buf, Py_buffer *swizzled_pix_buf,
-    uint32 merge_count, sint8 channel_count)
+    uint32 merge_count, sint8 ucc)
 {
     uint64 i=0, j=0, max_i=0, swizz_i=0;
     uint64 merge_val=0;
@@ -124,23 +124,21 @@ static void downsample_bitmap_16(
 
 static PyObject *py_depalettize_bitmap(PyObject *self, PyObject *args) {
     Py_buffer bufs[3];
-    sint8 channel_count;
+    sint8 ucc, i;
 
     // Get the pointers to each of the array objects and channel count
     if (!PyArg_ParseTuple(args, "w*w*w*b:depalettize_bitmap",
-        &bufs[0], &bufs[1], &bufs[2], &channel_count))
+        &bufs[0], &bufs[1], &bufs[2], &ucc))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        depalettize_bitmap_16(&bufs[0], &bufs[1], &bufs[2], channel_count);
+        depalettize_bitmap_16(&bufs[0], &bufs[1], &bufs[2], ucc);
     } else {
-        depalettize_bitmap_8(&bufs[0], &bufs[1], &bufs[2], channel_count);
+        depalettize_bitmap_8(&bufs[0], &bufs[1], &bufs[2], ucc);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
@@ -148,22 +146,22 @@ static PyObject *py_depalettize_bitmap(PyObject *self, PyObject *args) {
 static PyObject *py_downsample_bitmap(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
     uint32 merge_count;
-    sint8 channel_count;
+    sint8 ucc, i;
 
     // Get the pointers to each of the array objects and channel count
     if (!PyArg_ParseTuple(args, "w*w*kb:downsample_bitmap",
-        &bufs[0], &bufs[1], &merge_count, &channel_count))
+        &bufs[0], &bufs[1], &merge_count, &ucc)) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     if (bufs[0].itemsize == 2) {
-        downsample_bitmap_16(&bufs[0], &bufs[1], merge_count, channel_count);
+        downsample_bitmap_16(&bufs[0], &bufs[1], merge_count, ucc);
     } else {
-        downsample_bitmap_8(&bufs[0], &bufs[1], merge_count, channel_count);
+        downsample_bitmap_8(&bufs[0], &bufs[1], merge_count, ucc);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
@@ -175,8 +173,9 @@ static PyObject *py_populate_scaler_array(PyObject *self, PyObject *args) {
     uint8  *char_arr;
     uint16 *short_arr;
 
-    if (!PyArg_ParseTuple(args, "w*d:populate_scaler_array", &buf, &scale))
+    if (!PyArg_ParseTuple(args, "w*d:populate_scaler_array", &buf, &scale)) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     max_i = buf.len;
     if (buf.itemsize == 2) {

@@ -1,21 +1,47 @@
+#pragma warning(disable: 4101)
 #include <math.h>
 #include "shared.h"
 
 // to prevent loss of precision, cast these to ULL's before squaring
 #define SQ(x) ((uint64)x)*((uint64)x)
 
-#define READ_DXT_COLORS(x)\
-    color0 = packed_tex[x]&0xFFff;\
-    color1 = packed_tex[x]>>16;\
-    color_idx = packed_tex[x+1];\
+#define DEFINE_UNPACK_VARIABLES(packed_type, src_unpacked_type, dst_unpacked_type)\
+    packed_type *packed_pix     = (packed_type *) packed_pix_buf->buf;\
+    dst_unpacked_type *unpacked_pix = (dst_unpacked_type *) unpacked_pix_buf->buf;\
+    dst_unpacked_type *scales[4]={(dst_unpacked_type *)a_scale_buf->buf,\
+                                  (dst_unpacked_type *)r_scale_buf->buf,\
+                                  (dst_unpacked_type *)g_scale_buf->buf,\
+                                  (dst_unpacked_type *)b_scale_buf->buf};\
+    dst_unpacked_type *scale = (dst_unpacked_type *)unpacked_pix_buf->buf;\
+    src_unpacked_type src_unpacked_max = ((1 << (8 * sizeof(src_unpacked_type))) - 1);\
+    dst_unpacked_type dst_unpacked_max = ((1 << (8 * sizeof(dst_unpacked_type))) - 1);\
+    int src_chan, dst_chan;\
+    uint64 i, j, pxl_i, max_i;
+
+#define DEFINE_DXT_UNPACK_VARIABLES()\
+    int chans_per_tex=ucc*pix_per_tex, txl_pxl_i;\
+    uint64 idx;
+
+#define DEFINE_DXT_COLOR_UNPACK_VARIABLES()\
+    uint16 color0, color1;\
+    uint32 color_idx;\
+    uint8 c_0[4]={255,0,0,0}, c_1[4]={255,0,0,0},\
+          c_2[4]={255,0,0,0}, c_3[4]={255,0,0,0},\
+          transparent[4]={0,0,0,0};\
+    uint8 *color, *colors[4] = {c_0, c_1, c_2, c_3};
+
+#define READ_DXT_COLORS(i)\
+    color0 = packed_pix[(i)]&0xFFff;\
+    color1 = packed_pix[(i)]>>16;\
+    color_idx = packed_pix[(i)+1];\
     \
-    c_0[1] = r_scale[(color0>>11) & 31];\
-    c_0[2] = g_scale[(color0>>5)  & 63];\
-    c_0[3] = b_scale[ color0      & 31];\
+    c_0[1] = (((color0>>11) & 31)*255)/31;\
+    c_0[2] = (((color0>>5)  & 63)*255)/63;\
+    c_0[3] = (( color0      & 31)*255)/31;\
     \
-    c_1[1] = r_scale[(color1>>11) & 31];\
-    c_1[2] = g_scale[(color1>>5)  & 63];\
-    c_1[3] = b_scale[ color1      & 31];\
+    c_1[1] = (((color1>>11) & 31)*255)/31;\
+    c_1[2] = (((color1>>5)  & 63)*255)/63;\
+    c_1[3] = (( color1      & 31)*255)/31;\
     \
     if (color0 > color1) {\
         c_2[1] = (c_0[1]*2 + c_1[1])/3;\
@@ -33,36 +59,31 @@
         colors[3] = transparent;\
     }
 
-#define UNPACK_DXT_COLORS()\
-    color = colors[(color_idx>>(j<<1))&3];\
-    off = j*ucc + pxl_i;\
-    if (chan1 >= 0) unpacked_pix[off + 1] = color[chan1];\
-    if (chan2 >= 0) unpacked_pix[off + 2] = color[chan2];\
-    if (chan3 >= 0) unpacked_pix[off + 3] = color[chan3];
+#define UNPACK_DXT_COLORS(dst_chan)\
+    for (dst_chan = 0; dst_chan < ucc; dst_chan++) {\
+        src_chan = chan_map[dst_chan];\
+        if (src_chan < 0 && dst_chan == 0)\
+            unpacked_pix[pxl_i] = dst_unpacked_max;\
+        else if (src_chan >= 0)\
+            unpacked_pix[pxl_i] = scales[dst_chan][color[src_chan]];\
+        pxl_i++;\
+    }
 
-#define UNPACK_DXT2345_COLORS()\
-    color = colors[(color_idx>>(j<<1))&3];\
-    off = j*ucc + pxl_i;\
-    if      (chan0 == 0) unpacked_pix[off] = a_scale[a];\
-    else if (chan0 >  0) unpacked_pix[off] = color[chan0];\
-    else                 unpacked_pix[off] = unpack_max;\
-    \
-    if      (chan1 == 0) unpacked_pix[off + 1] = a_scale[a];\
-    else if (chan1 >  0) unpacked_pix[off + 1] = color[chan1];\
-    else                 unpacked_pix[off + 1] = unpack_max;\
-    \
-    if      (chan2 == 0) unpacked_pix[off + 2] = a_scale[a];\
-    else if (chan2 >  0) unpacked_pix[off + 2] = color[chan2];\
-    else                 unpacked_pix[off + 2] = unpack_max;\
-    \
-    if      (chan3 == 0) unpacked_pix[off + 3] = a_scale[a];\
-    else if (chan3 >  0) unpacked_pix[off + 3] = color[chan3];\
-    else                 unpacked_pix[off + 3] = unpack_max;
+#define UNPACK_DXT2345_COLORS(dst_chan)\
+    for (dst_chan = 0; dst_chan < ucc; dst_chan++) {\
+        if (chan_map[dst_chan] < 0 && dst_chan == 0)\
+            unpacked_pix[pxl_i] = dst_unpacked_max;\
+        else if (chan_map[dst_chan] > 0)\
+            unpacked_pix[pxl_i] = scales[dst_chan][color[chan_map[dst_chan]]];\
+        else if (chan_map[dst_chan] == 0)\
+            unpacked_pix[pxl_i] = scales[dst_chan][a];\
+        pxl_i++;\
+    }
 
-#define READ_DXT5_A(lookup, idx, j, val0, val1)\
-    lookup[0] = val0 = packed_tex[j]&0xFF;\
-    lookup[1] = val1 = (packed_tex[j]>>8)&0xFF;\
-    idx = (((uint64)packed_tex[(j)+1])<<16) + (packed_tex[(j)]>>16);\
+#define READ_DXT5_A(lookup, idx, i, val0, val1)\
+    lookup[0] = val0 = packed_pix[i]&0xFF;\
+    lookup[1] = val1 = (packed_pix[i]>>8)&0xFF;\
+    idx = (((uint64)packed_pix[(i)+1])<<16) | (packed_pix[(i)]>>16);\
     if (val0 > val1) {\
         lookup[2] = (val0*6 + val1)/7;\
         lookup[3] = (val0*5 + val1*2)/7;\
@@ -79,7 +100,7 @@
         lookup[7] = 255;\
     }
 
-#define CALC_B_NORMALIZE(r, g, b, x, y, mask, sign_mask, typ)\
+#define _CALC_B_NORMALIZE(r, g, b, x, y, mask, sign_mask, typ)\
     if (r&sign_mask) {x = r&mask;} else {x = mask - r;}\
     if (g&sign_mask) {y = g&mask;} else {y = mask - g;}\
     d = (double)(mask*mask - x*x - y*y);\
@@ -95,7 +116,10 @@
         b = sign_mask;\
     }
 
-#define CALC_W_NORMALIZE(u, v, w, max_len, mask, sign_mask, typ)\
+#define CALC_B_NORMALIZE(r, g, b, x, y, unpacked_max, typ)\
+_CALC_B_NORMALIZE(r, g, b, x, y, (unpacked_max >> 1), ((unpacked_max + 1) >> 1), typ)
+
+#define _CALC_W_NORMALIZE(u, v, w, max_len, mask, sign_mask, typ)\
     /*This function takes a ones signed u and v that were cast as unsigned\
       integers so it can preform its own ones signed operations.*/\
     if (u&sign_mask) {u -= mask;}\
@@ -110,30 +134,33 @@
         w = 0;\
     }
 
-#define PICK_DXT_PALETTE_DIST()\
-    for (j = 0; j < chans_per_tex; j+=ucc) {\
-        r = unpacked[r_pxl_i + j];\
-        g = unpacked[g_pxl_i + j];\
-        b = unpacked[b_pxl_i + j];\
-        for (k = j + ucc; k < chans_per_tex; k+=ucc) {\
+#define CALC_W_NORMALIZE(u, v, w, unpacked_max, typ)\
+_CALC_W_NORMALIZE(u, v, w, (unpacked_max>> 1), unpacked_max, ((unpacked_max + 1) >> 1), typ)
+
+#define PICK_DXT_PALETTE_DIST(i, j)\
+    for (i = 0; i < chans_per_tex; i+=ucc) {\
+        r = unpacked[r_pxl_i + i];\
+        g = unpacked[g_pxl_i + i];\
+        b = unpacked[b_pxl_i + i];\
+        for (j = i + ucc; j < chans_per_tex; j+=ucc) {\
             /* if this will be solid black we wont care about its color*/\
-            if (make_alpha && (unpacked[pxl_i + k] < a_cutoff)) continue;\
-            dist1 = (SQ(r - unpacked[r_pxl_i + k])+\
-                     SQ(g - unpacked[g_pxl_i + k])+\
-                     SQ(b - unpacked[b_pxl_i + k]));\
+            if (make_alpha && (unpacked[pxl_i + j] < a_cutoff)) continue;\
+            dist1 = (SQ(r - unpacked[r_pxl_i + j])+\
+                     SQ(g - unpacked[g_pxl_i + j])+\
+                     SQ(b - unpacked[b_pxl_i + j]));\
             if (dist1 >= dist0) {\
                 dist0 = dist1;\
-                c_0i = j;\
-                c_1i = k;\
+                c_0i = i;\
+                c_1i = j;\
             }\
         }\
     }
 
-#define PACK_DXT_COLOR(c, c_i, packed_c)\
-    c[1] = unpacked[r_pxl_i + c_i];\
-    c[2] = unpacked[g_pxl_i + c_i];\
-    c[3] = unpacked[b_pxl_i + c_i];\
-    packed_c = ((r_scale[c[1]]<<11) + (g_scale[c[2]]<<5) + b_scale[c[3]])&0xFFff;
+#define PACK_DXT_COLOR(c, i, packed_c)\
+    c[1] = unpacked[r_pxl_i + i];\
+    c[2] = unpacked[g_pxl_i + i];\
+    c[3] = unpacked[b_pxl_i + i];\
+    packed_c = ((r_scale[c[1]]<<11) | (g_scale[c[2]]<<5) | b_scale[c[3]])&0xFFff;
 
 #define SWAP_COLORS()\
     tmp[1] = c_0[1]; tmp[2] = c_0[2]; tmp[3] = c_0[3];\
@@ -143,55 +170,55 @@
     color0    = color1;\
     color1    = tmp_color;
 
-#define CALC_DXT_IDX_NO_ALPHA(idx)\
+#define CALC_DXT_IDX_NO_ALPHA(idx, i)\
     c_2[1] = (c_0[1]*2 + c_1[1])/3; c_3[1] = (c_0[1] + c_1[1]*2)/3;\
     c_2[2] = (c_0[2]*2 + c_1[2])/3; c_3[2] = (c_0[2] + c_1[2]*2)/3;\
     c_2[3] = (c_0[3]*2 + c_1[3])/3; c_3[3] = (c_0[3] + c_1[3]*2)/3;\
-    for (j=0; j<chans_per_tex; j+=ucc) {\
-        r = unpacked[r_pxl_i+j];\
-        g = unpacked[g_pxl_i+j];\
-        b = unpacked[b_pxl_i+j];\
+    for (i=0; i<chans_per_tex; i+=ucc) {\
+        r = unpacked[r_pxl_i+i];\
+        g = unpacked[g_pxl_i+i];\
+        b = unpacked[b_pxl_i+i];\
         dist0 = SQ(r-c_0[1]) + SQ(g-c_0[2]) + SQ(b-c_0[3]);\
         dist2 = SQ(r-c_2[1]) + SQ(g-c_2[2]) + SQ(b-c_2[3]);\
         dist3 = SQ(r-c_3[1]) + SQ(g-c_3[2]) + SQ(b-c_3[3]);\
         dist1 = SQ(r-c_1[1]) + SQ(g-c_1[2]) + SQ(b-c_1[3]);\
         if (dist1 < dist0) {\
             if (dist1 < dist3) {\
-                idx += 1<<(j>>1);\
+                idx |= 1<<(i>>1);\
             } else {\
-                idx += 3<<(j>>1);\
+                idx |= 3<<(i>>1);\
             }\
         } else if (dist2 < dist0) {\
-            idx += 2<<(j>>1);\
+            idx |= 2<<(i>>1);\
         }\
     }
 
-#define CALC_DXT_IDX_ALPHA(idx)\
+#define CALC_DXT_IDX_ALPHA(idx, i)\
     c_2[1] = (c_0[1] + c_1[1])/2;\
     c_2[2] = (c_0[2] + c_1[2])/2;\
     c_2[3] = (c_0[3] + c_1[3])/2;\
-    for (j=0; j<chans_per_tex; j+=ucc) {\
-        if (unpacked[pxl_i + j] < a_cutoff) {\
-            idx += 3<<(j>>1);\
+    for (i=0; i<chans_per_tex; i+=ucc) {\
+        if (unpacked[pxl_i + i] < a_cutoff) {\
+            idx |= 3<<(i>>1);\
             continue;\
         }\
-        r = unpacked[r_pxl_i+j];\
-        g = unpacked[g_pxl_i+j];\
-        b = unpacked[b_pxl_i+j];\
+        r = unpacked[r_pxl_i+i];\
+        g = unpacked[g_pxl_i+i];\
+        b = unpacked[b_pxl_i+i];\
         dist0 = SQ(r-c_0[1]) + SQ(g-c_0[2]) + SQ(b-c_0[3]);\
         dist2 = SQ(r-c_2[1]) + SQ(g-c_2[2]) + SQ(b-c_2[3]);\
         dist1 = SQ(r-c_1[1]) + SQ(g-c_1[2]) + SQ(b-c_1[3]);\
         if ((dist1 < dist0) && (dist1 < dist2)) {\
-            idx += 1<<(j>>1);\
+            idx |= 1<<(i>>1);\
         } else if (dist2 < dist0) {\
-            idx += 2<<(j>>1);\
+            idx |= 2<<(i>>1);\
         }\
     }
 
-#define PICK_DXT5_ALPHA_DIST(a0, a1, a_pxl_i, a_tmp, a_scale)\
+#define PICK_DXT5_ALPHA_DIST(a0, a1, a_pxl_i, a_tmp, a_scale, i)\
     a0 = a1 = a_scale[unpacked[a_pxl_i]];\
-    for (j = ucc; j < chans_per_tex; j += ucc) {\
-        a_tmp = a_scale[unpacked[a_pxl_i + j]];\
+    for (i = ucc; i < chans_per_tex; i += ucc) {\
+        a_tmp = a_scale[unpacked[a_pxl_i + i]];\
         if (a_tmp > a0) a0 = a_tmp;\
         if (a_tmp < a1) a1 = a_tmp;\
     }
@@ -201,14 +228,14 @@
 2 = (6*a0 +   a1)/7  3 = (5*a0 + 2*a1)/7
 4 = (4*a0 + 3*a1)/7  5 = (3*a0 + 4*a1)/7
 6 = (2*a0 + 5*a1)/7  7 = (  a0 + 6*a1)/7*/
-#define PICK_DXT5_ALPHA_IDX(a0, a1, a_idx, a_pxl_i, a_tmp, a_dif, a_scale)\
+#define PICK_DXT5_ALPHA_IDX(a0, a1, a_idx, a_pxl_i, a_tmp, a_dif, a_scale, i)\
     a_dif = a0 - a1;\
-    for (j = 0; j<chans_per_tex; j += ucc) {\
-        a_tmp = ((a_scale[unpacked[a_pxl_i + j]] - a1) * 7 + (a_dif >> 1)) / a_dif;\
+    for (i = 0; i<chans_per_tex; i += ucc) {\
+        a_tmp = ((a_scale[unpacked[a_pxl_i + i]] - a1) * 7 + (a_dif >> 1)) / a_dif;\
         if (a_tmp == 0) {\
-            a_idx += 1ULL << ((j * 3) / ucc);\
+            a_idx |= 1ULL << ((i * 3) / ucc);\
         } else if (a_tmp < 7) {\
-            a_idx += ((uint64)(8 - a_tmp)) << ((j * 3) / ucc);\
+            a_idx |= ((uint64)(8 - a_tmp)) << ((i * 3) / ucc);\
         }\
     }
 
@@ -218,10 +245,10 @@
 2 = (4*a0 +   a1)/5  3 = (3*a0 + 2*a1)/5
 4 = (2*a0 + 3*a1)/5  5 = (  a0 + 4*a1)/5
 6 =  0               7 = 255*/
-#define PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, a_pxl_i, a_tmp, a_dif, a_scale)\
+#define PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, a_pxl_i, a_tmp, a_dif, a_scale, i)\
     a0 = 255; a1 = 0;\
-    for (j = 0; j<chans_per_tex; j += ucc) {\
-        a_tmp = a_scale[unpacked[a_pxl_i + j]];\
+    for (i = 0; i<chans_per_tex; i += ucc) {\
+        a_tmp = a_scale[unpacked[a_pxl_i + i]];\
         if ((a_tmp < a0) && (a_tmp != 0))   a0 = a_tmp;\
         if ((a_tmp > a1) && (a_tmp != 255)) a1 = a_tmp;\
     }\
@@ -230,54 +257,38 @@
         a0 = a_dif = 0;\
         a1 = 255;\
     }\
-    for (j = 0; j<chans_per_tex; j += ucc) {\
-        a_tmp = a_scale[unpacked[a_pxl_i + j]];\
+    for (i = 0; i<chans_per_tex; i += ucc) {\
+        a_tmp = a_scale[unpacked[a_pxl_i + i]];\
         if (a_tmp == 0) {\
-            a_idx += 6ULL << ((j * 3) / ucc);\
+            a_idx |= 6ULL << ((i * 3) / ucc);\
         } else if (a_tmp == 255) {\
-            a_idx += 7ULL << ((j * 3) / ucc);\
+            a_idx |= 7ULL << ((i * 3) / ucc);\
         } else if (a_dif) {\
             a_tmp = ((a_tmp - a0) * 5 + (a_dif >> 1)) / a_dif;\
             if (a_tmp == 5) {\
-                a_idx += 1ULL << ((j * 3) / ucc);\
+                a_idx |= 1ULL << ((i * 3) / ucc);\
             } else if (a_tmp > 0) {\
-                a_idx += ((uint64)(a_tmp + 1)) << ((j * 3) / ucc);\
+                a_idx |= ((uint64)(a_tmp + 1)) << ((i * 3) / ucc);\
             }\
         }\
     }
 
 static void unpack_dxt1_8(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint16 chan0, sint16 chan1, sint16 chan2, sint16 chan3)
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint8 *unpacked_pix;
-    uint32 *packed_tex;
-    uint8 *r_scale, *g_scale, *b_scale;
-    uint16 color0, color1;
-    uint32 color_idx;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    sint8 ucc=4;  // unpacked channel count
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off;
-    uint8 c_0[4]={255,0,0,0}, c_1[4]={255,0,0,0},
-                  c_2[4]={255,0,0,0}, c_3[4]={255,0,0,0};
-    uint8 transparent[4]={0,0,0,0};
-    uint8 *color, *colors[4];
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    unpacked_pix = (uint8*)unpacked_pix_buf->buf;
-    r_scale = (uint8 *)r_scale_buf->buf;
-    g_scale = (uint8 *)g_scale_buf->buf;
-    b_scale = (uint8 *)b_scale_buf->buf;
-
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (uint32 *) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/chans_per_tex;
-
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        j = i<<1;
+        pxl_i = i * chans_per_tex;
+        j = i << 1;
 
         /*If the format DXT1 then the two entries in the array
         are the colors and the color indexing in that order.
@@ -285,230 +296,237 @@ static void unpack_dxt1_8(
         then color key transparency is NOT used.*/
         READ_DXT_COLORS(j);
 
-        for (j=0; j<pix_per_tex; j++) {
-            UNPACK_DXT_COLORS();
-            if (chan0 >= 0) unpacked_pix[off] = color[chan0];
-            else            unpacked_pix[off] = 0xFF;
+        for (txl_pxl_i = 0; txl_pxl_i < pix_per_tex; txl_pxl_i++) {
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            UNPACK_DXT_COLORS(dst_chan);
         }
     }
 }
 
 
 static void unpack_dxt2_3_8(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint16 chan0, sint16 chan1, sint16 chan2, sint16 chan3)
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint8 *unpacked_pix;
-    uint32 *packed_tex;
-    uint8 *a_scale, *r_scale, *g_scale, *b_scale;
-    uint16 color0, color1;
-    uint32 color_idx;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    sint8 ucc=4;  // unpacked channel count
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off, alpha;
-    uint8 c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
-                  c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
-    uint8 transparent[4]={0,0,0,0};
-    uint8 *color, *colors[4], a, unpack_max = 0xFF;
+    uint64 alpha;
+    uint8 a;
 
-    unpacked_pix = (uint8 *)unpacked_pix_buf->buf;
-    a_scale = (uint8 *)a_scale_buf->buf;
-    r_scale = (uint8 *)r_scale_buf->buf;
-    g_scale = (uint8 *)g_scale_buf->buf;
-    b_scale = (uint8 *)b_scale_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (uint32 *) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/chans_per_tex;
-
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        j = i<<2;
+        pxl_i = i * chans_per_tex;
+        j = i << 2;
 
-        alpha = ((uint64)packed_tex[j+1]<<32) + packed_tex[j];
-        READ_DXT_COLORS(j+2);
+        alpha = ((uint64)packed_pix[j + 1] << 32) + packed_pix[j];
+        READ_DXT_COLORS(j + 2);
 
-        for (j=0; j<pix_per_tex; j++) {
-            a = (alpha>>(j<<2))&15;
-            UNPACK_DXT2345_COLORS();
+        for (txl_pxl_i = 0; txl_pxl_i < pix_per_tex; txl_pxl_i++) {
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            a = (((alpha >> (txl_pxl_i << 2)) & 15) * 255) / 15;
+            UNPACK_DXT2345_COLORS(dst_chan);
         }
     }
 }
 
 
 static void unpack_dxt4_5_8(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint16 chan0, sint16 chan1, sint16 chan2, sint16 chan3)
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint8 *unpacked_pix;
-    uint32 *packed_tex;
-    uint8 *a_scale, *r_scale, *g_scale, *b_scale;
-    uint16 color0, color1;
-    uint32 color_idx;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    sint8 ucc=4;  // unpacked channel count
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off, alpha_idx;
-    uint8 c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
-                  c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
-    uint8 transparent[4]={0,0,0,0}, alpha0, alpha1, a_lookup[8];
-    uint8 *color, *colors[4], a, unpack_max=0xFF;
+    uint64 alpha_idx;
+    uint8 a, alpha0, alpha1, a_lookup[8];
 
-    unpacked_pix = (uint8 *)unpacked_pix_buf->buf;
-    a_scale = (uint8 *)a_scale_buf->buf;
-    r_scale = (uint8 *)r_scale_buf->buf;
-    g_scale = (uint8 *)g_scale_buf->buf;
-    b_scale = (uint8 *)b_scale_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (uint32 *) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/chans_per_tex;
-
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        j = i<<2;
+        pxl_i = i * chans_per_tex;
+        j = i << 2;
 
         READ_DXT5_A(a_lookup, alpha_idx, j, alpha0, alpha1);
-        READ_DXT_COLORS(j+2);
-        for (j=0; j<pix_per_tex; j++) {
-            a = a_lookup[(alpha_idx>>(3*j))&7];
-            UNPACK_DXT2345_COLORS();
+        READ_DXT_COLORS(j + 2);
+        for (txl_pxl_i = 0; txl_pxl_i < pix_per_tex; txl_pxl_i++) {
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            a = a_lookup[(alpha_idx >> (3 * txl_pxl_i)) & 7];
+            UNPACK_DXT2345_COLORS(dst_chan);
         }
     }
 }
 
+static void unpack_dxt3a_8(
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 scc, sint8 *chan_map)
+{
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    DEFINE_DXT_UNPACK_VARIABLES()
+
+    uint64 alpha;
+    uint8 a;
+
+    max_i = unpacked_pix_buf->len / chans_per_tex;
+
+    //loop through each destination channel
+    for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+        scale = scales[dst_chan];
+        src_chan = chan_map[dst_chan];
+        pxl_i = dst_chan;
+
+        if (src_chan < 0) {
+            // not reading anything for this destination channel.
+            // either leave it full black, or set it to full white.
+            if (dst_chan == 0) {
+                // set alpha to full white for the entire image
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len / ucc); i++) {
+                    unpacked_pix[pxl_i] = dst_unpacked_max;
+                    pxl_i += ucc;
+                }
+            }
+            continue;
+        }
+
+        // loop through each texel
+        for (i=0; i < max_i; i++) {
+            j = (i * scc + src_chan) << 1;
+            alpha = ((uint64)packed_pix[j + 1] << 32) + packed_pix[j];
+
+            for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+                a = (alpha >> (txl_pxl_i << 2)) & 15;
+                unpacked_pix[pxl_i] = scale[(a * 255) / 15];
+                pxl_i += ucc;
+            }
+        }
+    }
+}
 
 static void unpack_dxt5a_8(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *scale0_buf, Py_buffer *scale1_buf,
-    Py_buffer *scale2_buf, Py_buffer *scale3_buf,
-    sint8 ucc, sint8 scc, sint8 pix_per_tex, sint16 *chans)
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 scc, sint8 *chan_map)
 {
-    uint8 *unpacked_pix;
-    uint32 *packed_tex;
-    uint8 *scales[4], *scale;
-
-    sint16 chans_per_tex=ucc*pix_per_tex, chan;
-    uint64 i, j, max_i, pxl_i, idx;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    DEFINE_DXT_UNPACK_VARIABLES()
     uint8 val0, val1, lookup[8];
 
-    unpacked_pix = (uint8 *)unpacked_pix_buf->buf;
-    scales[0] = (uint8 *)scale0_buf->buf;
-    scales[1] = (uint8 *)scale1_buf->buf;
-    scales[2] = (uint8 *)scale2_buf->buf;
-    scales[3] = (uint8 *)scale3_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    packed_tex = (uint32 *) packed_tex_buf->buf;
-    max_i = unpacked_pix_buf->len/pix_per_tex;
+    //loop through each destination channel
+    for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+        scale = scales[dst_chan];
+        src_chan = chan_map[dst_chan];
+        pxl_i = dst_chan;
 
-    //loop through each texel
-    for (i=0; i < max_i; i++) {
-        //chan = chans[i%ucc];
-        chan = i%ucc;
-        pxl_i = (i/scc)*chans_per_tex + chan;
-        scale = scales[chan];
+        if (src_chan < 0) {
+            // not reading anything for this destination channel.
+            // either leave it full black, or set it to full white.
+            if (dst_chan == 0) {
+                // set alpha to full white for the entire image
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len / ucc); i++) {
+                    unpacked_pix[pxl_i] = dst_unpacked_max;
+                    pxl_i += ucc;
+                }
+            }
+            continue;
+        }
 
-        READ_DXT5_A(lookup, idx, i << 1, val0, val1);
-        for (j=0; j<pix_per_tex; j++) {
-            unpacked_pix[pxl_i + j*ucc] = scale[lookup[(idx>>(j*3))&7]];
+        // loop through each texel
+        for (i=0; i < max_i; i++) {
+            j = (i * scc + src_chan) << 1;
+            READ_DXT5_A(lookup, idx, j, val0, val1);
+            for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+                unpacked_pix[pxl_i] = scale[lookup[(idx >> (3 * txl_pxl_i)) & 7]];
+                pxl_i += ucc;
+            }
         }
     }
 }
 
 
 static void unpack_dxn_8(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf,
-    sint8 ucc, sint16 pix_per_tex, sint16 chan1, sint16 chan2, sint16 chan3)
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint8 *unpacked_pix;
-    uint32 *packed_tex;
-    uint8 *r_scale, *g_scale;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    DEFINE_DXT_UNPACK_VARIABLES()
 
-    sint8 chans_per_tex=ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i;
-    uint64 r_idx, g_idx, r_pxl_i, g_pxl_i, b_pxl_i;
     uint8 r0, r1, r_lookup[8], g0, g1, g_lookup[8];
-    uint8 x, y, r, g, b, colors[4]={0,0,0,0};
+    uint8 x, y, r, g, b, color[4]={0,0,0,0};
+    uint64 r_idx, g_idx;
     double d, n_len;
 
-    unpacked_pix = (uint8 *)unpacked_pix_buf->buf;
-    r_scale = (uint8 *)r_scale_buf->buf;
-    g_scale = (uint8 *)g_scale_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
+    pxl_i = 0;
 
-    packed_tex = (uint32 *) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/chans_per_tex;
-
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        r_pxl_i = pxl_i + 1;
-        g_pxl_i = pxl_i + 2;
-        b_pxl_i = pxl_i + 3;
-        j = i<<2;
+        j = i << 2;
 
-        READ_DXT5_A(g_lookup, g_idx, j, g0, g1);
+        READ_DXT5_A(g_lookup, g_idx, j,     g0, g1);
         READ_DXT5_A(r_lookup, r_idx, j + 2, r0, r1);
 
-        for (j=0; j<pix_per_tex; j++) {
-            g = y = g_scale[g_lookup[(g_idx>>(j*3))&7]];
-            r = x = r_scale[r_lookup[(r_idx>>(j*3))&7]];
-            CALC_B_NORMALIZE(r, g, b, x, y, 0x7F, 0x80, uint8);
-            colors[1] = r; colors[2] = g; colors[3] = b;
-            if (chan1 >= 0) unpacked_pix[r_pxl_i + j*ucc] = colors[chan1];
-            if (chan2 >= 0) unpacked_pix[g_pxl_i + j*ucc] = colors[chan2];
-            if (chan3 >= 0) unpacked_pix[b_pxl_i + j*ucc] = colors[chan3];
+        for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+            g = y = g_lookup[(g_idx >> (txl_pxl_i * 3)) & 7];
+            r = x = r_lookup[(r_idx >> (txl_pxl_i * 3)) & 7];
+            CALC_B_NORMALIZE(r, g, b, x, y, src_unpacked_max, uint8);
+            color[1] = r; color[2] = g; color[3] = b;
+            //loop through each destination channel
+            for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+                if (chan_map[dst_chan] >= 0)
+                    unpacked_pix[pxl_i] = scales[dst_chan][color[chan_map[dst_chan]]];
+                else if (dst_chan == 0)
+                    unpacked_pix[pxl_i] = dst_unpacked_max;
+                pxl_i++;
+            }
         }
     }
 }
 
 
 static void unpack_ctx1_8(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf,
-    sint8 ucc, sint16 pix_per_tex, sint16 chan1, sint16 chan2, sint16 chan3)
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint8 *unpacked_pix;
-    uint32 *packed_tex;
-    uint8 *r_scale, *g_scale;
-    uint32 color_idx;
-
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off;
-    uint8 c_0[4] = {255,0,0,0}, c_1[4] = {255,0,0,0},
-                  c_2[4] = {255,0,0,0}, c_3[4] = {255,0,0,0};
-    uint8 *color, *colors[4], x, y;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
+    uint8 x, y;
     double d, n_len;
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
 
-    packed_tex = (uint32 *)packed_tex_buf->buf;
-    unpacked_pix = (uint8*)unpacked_pix_buf->buf;
-    r_scale = (uint8 *)r_scale_buf->buf;
-    g_scale = (uint8 *)g_scale_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    max_i = (unpacked_pix_buf->len) / chans_per_tex;
-
-    //loop through each texel
+    // loop through each texel
     for (i = 0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
+        pxl_i = i * chans_per_tex;
         j = i << 1;
 
-        c_0[1] = r_scale[packed_tex[j] & 255];
-        c_0[2] = g_scale[(packed_tex[j] >> 8) & 255];
-        CALC_B_NORMALIZE(c_0[1], c_0[2], c_0[3], x, y, 0x7F, 0x80, uint8);
+        c_0[1] = packed_pix[j] & 255;
+        c_0[2] = (packed_pix[j] >> 8) & 255;
+        CALC_B_NORMALIZE(c_0[1], c_0[2], c_0[3], x, y, src_unpacked_max, uint8);
 
-        c_1[1] = r_scale[(packed_tex[j] >> 16) & 255];
-        c_1[2] = g_scale[(packed_tex[j] >> 24) & 255];
-        CALC_B_NORMALIZE(c_1[1], c_1[2], c_1[3], x, y, 0x7F, 0x80, uint8);
+        c_1[1] = (packed_pix[j] >> 16) & 255;
+        c_1[2] = (packed_pix[j] >> 24) & 255;
+        CALC_B_NORMALIZE(c_1[1], c_1[2], c_1[3], x, y, src_unpacked_max, uint8);
 
-        color_idx = packed_tex[j + 1];
+        color_idx = packed_pix[j + 1];
 
         c_2[1] = (c_0[1] * 2 + c_1[1]) / 3;
         c_2[2] = (c_0[2] * 2 + c_1[2]) / 3;
@@ -517,8 +535,9 @@ static void unpack_ctx1_8(
         c_3[1] = (c_0[1] + 2 * c_1[1]) / 3;
         c_3[2] = (c_0[2] + 2 * c_1[2]) / 3;
         c_3[3] = (c_0[3] + 2 * c_1[3]) / 3;
-        for (j = 0; j<pix_per_tex; j++) {
-            UNPACK_DXT_COLORS();
+        for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            UNPACK_DXT_COLORS(dst_chan);
         }
     }
 }
@@ -526,22 +545,14 @@ static void unpack_ctx1_8(
 
 static void unpack_v16u16_8(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 ucc, sint16 r_chan, sint16 g_chan, sint16 b_chan)
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint32 *packed_pix;
-    uint8 *unpacked_pix;
-    uint8 *r_scale, *g_scale, *b_scale;
-
-    uint64 i, max_i, pxl_i;
-    sint32 u, v, w;
+    DEFINE_UNPACK_VARIABLES(uint32, uint16, uint8)
+    uint16 color[4] = { 0xFFff,0,0,0 };
+    sint16 u, v, w;
     double d, n_len;
-
-    packed_pix   = (uint32 *)packed_pix_buf->buf;
-    unpacked_pix = (uint8 *)unpacked_pix_buf->buf;
-    r_scale = (uint8 *)r_scale_buf->buf;
-    g_scale = (uint8 *)g_scale_buf->buf;
-    b_scale = (uint8 *)g_scale_buf->buf;
 
     max_i = (unpacked_pix_buf->len)/ucc;
     //loop through each pixel
@@ -550,53 +561,61 @@ static void unpack_v16u16_8(
 
         u = packed_pix[i] & 0xFFff;
         v = packed_pix[i] >> 16;
-        CALC_W_NORMALIZE(u, v, w, 0x7Fff, 0xFFff, 0x8000, sint32);
-        unpacked_pix[pxl_i + r_chan] = r_scale[u + 0x8000];
-        unpacked_pix[pxl_i + g_chan] = g_scale[v + 0x8000];
-        unpacked_pix[pxl_i + b_chan] = b_scale[w + 0x8000];
+        CALC_W_NORMALIZE(u, v, w, src_unpacked_max, sint32);
+        color[1] = u + ((src_unpacked_max + 1) >> 1);
+        color[2] = v + ((src_unpacked_max + 1) >> 1);
+        color[3] = w + ((src_unpacked_max + 1) >> 1);
+
+        //loop through each destination channel
+        for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+            if (chan_map[dst_chan] >= 0)
+                unpacked_pix[pxl_i] = scales[dst_chan][color[chan_map[dst_chan]]];
+            else if (dst_chan == 0)
+                unpacked_pix[pxl_i] = dst_unpacked_max;
+            pxl_i++;
+        }
     }
 }
 
 
 static void unpack_v8u8_8(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 ucc, sint16 chan1, sint16 chan2, sint16 chan3)
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint16 *packed_pix;
-    uint8  *unpacked_pix;
-    uint8 *r_scale, *g_scale, *b_scale, colors[4]={0,0,0,0};
-
-    uint64 i, max_i, pxl_i;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
+    uint8 color[4] = { src_unpacked_max,0,0,0 };
     sint16 u, v, w;
     double d, n_len;
 
-    packed_pix   = (uint16 *)packed_pix_buf->buf;
-    unpacked_pix = (uint8 *)unpacked_pix_buf->buf;
-    r_scale = (uint8 *)r_scale_buf->buf;
-    g_scale = (uint8 *)g_scale_buf->buf;
-    b_scale = (uint8 *)g_scale_buf->buf;
-
     max_i = (unpacked_pix_buf->len)/ucc;
+
     //loop through each pixel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*ucc;
+        pxl_i = i * ucc;
 
         u = packed_pix[i] & 0xFF;
         v = packed_pix[i] >> 8;
-        CALC_W_NORMALIZE(u, v, w, 0x7F, 0xFF, 0x80, sint16);
-        colors[1] = r_scale[u + 0x80];
-        colors[2] = g_scale[v + 0x80];
-        colors[3] = b_scale[w + 0x80];
-        if (chan1 >= 0) unpacked_pix[pxl_i + 1] = colors[chan1];
-        if (chan2 >= 0) unpacked_pix[pxl_i + 2] = colors[chan2];
-        if (chan3 >= 0) unpacked_pix[pxl_i + 3] = colors[chan3];
+        CALC_W_NORMALIZE(u, v, w, src_unpacked_max, sint16);
+        color[1] = u + ((src_unpacked_max + 1) >> 1);
+        color[2] = v + ((src_unpacked_max + 1) >> 1);
+        color[3] = w + ((src_unpacked_max + 1) >> 1);
+
+        //loop through each destination channel
+        for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+            if (chan_map[dst_chan] >= 0)
+                unpacked_pix[pxl_i] = scales[dst_chan][color[chan_map[dst_chan]]];
+            else if (dst_chan == 0)
+                unpacked_pix[pxl_i] = dst_unpacked_max;
+            pxl_i++;
+        }
     }
 }
 
 
 static void pack_dxt1_8(
-    Py_buffer *packed_tex_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
     Py_buffer *r_scale_buf, Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
     sint8 pix_per_tex, sint8 can_have_alpha, uint8 a_cutoff)
 {
@@ -612,17 +631,17 @@ static void pack_dxt1_8(
     uint16 color0, color1, tmp_color;
     uint32 idx, dist0, dist1, dist2, dist3;
 
-    packed   = (uint32 *)packed_tex_buf->buf;
+    packed   = (uint32 *)packed_pix_buf->buf;
     unpacked = (uint8 *)unpacked_pix_buf->buf;
     r_scale  = (uint8 *)r_scale_buf->buf;
     g_scale  = (uint8 *)g_scale_buf->buf;
     b_scale  = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_tex_buf->len)/8; // 8 bytes per texel
+    max_i = (packed_pix_buf->len)/8; // 8 bytes per texel
 
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = dist0 = c_0i = c_1i = 0;
+        c_0i = c_1i = idx = dist0 = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i + 1;
         g_pxl_i = pxl_i + 2;
@@ -641,7 +660,7 @@ static void pack_dxt1_8(
         }
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
-        PICK_DXT_PALETTE_DIST();
+        PICK_DXT_PALETTE_DIST(j, k);
 
         // store furthest apart colors for use
         PACK_DXT_COLOR(c_0, c_0i, color0);
@@ -651,19 +670,24 @@ static void pack_dxt1_8(
             ;// do nothing except save the colors to the array
         } else {
             //  make_alpha == no_alpha_for_texel
-            if (make_alpha == (color0 > color1)) {SWAP_COLORS();}
+            if (make_alpha == (color0 > color1)) {
+                SWAP_COLORS()
+            }
 
-            if (color0 > color1) {CALC_DXT_IDX_NO_ALPHA(idx);}
-            else                 {CALC_DXT_IDX_ALPHA(idx);}
+            if (color0 > color1) {
+                CALC_DXT_IDX_NO_ALPHA(idx, j)
+            } else {
+                CALC_DXT_IDX_ALPHA(idx, j)
+            }
         }
-        packed[i << 1] = (color1 << 16) + color0;
+        packed[i << 1] = (color1 << 16) | color0;
         packed[(i << 1) + 1] = idx;
     }
 }
 
 
 static void pack_dxt2_3_8(
-    Py_buffer *packed_tex_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf, sint8 pix_per_tex)
 {
@@ -679,18 +703,18 @@ static void pack_dxt2_3_8(
     uint16 color0, color1, tmp_color;
     uint32 idx, dist0, dist1, dist2, dist3;
 
-    packed = (uint32 *) packed_tex_buf->buf;
+    packed = (uint32 *) packed_pix_buf->buf;
     unpacked = (uint8 *)unpacked_pix_buf->buf;
     a_scale = (uint8 *)a_scale_buf->buf;
     r_scale = (uint8 *)r_scale_buf->buf;
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_tex_buf->len)/16; // 16 bytes per texel
+    max_i = (packed_pix_buf->len)/16; // 16 bytes per texel
 
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = dist0 = alpha = c_0i = c_1i = 0;
+        alpha = c_0i = c_1i = idx = dist0 = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -698,30 +722,32 @@ static void pack_dxt2_3_8(
 
         // calculate the alpha
         for (j=0; j<chans_per_tex; j+=ucc) {
-            alpha += ((uint64)a_scale[unpacked[pxl_i+j]])<<j;
+            alpha |= ((uint64)a_scale[unpacked[pxl_i+j]])<<j;
         }
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
-        PICK_DXT_PALETTE_DIST();
+        PICK_DXT_PALETTE_DIST(j, k);
 
         // store furthest apart colors for use
         PACK_DXT_COLOR(c_0, c_0i, color0);
         PACK_DXT_COLOR(c_1, c_1i, color1);
 
         if (color0 != color1) {
-            if (color0 < color1) {SWAP_COLORS();}
-            CALC_DXT_IDX_NO_ALPHA(idx);
+            if (color0 < color1) {
+                SWAP_COLORS()
+            }
+            CALC_DXT_IDX_NO_ALPHA(idx, j)
         }
         packed[i << 2]       = alpha & 0xFFffFFff;
         packed[(i << 2) + 1] = alpha >> 32;
-        packed[(i << 2) + 2] = (color1 << 16) + color0;
+        packed[(i << 2) + 2] = (color1 << 16) | color0;
         packed[(i << 2) + 3] = idx;
     }
 }
 
 
 static void pack_dxt4_5_8(
-    Py_buffer *packed_tex_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf, sint8 pix_per_tex)
 {
@@ -738,51 +764,53 @@ static void pack_dxt4_5_8(
     uint16 color0, color1, tmp_color;
     uint32 idx, dist0, dist1, dist2, dist3;
 
-    packed = (uint32 *) packed_tex_buf->buf;
+    packed = (uint32 *) packed_pix_buf->buf;
     unpacked = (uint8 *)unpacked_pix_buf->buf;
     a_scale = (uint8 *)a_scale_buf->buf;
     r_scale = (uint8 *)r_scale_buf->buf;
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_tex_buf->len)/16; // 16 bytes per texel
+    max_i = (packed_pix_buf->len)/16; // 16 bytes per texel
 
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = dist0 = c_0i = c_1i = a_idx = 0;
+        c_0i = c_1i = a_idx = idx = dist0 = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
         b_pxl_i = pxl_i+3;
 
         // calculate the min and max alpha values
-        PICK_DXT5_ALPHA_DIST(a0, a1, pxl_i, a_tmp, a_scale);
+        PICK_DXT5_ALPHA_DIST(a0, a1, pxl_i, a_tmp, a_scale, j)
 
         // calculate the alpha indexing
         if (a0 == a1) {
             ; // values are the same; do nothing
         } else if (a1 && (a0 != 255)) {
-            PICK_DXT5_ALPHA_IDX(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale);
+            PICK_DXT5_ALPHA_IDX(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale, j)
         } else {
             // max is 255 or min is 0
-            PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale);
+            PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale, j)
         }
 
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
-        PICK_DXT_PALETTE_DIST();
+        PICK_DXT_PALETTE_DIST(j, k);
 
         // store furthest apart colors for use
         PACK_DXT_COLOR(c_0, c_0i, color0);
         PACK_DXT_COLOR(c_1, c_1i, color1);
 
         if (color0 != color1) {
-            if (color0 < color1) { SWAP_COLORS(); }
-            CALC_DXT_IDX_NO_ALPHA(idx);
+            if (color0 < color1) {
+                SWAP_COLORS()
+            }
+            CALC_DXT_IDX_NO_ALPHA(idx, j)
         }
-        packed[i << 2] = ((a_idx & 0xFFff) << 16) + (a1 << 8) + a0;
+        packed[i << 2] = ((a_idx & 0xFFff) << 16) | (a1 << 8) | a0;
         packed[(i << 2) + 1] = (a_idx >> 16) & 0xFFffFFff;
-        packed[(i << 2) + 2] = (color1 << 16) + color0;
+        packed[(i << 2) + 2] = (color1 << 16) | color0;
         packed[(i << 2) + 3] = idx;
     }
 }
@@ -807,8 +835,8 @@ static void pack_v8u8_8(
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
-        packed_pix[i] = ((((uint32)v_scale[unpacked_pix[pxl_i + v_chan]]) << 8) +
-                                          u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x8080;
+        packed_pix[i] = ((((uint32)v_scale[unpacked_pix[pxl_i + v_chan]]) << 8) |
+                                   u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x8080;
     }
 }
 
@@ -832,8 +860,8 @@ static void pack_v16u16_8(
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
-        packed_pix[i] = ((((uint32)v_scale[unpacked_pix[pxl_i + v_chan]]) << 16) +
-                                          u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x80008000UL;
+        packed_pix[i] = ((((uint32)v_scale[unpacked_pix[pxl_i + v_chan]]) << 16) |
+                                   u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x80008000UL;
     }
 }
 
@@ -844,37 +872,21 @@ static void pack_v16u16_8(
 
 
 static void unpack_dxt1_16(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint8 chan0, sint8 chan1, sint8 chan2, sint8 chan3)
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint16 *unpacked_pix;
-    uint32 *packed_tex;
-    uint16 *r_scale, *g_scale, *b_scale;
-    uint16 color0, color1;
-    uint32 color_idx;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    sint8 ucc=4;  // unpacked channel count
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off;
-    uint16 c_0[4]={65535,0,0,0}, c_1[4]={65535,0,0,0},
-                   c_2[4]={65535,0,0,0}, c_3[4]={65535,0,0,0};
-    uint16 transparent[4]={0,0,0,0};
-    uint16 *color, *colors[4];
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    unpacked_pix = (uint16 *)unpacked_pix_buf->buf;
-    r_scale = (uint16 *)r_scale_buf->buf;
-    g_scale = (uint16 *)g_scale_buf->buf;
-    b_scale = (uint16 *)b_scale_buf->buf;
-
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (uint32 *)packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
-
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        j = i<<1;
+        pxl_i = i * chans_per_tex;
+        j = i << 1;
 
         /*If the format DXT1 then the two entries in the array
         are the colors and the color indexing in that order.
@@ -882,230 +894,238 @@ static void unpack_dxt1_16(
         then color key transparency is NOT used.*/
         READ_DXT_COLORS(j);
 
-        for (j=0; j<pix_per_tex; j++) {
-            UNPACK_DXT_COLORS();
-            if (chan0 >= 0) unpacked_pix[off + chan0] = color[0];
-            else            unpacked_pix[off] = 0xFFff;
+        for (txl_pxl_i = 0; txl_pxl_i < pix_per_tex; txl_pxl_i++) {
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            UNPACK_DXT_COLORS(dst_chan);
         }
     }
 }
 
 static void unpack_dxt2_3_16(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint8 chan0, sint8 chan1, sint8 chan2, sint8 chan3)
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint16 *unpacked_pix;
-    uint32 *packed_tex;
-    uint16 *a_scale, *r_scale, *g_scale, *b_scale;
-    uint16 color0, color1;
-    uint32 color_idx;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    sint8 ucc=4;  // unpacked channel count
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off, alpha;
-    uint16 c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
-                   c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
-    uint16 transparent[4]={0,0,0,0};
-    uint16 *color, *colors[4], a, unpack_max=0xFFff;
+    uint64 alpha;
+    uint8 a;
 
-    unpacked_pix = (uint16 *)unpacked_pix_buf->buf;
-    a_scale = (uint16 *)a_scale_buf->buf;
-    r_scale = (uint16 *)r_scale_buf->buf;
-    g_scale = (uint16 *)g_scale_buf->buf;
-    b_scale = (uint16 *)b_scale_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (uint32 *) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
-
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        j = i<<2;
+        pxl_i = i * chans_per_tex;
+        j = i << 2;
 
-        alpha = ((uint64)packed_tex[j+1]<<32) + packed_tex[j];
-        READ_DXT_COLORS(j+2);
+        alpha = ((uint64)packed_pix[j + 1] << 32) + packed_pix[j];
+        READ_DXT_COLORS(j + 2);
 
-        for (j=0; j<pix_per_tex; j++) {
-            a = (alpha>>(j<<2))&15;
-            UNPACK_DXT2345_COLORS();
+        for (txl_pxl_i = 0; txl_pxl_i < pix_per_tex; txl_pxl_i++) {
+            a = (((alpha >> (txl_pxl_i << 2)) & 15) * 255) / 15;
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            UNPACK_DXT2345_COLORS(dst_chan);
         }
     }
 }
 
 
 static void unpack_dxt4_5_16(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint8 chan0, sint8 chan1, sint8 chan2, sint8 chan3)
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint16 *unpacked_pix;
-    uint32 *packed_tex;
-    uint16 *a_scale, *r_scale, *g_scale, *b_scale;
-    uint16 color0, color1;
-    uint32 color_idx;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    sint8 ucc=4;  // unpacked channel count
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off, alpha_idx;
-    uint16 c_0[4]={0,0,0,0}, c_1[4]={0,0,0,0},
-                   c_2[4]={0,0,0,0}, c_3[4]={0,0,0,0};
-    uint16 transparent[4]={0,0,0,0};
-    uint16 *color, *colors[4], a, unpack_max=0xFFff;
-    uint8 alpha0, alpha1, a_lookup[8];
+    uint64 alpha_idx;
+    uint8 a, alpha0, alpha1, a_lookup[8];
 
-    unpacked_pix = (uint16 *)unpacked_pix_buf->buf;
-    a_scale = (uint16 *)a_scale_buf->buf;
-    r_scale = (uint16 *)r_scale_buf->buf;
-    g_scale = (uint16 *)g_scale_buf->buf;
-    b_scale = (uint16 *)b_scale_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (uint32 *) packed_tex_buf->buf;
-    max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
-
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        j = i<<2;
+        pxl_i = i * chans_per_tex;
+        j = i << 2;
 
         READ_DXT5_A(a_lookup, alpha_idx, j, alpha0, alpha1);
-        READ_DXT_COLORS(j+2);
-        for (j=0; j<pix_per_tex; j++) {
-            a = a_lookup[(alpha_idx>>(3*j))&7];
-            UNPACK_DXT2345_COLORS();
+        READ_DXT_COLORS(j + 2);
+        for (txl_pxl_i = 0; txl_pxl_i < pix_per_tex; txl_pxl_i++) {
+            a = a_lookup[(alpha_idx >> (3 * txl_pxl_i)) & 7];
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            UNPACK_DXT2345_COLORS(dst_chan);
+        }
+    }
+}
+
+static void unpack_dxt3a_16(
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 scc, sint8 *chan_map)
+{
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
+    DEFINE_DXT_UNPACK_VARIABLES()
+
+    uint64 alpha;
+    uint8 a;
+
+    max_i = unpacked_pix_buf->len / chans_per_tex;
+
+    //loop through each destination channel
+    for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+        scale = scales[dst_chan];
+        src_chan = chan_map[dst_chan];
+        pxl_i = dst_chan;
+
+        if (src_chan < 0) {
+            // not reading anything for this destination channel.
+            // either leave it full black, or set it to full white.
+            if (dst_chan == 0) {
+                // set alpha to full white for the entire image
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len / (2 * ucc)); i++) {
+                    unpacked_pix[pxl_i] = dst_unpacked_max;
+                    pxl_i += ucc;
+                }
+            }
+            continue;
+        }
+
+        // loop through each texel
+        for (i=0; i < max_i; i++) {
+            j = (i * scc + src_chan) << 1;
+            alpha = ((uint64)packed_pix[j + 1] << 32) + packed_pix[j];
+
+            for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+                a = (alpha >> (txl_pxl_i << 2)) & 15;
+                unpacked_pix[pxl_i] = scale[(a * 255) / 15];
+                pxl_i += ucc;
+            }
         }
     }
 }
 
 
-static void unpack_dxt5a_16(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *scale0_buf, Py_buffer *scale1_buf,
-    Py_buffer *scale2_buf, Py_buffer *scale3_buf,
-    sint8 ucc, sint8 scc, sint8 pix_per_tex, sint16 *chans)
-{
-    uint16 *unpacked_pix;
-    uint32  *packed_tex;
-    uint16 *scales[4], *scale;
 
-    sint16 chans_per_tex=ucc*pix_per_tex, chan;
-    uint64 i, j, max_i, pxl_i, idx;
+static void unpack_dxt5a_16(
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 scc, sint8 *chan_map)
+{
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
+    DEFINE_DXT_UNPACK_VARIABLES()
     uint8 val0, val1, lookup[8];
 
-    unpacked_pix = (uint16 *)unpacked_pix_buf->buf;
-    scales[0] = (uint16 *)scale0_buf->buf;
-    scales[1] = (uint16 *)scale1_buf->buf;
-    scales[2] = (uint16 *)scale2_buf->buf;
-    scales[3] = (uint16 *)scale3_buf->buf;
+    max_i = unpacked_pix_buf->len / chans_per_tex;
 
-    packed_tex = (uint32 *)packed_tex_buf->buf;
-    max_i = unpacked_pix_buf->len/(2*pix_per_tex);
+    //loop through each destination channel
+    for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+        scale = scales[dst_chan];
+        src_chan = chan_map[dst_chan];
+        pxl_i = dst_chan;
 
-    //loop through each texel
-    for (i=0; i < max_i; i++) {
-        //chan = chans[i%ucc];
-        chan = i%ucc;
-        pxl_i = (i/scc)*chans_per_tex + chan;
-        scale = scales[chan];
+        if (src_chan < 0) {
+            // not reading anything for this destination channel.
+            // either leave it full black, or set it to full white.
+            if (dst_chan == 0) {
+                // set alpha to full white for the entire image
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len / (2 * ucc)); i++) {
+                    unpacked_pix[pxl_i] = dst_unpacked_max;
+                    pxl_i += ucc;
+                }
+            }
+            continue;
+        }
 
-        READ_DXT5_A(lookup, idx, i << 1, val0, val1);
-        for (j=0; j<pix_per_tex; j++) {
-            unpacked_pix[pxl_i + j*ucc] = scale[lookup[(idx>>(j*3))&7]];
+        // loop through each texel
+        for (i=0; i < max_i; i++) {
+            j = (i * scc + src_chan) << 1;
+            READ_DXT5_A(lookup, idx, j, val0, val1);
+            for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+                unpacked_pix[pxl_i] = scale[lookup[(idx >> (3 * txl_pxl_i)) & 7]];
+                pxl_i += ucc;
+            }
         }
     }
 }
 
 
 static void unpack_dxn_16(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf,
-    sint8 ucc, sint8 pix_per_tex, sint8 chan1, sint8 chan2, sint8 chan3)
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint16 *unpacked_pix;
-    uint32 *packed_tex;
-    uint16 *r_scale, *g_scale;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
+    DEFINE_DXT_UNPACK_VARIABLES()
 
-    sint8 chans_per_tex=ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i;
-    uint64 r_idx, g_idx, r_pxl_i, g_pxl_i, b_pxl_i;
-    uint16 r0, r1, r_lookup[8], g0, g1, g_lookup[8];
-    uint16  x, y, r, g, b, colors[4]={0,0,0,0};
+    uint8 r0, r1, r_lookup[8], g0, g1, g_lookup[8];
+    uint8 x, y, r, g, b, color[4]={0,0,0,0};
+    uint64 r_idx, g_idx;
     double d, n_len;
 
-    unpacked_pix = (uint16 *)unpacked_pix_buf->buf;
-    r_scale      = (uint16 *)r_scale_buf->buf;
-    g_scale      = (uint16 *)g_scale_buf->buf;
-
-    packed_tex = (uint32 *)packed_tex_buf->buf;
     max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
+    pxl_i = 0;
 
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        pxl_i = i*chans_per_tex;
-        r_pxl_i = pxl_i + 1;
-        g_pxl_i = pxl_i + 2;
-        b_pxl_i = pxl_i + 3;
-        j = i<<2;
+        j = i << 2;
 
-        READ_DXT5_A(g_lookup, g_idx, j, g0, g1);
+        READ_DXT5_A(g_lookup, g_idx, j,     g0, g1);
         READ_DXT5_A(r_lookup, r_idx, j + 2, r0, r1);
 
-        for (j=0; j<pix_per_tex; j++) {
-            g = y = g_scale[g_lookup[(g_idx>>(j*3))&7]];
-            r = x = r_scale[r_lookup[(r_idx>>(j*3))&7]];
-            CALC_B_NORMALIZE(r, g, b, x, y, 0x7Fff, 0x8000, uint16);
-            colors[1] = r; colors[2] = g; colors[3] = b;
-            if (chan1 >= 0) unpacked_pix[r_pxl_i + j*ucc] = colors[chan1];
-            if (chan2 >= 0) unpacked_pix[g_pxl_i + j*ucc] = colors[chan2];
-            if (chan3 >= 0) unpacked_pix[b_pxl_i + j*ucc] = colors[chan3];
+        for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+            g = y = g_lookup[(g_idx >> (txl_pxl_i * 3)) & 7];
+            r = x = r_lookup[(r_idx >> (txl_pxl_i * 3)) & 7];
+            CALC_B_NORMALIZE(r, g, b, x, y, src_unpacked_max, uint8);
+            color[1] = r; color[2] = g; color[3] = b;
+            //loop through each destination channel
+            for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+                if (chan_map[dst_chan] >= 0)
+                    unpacked_pix[pxl_i] = scales[dst_chan][color[chan_map[dst_chan]]];
+                else if (dst_chan == 0)
+                    unpacked_pix[pxl_i] = dst_unpacked_max;
+                pxl_i++;
+            }
         }
     }
 }
 
 
 static void unpack_ctx1_16(
-    Py_buffer *unpacked_pix_buf, Py_buffer *packed_tex_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf,
-    sint8 ucc, sint8 pix_per_tex, sint8 chan1, sint8 chan2, sint8 chan3)
+    Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint16 *unpacked_pix;
-    uint32  *packed_tex;
-    uint16 *r_scale, *g_scale;
-    uint32 color_idx;
-
-    sint8 chans_per_tex = ucc*pix_per_tex;
-    uint64 i, j, max_i, pxl_i, off;
-    uint16 c_0[4] = {65535,0,0,0}, c_1[4] = {65535,0,0,0},
-                   c_2[4] = {65535,0,0,0}, c_3[4] = {65535,0,0,0};
-    uint16 *color, *colors[4], x, y;
+    DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
+    DEFINE_DXT_UNPACK_VARIABLES()
+    DEFINE_DXT_COLOR_UNPACK_VARIABLES()
+    uint8 x, y;
     double d, n_len;
 
-    unpacked_pix = (uint16*)unpacked_pix_buf->buf;
-    r_scale = (uint16 *)r_scale_buf->buf;
-    g_scale = (uint16 *)g_scale_buf->buf;
-
-    colors[0] = c_0; colors[1] = c_1; colors[2] = c_2; colors[3] = c_3;
-    packed_tex = (uint32 *)packed_tex_buf->buf;
     max_i = (unpacked_pix_buf->len) / (2*chans_per_tex);
 
-    //loop through each texel
+    // loop through each texel
     for (i = 0; i < max_i; i++) {
         pxl_i = i*chans_per_tex;
         j = i << 1;
 
-        c_0[1] = r_scale[packed_tex[j] & 255];
-        c_0[2] = g_scale[(packed_tex[j] >> 8) & 255];
-        CALC_B_NORMALIZE(c_0[1], c_0[2], c_0[3], x, y, 0x7Fff, 0x8000, uint16);
+        c_0[1] = packed_pix[j] & 255;
+        c_0[2] = (packed_pix[j] >> 8) & 255;
+        CALC_B_NORMALIZE(c_0[1], c_0[2], c_0[3], x, y, src_unpacked_max, uint8);
 
-        c_1[1] = r_scale[(packed_tex[j] >> 16) & 255];
-        c_1[2] = g_scale[(packed_tex[j] >> 24) & 255];
-        CALC_B_NORMALIZE(c_1[1], c_1[2], c_1[3], x, y, 0x7Fff, 0x8000, uint16);
+        c_1[1] = (packed_pix[j] >> 16) & 255;
+        c_1[2] = (packed_pix[j] >> 24) & 255;
+        CALC_B_NORMALIZE(c_1[1], c_1[2], c_1[3], x, y, src_unpacked_max, uint8);
 
-        color_idx = packed_tex[j + 1];
+        color_idx = packed_pix[j + 1];
 
         c_2[1] = (c_0[1] * 2 + c_1[1]) / 3;
         c_2[2] = (c_0[2] * 2 + c_1[2]) / 3;
@@ -1114,8 +1134,9 @@ static void unpack_ctx1_16(
         c_3[1] = (c_0[1] + 2 * c_1[1]) / 3;
         c_3[2] = (c_0[2] + 2 * c_1[2]) / 3;
         c_3[3] = (c_0[3] + 2 * c_1[3]) / 3;
-        for (j = 0; j<pix_per_tex; j++) {
-            UNPACK_DXT_COLORS();
+        for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
+            color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
+            UNPACK_DXT_COLORS(dst_chan);
         }
     }
 }
@@ -1123,81 +1144,76 @@ static void unpack_ctx1_16(
 
 static void unpack_v8u8_16(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 ucc, sint8 chan1, sint8 chan2, sint8 chan3)
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint16 *packed_pix;
-    uint16 *unpacked_pix;
-    uint16 *r_scale, *g_scale, *b_scale, colors[4]={0,0,0,0};
-
-    uint64 i, max_i, pxl_i;
+    DEFINE_UNPACK_VARIABLES(uint16, uint8, uint16)
+    uint8 color[4] = { src_unpacked_max,0,0,0 };
     sint16 u, v, w;
     double d, n_len;
 
-    packed_pix   = (uint16 *)packed_pix_buf->buf;
-    unpacked_pix = (uint16 *)unpacked_pix_buf->buf;
-    r_scale = (uint16 *)r_scale_buf->buf;
-    g_scale = (uint16 *)g_scale_buf->buf;
-    b_scale = (uint16 *)g_scale_buf->buf;
-
-    max_i = (unpacked_pix_buf->len)/(ucc*2);
-
+    max_i = (unpacked_pix_buf->len) / (ucc * 2);
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
 
-        u = packed_pix[i] & 0xFF;
+        u = packed_pix[i] & src_unpacked_max;
         v = packed_pix[i] >> 8;
-        CALC_W_NORMALIZE(u, v, w, 0x7F, 0xFF, 0x80, sint16);
-        colors[1] = r_scale[u + 0x80]; 
-        colors[2] = g_scale[v + 0x80]; 
-        colors[3] = b_scale[w + 0x80];
-        if (chan1 >= 0) unpacked_pix[pxl_i + 1] = colors[chan1];
-        if (chan2 >= 0) unpacked_pix[pxl_i + 2] = colors[chan2];
-        if (chan3 >= 0) unpacked_pix[pxl_i + 3] = colors[chan3];
+        CALC_W_NORMALIZE(u, v, w, src_unpacked_max, sint8);
+        color[1] = u + ((src_unpacked_max + 1) >> 1);
+        color[2] = v + ((src_unpacked_max + 1) >> 1);
+        color[3] = w + ((src_unpacked_max + 1) >> 1);
+
+        //loop through each destination channel
+        for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+            if (chan_map[dst_chan] >= 0)
+                unpacked_pix[pxl_i] = scales[dst_chan][color[chan_map[dst_chan]]];
+            else if (dst_chan == 0)
+                unpacked_pix[pxl_i] = dst_unpacked_max;
+            pxl_i++;
+        }
     }
 }
 
 
 static void unpack_v16u16_16(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
-    Py_buffer *r_scale_buf, Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 ucc, sint8 chan1, sint8 chan2, sint8 chan3)
+    Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
+    Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
+    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
 {
-    uint32  *packed_pix;
-    uint16 *unpacked_pix;
-    uint16 *r_scale, *g_scale, *b_scale, colors[4]={0,0,0,0};
-
-    uint64 i, max_i, pxl_i;
+    DEFINE_UNPACK_VARIABLES(uint32, uint16, uint16)
+    uint16 color[4] = { src_unpacked_max,0,0,0 };
     sint32 u, v, w;
     double d, n_len;
 
-    packed_pix   = (uint32 *)packed_pix_buf->buf;
-    unpacked_pix = (uint16 *)unpacked_pix_buf->buf;
-    r_scale = (uint16 *)r_scale_buf->buf;
-    g_scale = (uint16 *)g_scale_buf->buf;
-    b_scale = (uint16 *)g_scale_buf->buf;
-
-    max_i = (unpacked_pix_buf->len)/(ucc*2);
+    max_i = (unpacked_pix_buf->len) / (ucc * 2);
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
 
-        u = packed_pix[i] & 0xFFff;
+        u = packed_pix[i] & src_unpacked_max;
         v = packed_pix[i] >> 16;
-        CALC_W_NORMALIZE(u, v, w, 0x7Fff, 0xFFff, 0x8000, sint32);
-        colors[1] = r_scale[u + 0x8000]; 
-        colors[2] = g_scale[v + 0x8000]; 
-        colors[3] = b_scale[w + 0x8000];
-        if (chan1 >= 0) unpacked_pix[pxl_i + 1] = colors[chan1];
-        if (chan2 >= 0) unpacked_pix[pxl_i + 2] = colors[chan2];
-        if (chan3 >= 0) unpacked_pix[pxl_i + 3] = colors[chan3];
+        CALC_W_NORMALIZE(u, v, w, src_unpacked_max, sint16);
+        color[1] = u + ((src_unpacked_max + 1) >> 1);
+        color[2] = v + ((src_unpacked_max + 1) >> 1);
+        color[3] = w + ((src_unpacked_max + 1) >> 1);
+
+        //loop through each destination channel
+        for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
+            if (chan_map[dst_chan] >= 0)
+                unpacked_pix[pxl_i] = scales[dst_chan][color[chan_map[dst_chan]]];
+            else if (dst_chan == 0)
+                unpacked_pix[pxl_i] = dst_unpacked_max;
+            pxl_i++;
+        }
     }
 }
 
 
 static void pack_dxt1_16(
-    Py_buffer *packed_tex_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
     Py_buffer *r_scale_buf, Py_buffer *g_scale_buf,  Py_buffer *b_scale_buf,
     sint8 pix_per_tex, sint8 can_have_alpha, uint16 a_cutoff)
 {
@@ -1214,17 +1230,17 @@ static void pack_dxt1_16(
     uint32 idx;
     uint64 dist0, dist1, dist2, dist3;
 
-    packed = (uint32 *) packed_tex_buf->buf;
+    packed = (uint32 *) packed_pix_buf->buf;
     unpacked = (uint16 *)unpacked_pix_buf->buf;
     r_scale = (uint8 *)r_scale_buf->buf;
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_tex_buf->len)/8; // 8 bytes per texel
+    max_i = (packed_pix_buf->len)/8; // 8 bytes per texel
 
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = dist0 = c_0i = c_1i = 0;
+        dist0 = c_0i = c_1i = idx = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i + 1;
         g_pxl_i = pxl_i + 2;
@@ -1243,7 +1259,7 @@ static void pack_dxt1_16(
         }
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
-        PICK_DXT_PALETTE_DIST();
+        PICK_DXT_PALETTE_DIST(j, k);
 
         // store furthest apart colors for use
         PACK_DXT_COLOR(c_0, c_0i, color0);
@@ -1253,19 +1269,24 @@ static void pack_dxt1_16(
             ;// do nothing except save the colors to the array
         } else {
             //  make_alpha == no_alpha_for_texel
-            if (make_alpha == (color0 > color1)) {SWAP_COLORS();}
+            if (make_alpha == (color0 > color1)) {
+                SWAP_COLORS()
+            }
 
-            if (color0 > color1) {CALC_DXT_IDX_NO_ALPHA(idx);}
-            else                 {CALC_DXT_IDX_ALPHA(idx);}
+            if (color0 > color1) {
+                CALC_DXT_IDX_NO_ALPHA(idx, j)
+            } else {
+                CALC_DXT_IDX_ALPHA(idx, j)
+            }
         }
-        packed[i << 1] = (color1 << 16) + color0;
+        packed[i << 1] = (color1 << 16) | color0;
         packed[(i << 1) + 1] = idx;
     }
 }
 
 
 static void pack_dxt2_3_16(
-    Py_buffer *packed_tex_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf, sint8 pix_per_tex)
 {
@@ -1282,18 +1303,18 @@ static void pack_dxt2_3_16(
     uint32 idx;
     uint64 dist0, dist1, dist2, dist3;
 
-    packed = (uint32 *) packed_tex_buf->buf;
+    packed = (uint32 *) packed_pix_buf->buf;
     unpacked = (uint16 *)unpacked_pix_buf->buf;
     a_scale = (uint8 *)a_scale_buf->buf;
     r_scale = (uint8 *)r_scale_buf->buf;
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_tex_buf->len)/16; // 8 bytes per texel
+    max_i = (packed_pix_buf->len)/16; // 8 bytes per texel
 
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = dist0 = alpha = c_0i = c_1i = 0;
+        dist0 = alpha = c_0i = c_1i = idx = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
@@ -1301,29 +1322,31 @@ static void pack_dxt2_3_16(
 
         // calculate the alpha
         for (j=0; j<chans_per_tex; j+=ucc) {
-            alpha += ((uint64)a_scale[unpacked[pxl_i+j]])<<j;
+            alpha |= ((uint64)a_scale[unpacked[pxl_i+j]])<<j;
         }
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
-        PICK_DXT_PALETTE_DIST();
+        PICK_DXT_PALETTE_DIST(j, k);
 
         // store furthest apart colors for use
         PACK_DXT_COLOR(c_0, c_0i, color0);
         PACK_DXT_COLOR(c_1, c_1i, color1);
 
         if (color0 != color1) {
-            if (color0 < color1) { SWAP_COLORS(); }
-            CALC_DXT_IDX_NO_ALPHA(idx);
+            if (color0 < color1) {
+                SWAP_COLORS()
+            }
+            CALC_DXT_IDX_NO_ALPHA(idx, j)
         }
         packed[i << 2]       = alpha & 0xFFffFFff;
         packed[(i << 2) + 1] = alpha >> 32;
-        packed[(i << 2) + 2] = (color1 << 16) + color0;
+        packed[(i << 2) + 2] = (color1 << 16) | color0;
         packed[(i << 2) + 3] = idx;
     }
 }
 
 static void pack_dxt4_5_16(
-    Py_buffer *packed_tex_buf, Py_buffer *unpacked_pix_buf,
+    Py_buffer *packed_pix_buf, Py_buffer *unpacked_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf, sint8 pix_per_tex)
 {
@@ -1341,51 +1364,53 @@ static void pack_dxt4_5_16(
     uint32 idx;
     uint64 dist0, dist1, dist2, dist3;
 
-    packed = (uint32 *) packed_tex_buf->buf;
+    packed = (uint32 *) packed_pix_buf->buf;
     unpacked = (uint16 *)unpacked_pix_buf->buf;
     a_scale = (uint8 *)a_scale_buf->buf;
     r_scale = (uint8 *)r_scale_buf->buf;
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_tex_buf->len)/16; // 16 bytes per texel
+    max_i = (packed_pix_buf->len)/16; // 16 bytes per texel
 
-    //loop through each texel
+    // loop through each texel
     for (i=0; i < max_i; i++) {
-        idx = dist0 = c_0i = c_1i = a_idx = 0;
+        dist0 = c_0i = c_1i = a_idx = idx = 0;
         pxl_i = i*chans_per_tex;
         r_pxl_i = pxl_i+1;
         g_pxl_i = pxl_i+2;
         b_pxl_i = pxl_i+3;
 
         // calculate the min and max alpha values
-        PICK_DXT5_ALPHA_DIST(a0, a1, pxl_i, a_tmp, a_scale);
+        PICK_DXT5_ALPHA_DIST(a0, a1, pxl_i, a_tmp, a_scale, j);
 
         // calculate the alpha indexing
         if (a0 == a1) {
             ; // values are the same; do nothing
         } else if (a1 && (a0 != 255)) {
-            PICK_DXT5_ALPHA_IDX(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale);
+            PICK_DXT5_ALPHA_IDX(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale, j);
         } else {
             // max is 255 or min is 0
-            PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale);
+            PICK_DXT5_ALPHA_IDX_0_255(a0, a1, a_idx, pxl_i, a_tmp, a_dif, a_scale, j);
         }
 
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
-        PICK_DXT_PALETTE_DIST();
+        PICK_DXT_PALETTE_DIST(j, k);
 
         // store furthest apart colors for use
         PACK_DXT_COLOR(c_0, c_0i, color0);
         PACK_DXT_COLOR(c_1, c_1i, color1);
 
         if (color0 != color1) {
-            if (color0 < color1) {SWAP_COLORS();}
-            CALC_DXT_IDX_NO_ALPHA(idx);
+            if (color0 < color1) {
+                SWAP_COLORS()
+            }
+            CALC_DXT_IDX_NO_ALPHA(idx, j);
         }
-        packed[i << 2] = ((a_idx & 0xFFff) << 16) + (a1 << 8) + a0;
+        packed[i << 2] = ((a_idx & 0xFFff) << 16) | (a1 << 8) | a0;
         packed[(i << 2) + 1] = (a_idx >> 16) & 0xFFffFFff;
-        packed[(i << 2) + 2] = (color1 << 16) + color0;
+        packed[(i << 2) + 2] = (color1 << 16) | color0;
         packed[(i << 2) + 3] = idx;
     }
 }
@@ -1410,8 +1435,8 @@ static void pack_v8u8_16(
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
-        packed_pix[i] = ((((uint16)v_scale[unpacked_pix[pxl_i + v_chan]]) << 8) +
-                                           u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x8080;
+        packed_pix[i] = ((((uint16)v_scale[unpacked_pix[pxl_i + v_chan]]) << 8) |
+                                   u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x8080;
     }
 }
 
@@ -1435,245 +1460,210 @@ static void pack_v16u16_16(
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
-        packed_pix[i] = ((((uint32)v_scale[unpacked_pix[pxl_i + v_chan]]) << 16) +
-                                          u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x80008000UL;
+        packed_pix[i] = ((((uint32)v_scale[unpacked_pix[pxl_i + v_chan]]) << 16) |
+                                   u_scale[unpacked_pix[pxl_i + u_chan]]) ^ 0x80008000UL;
     }
 }
 
-
 static PyObject *py_unpack_dxt1(PyObject *self, PyObject *args) {
-    Py_buffer bufs[5];
-    sint8 pix_per_tex;
-    sint16 chans[4];
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*w*bhhhh:unpack_dxt1",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &pix_per_tex,
-        &chans[0], &chans[1], &chans[2], &chans[3]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbw*:unpack_dxt1",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        unpack_dxt1_16(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], pix_per_tex,
-            chans[0], chans[1], chans[2], chans[3]);
+        unpack_dxt1_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     } else {
-        unpack_dxt1_8(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], pix_per_tex,
-            chans[0], chans[1], chans[2], chans[3]);
+        unpack_dxt1_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_dxt2_3(PyObject *self, PyObject *args) {
-    Py_buffer bufs[6];
-    sint8 pix_per_tex;
-    sint16 chans[4];
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bhhhh:unpack_dxt2_3",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        &pix_per_tex, &chans[0], &chans[1], &chans[2], &chans[3]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbw*:unpack_dxt2_3",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        unpack_dxt2_3_16(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-            pix_per_tex, chans[0], chans[1], chans[2], chans[3]);
+        unpack_dxt2_3_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     } else {
-        unpack_dxt2_3_8(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-            pix_per_tex, chans[0], chans[1], chans[2], chans[3]);
+        unpack_dxt2_3_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
-    PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_dxt4_5(PyObject *self, PyObject *args) {
-    Py_buffer bufs[6];
-    sint8 pix_per_tex;
-    sint16 chans[4];
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bhhhh:unpack_dxt4_5",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        &pix_per_tex, &chans[0], &chans[1], &chans[2], &chans[3]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbw*:unpack_dxt4_5",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
+
     if (bufs[0].itemsize == 2) {
-        unpack_dxt4_5_16(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-            pix_per_tex, chans[0], chans[1], chans[2], chans[3]);
+        unpack_dxt4_5_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     } else {
-        unpack_dxt4_5_8(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-            pix_per_tex, chans[0], chans[1], chans[2], chans[3]);
+        unpack_dxt4_5_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
-    PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
-static PyObject *py_unpack_dxt5a(PyObject *self, PyObject *args) {
-    Py_buffer bufs[6];
-    sint8 pix_per_tex, ucc, scc;
-    sint16 chans[4];
+static PyObject *py_unpack_dxt3a(PyObject *self, PyObject *args) {
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, scc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbbhhhh:unpack_dxt5a",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        &ucc, &scc, &pix_per_tex, &chans[0], &chans[1], &chans[2], &chans[3]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbbw*:unpack_dxt3a",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &scc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        unpack_dxt5a_16(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-            ucc, scc, pix_per_tex, chans);
+        unpack_dxt3a_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, scc, bufs[6].buf);
     } else {
-        unpack_dxt5a_8(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-            ucc, scc, pix_per_tex, chans);
+        unpack_dxt3a_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, scc, bufs[6].buf);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
-    PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
+
+    return Py_BuildValue("");  // return Py_None while incrementing it
+}
+
+
+static PyObject *py_unpack_dxt5a(PyObject *self, PyObject *args) {
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, scc, i;
+
+    // Get the pointers to each of the array objects
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbbw*:unpack_dxt5a",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &scc, &bufs[6]))
+        return Py_BuildValue("");  // return Py_None while incrementing it
+
+    if (bufs[0].itemsize == 2) {
+        unpack_dxt5a_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, scc, bufs[6].buf);
+    } else {
+        unpack_dxt5a_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, scc, bufs[6].buf);
+    }
+
+    // Release the buffer objects
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_dxn(PyObject *self, PyObject *args) {
-    Py_buffer bufs[4];
-    sint8 pix_per_tex, ucc;
-    sint16 chans[3];
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*bbhhh:unpack_dxn",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3],
-        &ucc, &pix_per_tex, &chans[0], &chans[1], &chans[2]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbw*:unpack_dxn",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        unpack_dxn_16(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3],
-            ucc, pix_per_tex, chans[0], chans[1], chans[2]);
+        unpack_dxn_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     } else {
-        unpack_dxn_8(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3],
-            ucc, pix_per_tex, chans[0], chans[1], chans[2]);
+        unpack_dxn_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_ctx1(PyObject *self, PyObject *args) {
-    Py_buffer bufs[4];
-    sint8 pix_per_tex, ucc;
-    sint16 chans[3];
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*bbhhh:unpack_ctx1",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3],
-        &ucc, &pix_per_tex, &chans[0], &chans[1], &chans[2]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbw*:unpack_ctx1",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        unpack_ctx1_16(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3],
-            ucc, pix_per_tex, chans[0], chans[1], chans[2]);
+        unpack_ctx1_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     } else {
-        unpack_ctx1_8(
-            &bufs[0], &bufs[1], &bufs[2], &bufs[3],
-            ucc, pix_per_tex, chans[0], chans[1], chans[2]);
+        unpack_ctx1_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unpack_vu(PyObject *self, PyObject *args) {
-    Py_buffer bufs[5];
-    sint8 ucc;
-    sint16 chans[3];
+    Py_buffer bufs[7];
+    sint8 pix_per_tex, ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*w*bhhh:unpack_vu",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4],
-        &ucc, &chans[0], &chans[1], &chans[2]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbw*:unpack_vu",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {  // unpacking v8u8
         if (bufs[0].itemsize == 2) {  // to a16r16g16b16
-            unpack_v8u8_16(
-                &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4],
-                ucc, chans[0], chans[1], chans[2]);
+            unpack_v8u8_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
         } else {  // to a8r8g8b8
-            unpack_v8u8_8(
-                &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4],
-                ucc, chans[0], chans[1], chans[2]);
+            unpack_v8u8_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
         }
     } else if (bufs[1].itemsize == 4) {  // unpacking v16u16
         if (bufs[0].itemsize == 2) {  // to a16r16g16b16
-            unpack_v16u16_16(
-                &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4],
-                ucc, chans[0], chans[1], chans[2]);
+            unpack_v16u16_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
         } else {  // to a8r8g8b8
-            unpack_v16u16_8(
-                &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4],
-                ucc, chans[0], chans[1], chans[2]);
+            unpack_v16u16_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+        pix_per_tex, ucc, bufs[6].buf);
         }
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_dxt1(PyObject *self, PyObject *args) {
     Py_buffer bufs[5];
-    sint8 pix_per_tex, can_have_alpha;
+    sint8 pix_per_tex, can_have_alpha, i;
     uint16 a_cutoff;
 
     // Get the pointers to each of the array objects
@@ -1693,18 +1683,14 @@ static PyObject *py_pack_dxt1(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_dxt2_3(PyObject *self, PyObject *args) {
     Py_buffer bufs[6];
-    sint8 pix_per_tex;
+    sint8 pix_per_tex, i;
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*b:pack_dxt2_3",
@@ -1723,19 +1709,14 @@ static PyObject *py_pack_dxt2_3(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
-    PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_dxt4_5(PyObject *self, PyObject *args) {
     Py_buffer bufs[6];
-    sint8 pix_per_tex;
+    sint8 pix_per_tex, i;
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*b:pack_dxt4_5",
@@ -1754,22 +1735,17 @@ static PyObject *py_pack_dxt4_5(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
-    PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_vu(PyObject *self, PyObject *args) {
     Py_buffer bufs[4];
-    sint16 u_chan, v_chan, ucc;
+    sint8 u_chan, v_chan, ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*bhh:pack_vu",
+    if (!PyArg_ParseTuple(args, "w*w*w*w*bbb:pack_vu",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &ucc, &u_chan, &v_chan))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
@@ -1788,25 +1764,21 @@ static PyObject *py_pack_vu(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_dxt_swizzle(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
-    uint8 *src_pixels, *dst_pixels;
-    uint8 ucc;
-    uint64 txl_stride, single_txl_stride;
     int swizzle;
+    uint8 ucc;
+    sint64 txl_stride, single_txl_stride;
+    sint64 txl_ct_y, txl_ct_x, txl_w, txl_h;
 
-    uint64 txl_ct_y, txl_ct_x, txl_w, txl_h;
-    uint64 tx_y_idx, tx_idx, y_idx;
-    uint64 i = 0, j = 0, i_tx, i_tx_y, i_tx_yx, k;
-    uint64 max_i, max_y_idx, max_x_idx, max_k;
+    uint8 *src_pixels, *dst_pixels;
+    sint64 tx_y_idx, tx_idx, y_idx;
+    sint64 i = 0, j = 0, k, a, i_tx, i_tx_y, i_tx_yx;
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*pbKKKK:dxt_swizzle",
@@ -1819,21 +1791,23 @@ static PyObject *py_dxt_swizzle(PyObject *self, PyObject *args) {
     single_txl_stride = txl_w * ucc * bufs[0].itemsize;
     txl_stride = txl_h * txl_ct_x * single_txl_stride;
 
-    if (bufs[0].len != bufs[1].len || bufs[0].itemsize != bufs[1].itemsize)
+    if (bufs[0].len != bufs[1].len || bufs[0].itemsize != bufs[1].itemsize) {
+        RELEASE_PY_BUFFER_ARRAY(bufs, i)
+        PySys_FormatStdout("Pixel buffers supplied to dds_defs_ext.dxt_swizzle are not the same size.\n");
         return Py_BuildValue("");  // return Py_None while incrementing it
-    else if (txl_stride * txl_ct_y > bufs[0].len)
+    } else if (txl_stride * txl_ct_y > bufs[0].len) {
+        RELEASE_PY_BUFFER_ARRAY(bufs, i)
+        PySys_FormatStdout("Pixel buffers supplied to dds_defs_ext.dxt_swizzle are smaller than required.\n");
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     for (tx_y_idx = 0; tx_y_idx < txl_ct_y; tx_y_idx++) {
         i_tx = i;
-
         if (swizzle) {
             for (tx_idx = 0; tx_idx < txl_ct_x; tx_idx++) {
                 i_tx_y = i_tx;
-
                 for (y_idx = 0; y_idx < txl_h; y_idx++) {
                     i_tx_yx = i_tx_y;
-
                     for (k = 0; k < single_txl_stride; k++) {
                         dst_pixels[j] = src_pixels[i_tx_yx];
                         j++;
@@ -1846,10 +1820,8 @@ static PyObject *py_dxt_swizzle(PyObject *self, PyObject *args) {
         } else {
             for (tx_idx = 0; tx_idx < txl_ct_x; tx_idx++) {
                 i_tx_y = i_tx;
-
                 for (y_idx = 0; y_idx < txl_h; y_idx++) {
                     i_tx_yx = i_tx_y;
-
                     for (k = 0; k < single_txl_stride; k++) {
                         dst_pixels[i_tx_yx] = src_pixels[j];
                         j++;
@@ -1864,8 +1836,7 @@ static PyObject *py_dxt_swizzle(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, a)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
@@ -1878,7 +1849,9 @@ static PyMethodDef dds_defs_ext_methods[] = {
     {"unpack_dxt1", py_unpack_dxt1, METH_VARARGS, ""},
     {"unpack_dxt2_3", py_unpack_dxt2_3, METH_VARARGS, ""},
     {"unpack_dxt4_5", py_unpack_dxt4_5, METH_VARARGS, ""},
+    {"unpack_dxt3a", py_unpack_dxt3a, METH_VARARGS, ""},
     {"unpack_dxt5a", py_unpack_dxt5a, METH_VARARGS, ""},
+    //{"unpack_dxt3a1111", py_unpack_dxt3a1111, METH_VARARGS, ""},
     {"unpack_dxn", py_unpack_dxn, METH_VARARGS, ""},
     {"unpack_ctx1", py_unpack_ctx1, METH_VARARGS, ""},
     {"unpack_vu", py_unpack_vu, METH_VARARGS, ""},
@@ -1886,7 +1859,9 @@ static PyMethodDef dds_defs_ext_methods[] = {
     {"pack_dxt1", py_pack_dxt1, METH_VARARGS, ""},
     {"pack_dxt2_3", py_pack_dxt2_3, METH_VARARGS, ""},
     {"pack_dxt4_5", py_pack_dxt4_5, METH_VARARGS, ""},
+    //{"pack_dxt3a", py_pack_dxt3a, METH_VARARGS, ""},
     //{"pack_dxt5a", py_pack_dxt5a, METH_VARARGS, ""},
+    //{"pack_dxt3a1111", py_pack_dxt3a1111, METH_VARARGS, ""},
     //{"pack_dxn", py_pack_dxn, METH_VARARGS, ""},
     //{"pack_ctx1", py_pack_ctx1, METH_VARARGS, ""},
     {"pack_vu", py_pack_vu, METH_VARARGS, ""},

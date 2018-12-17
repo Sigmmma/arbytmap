@@ -22,6 +22,7 @@ class Tiler():
     converter = None
     tile_method = ""
     _methods = {}
+    _fast_methods = {}
 
     def __init__(self, **kwargs):
         self.converter = kwargs.get("converter")
@@ -31,16 +32,18 @@ class Tiler():
             raise TypeError("Unknown tiler method '%'" %
                             kwargs.get("tile_method"))
 
-    def add_method(*args):
+    def add_method(*args, fast=False):
         if not args:
             return
         elif isinstance(args[0], Tiler):
             args = args[1:]
 
         tile_method, tile_func = args
-        if tile_method in Tiler._methods:
+        methods = Tiler._fast_methods if fast else Tiler._methods
+        if tile_method in methods:
             raise ValueError("Method '%s' already exists." % tile_method)
-        Tiler._methods[tile_method] = tile_func
+
+        methods[tile_method] = tile_func
 
     def tile_texture(self, force=False, delete_old=True):
         conv = self.converter
@@ -110,20 +113,21 @@ class Tiler():
                     fmt, width, height, depth):
         b_width, b_height, b_size = get_tiling_info(fmt)
 
+        tile_method = self._methods.get(self.tile_method)
+        fast_tile_method = self._fast_methods.get(self.tile_method)
+        if False and fast_tile_method:
+            # TODO: Enable this when the accelerator bug is fixed
+            fast_tile_method(mode, pixels, modified_pixels,
+                             width, height, depth,
+                             b_width, b_height, b_size)
+            return
+        elif tile_method is None:
+            raise TypeError("Unknown tile method '%s'" % self.tile_method)
+
         if mode:
             tiled, untiled = modified_pixels, pixels
         else:
             tiled, untiled = pixels, modified_pixels
-
-        tiler = self._methods.get(self.tile_method)
-        if fast_tiler:
-            if mode:
-                tiler_ext.tile_array()
-            else:
-                untiler_ext.tile_array()
-            return
-        elif tiler is None:
-            raise TypeError("Unknown tile method '%s'" % self.tile_method)
 
         dst_b_size = b_size
         if isinstance(untiled, array):
@@ -132,15 +136,11 @@ class Tiler():
 
         x_chunks = width // b_width
         y_chunks = height // b_height
-        #print("%sx%s  %sx%s  %sx%s %sx%s" % (width, height,
-        #                                     x_chunks, y_chunks,
-        #                                     b_width, b_height,
-        #                                     b_size, untiled.itemsize))
         if mode:
             for i in range(y_chunks):
                 offset = i * x_chunks
                 for j in range(x_chunks):
-                    x, y = tiler(offset + j, x_chunks, b_size)
+                    x, y = tile_method(offset + j, x_chunks, b_size)
                     t_idx = (i * x_chunks + j) * dst_b_size
                     u_idx = (y * x_chunks + x) * dst_b_size
                     tiled[t_idx: t_idx + dst_b_size] = untiled[
@@ -149,7 +149,7 @@ class Tiler():
             for i in range(y_chunks):
                 offset = i * x_chunks
                 for j in range(x_chunks):
-                    x, y = tiler(offset + j, x_chunks, b_size)
+                    x, y = tile_method(offset + j, x_chunks, b_size)
                     t_idx = (i * x_chunks + j) * dst_b_size
                     u_idx = (y * x_chunks + x) * dst_b_size
                     untiled[u_idx: u_idx + dst_b_size] = tiled[
@@ -182,3 +182,6 @@ def get_dxgi_tiled_address(offset, tile_ct_x, tile_len):
 
 Tiler.add_method("DEFAULT", get_dxgi_tiled_address)
 Tiler.add_method("DXGI", get_dxgi_tiled_address)
+if fast_tiler:
+    Tiler.add_method("DEFAULT", tiler_ext.dxgi_tile_array, fast=True)
+    Tiler.add_method("DXGI", tiler_ext.dxgi_tile_array, fast=True)
