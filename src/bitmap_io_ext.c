@@ -36,7 +36,7 @@ static void unpad_24bit_array(
 
     max_i = (unpadded_pix_buf->len)/3;
 
-    if ( padded_pix_buf->itemsize == 4) {
+    if (padded_pix_buf->itemsize == 4) {
         for (i=0; i < max_i; i++) {
             j=i*3;
             pixel = padded_pix_32[i];
@@ -95,7 +95,7 @@ static void unpad_48bit_array(
 
     max_i = (unpadded_pix_buf->len)/6;
 
-    if ( padded_pix_buf->itemsize == 8) {
+    if (padded_pix_buf->itemsize == 8) {
         for (i=0; i < max_i; i++) {
             j=i*3;
             pixel = padded_pix_64[i];
@@ -122,8 +122,9 @@ static PyObject *py_pad_24bit_array(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*:pad_24bit_array", &bufs[0], &bufs[1]))
+    if (!PyArg_ParseTuple(args, "w*w*:pad_24bit_array", &bufs[0], &bufs[1])) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     pad_24bit_array(&bufs[0], &bufs[1]);
 
@@ -138,8 +139,9 @@ static PyObject *py_pad_48bit_array(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*:pad_48bit_array", &bufs[0], &bufs[1]))
+    if (!PyArg_ParseTuple(args, "w*w*:pad_48bit_array", &bufs[0], &bufs[1])) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     pad_48bit_array(&bufs[0], &bufs[1]);
 
@@ -154,8 +156,9 @@ static PyObject *py_unpad_24bit_array(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*:unpad_24bit_array", &bufs[0], &bufs[1]))
+    if (!PyArg_ParseTuple(args, "w*w*:unpad_24bit_array", &bufs[0], &bufs[1])) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     unpad_24bit_array(&bufs[0], &bufs[1]);
 
@@ -170,8 +173,9 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*:unpad_48bit_array", &bufs[0], &bufs[1]))
+    if (!PyArg_ParseTuple(args, "w*w*:unpad_48bit_array", &bufs[0], &bufs[1])) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     unpad_48bit_array(&bufs[0], &bufs[1]);
 
@@ -185,17 +189,18 @@ static PyObject *py_unpad_48bit_array(PyObject *self, PyObject *args) {
 static PyObject *py_crop_pixel_data(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
     uint8  *pixels, *new_pixels;
-    uint64 z_stride, y_stride, x_stride, src_i, dst_i,
+    sint64 z_stride, y_stride, x_stride, src_i, dst_i,
         src_y_skip0, dst_y_skip0, src_x_skip0, dst_x_skip0,
-        src_y_skip1, dst_y_skip1, src_x_skip1, dst_x_skip1;
-    uint64 max_src_i, max_dst_i, x, y, z;
+        src_y_skip1, dst_y_skip1, src_x_skip1, dst_x_skip1,
+        max_src_i, max_dst_i, y, z;
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*KKKKKKKKKKKKK:crop_pixel_data",
         &bufs[0], &bufs[1], &z_stride, &y_stride, &x_stride, &src_i, &dst_i,
         &src_y_skip0, &dst_y_skip0, &src_x_skip0, &dst_x_skip0,
-        &src_y_skip1, &dst_y_skip1, &src_x_skip1, &dst_x_skip1))
+        &src_y_skip1, &dst_y_skip1, &src_x_skip1, &dst_x_skip1)) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     src_x_skip1 += x_stride;
     dst_x_skip1 += x_stride;
@@ -203,23 +208,36 @@ static PyObject *py_crop_pixel_data(PyObject *self, PyObject *args) {
     max_src_i = src_i + (src_y_skip0 + (src_x_skip0 + src_x_skip1) * y_stride + src_y_skip1) * z_stride;
     max_dst_i = dst_i + (dst_y_skip0 + (dst_x_skip0 + dst_x_skip1) * y_stride + dst_y_skip1) * z_stride;
 
-    if (bufs[0].len == bufs[1].len && (max_src_i < bufs[0].len &&
-                                       max_dst_i < bufs[1].len)) {
-        pixels     = (uint8*)bufs[0].buf;
-        new_pixels = (uint8*)bufs[1].buf;
-        for (z = 0; z < z_stride; z++) {
-            src_i += src_y_skip0;
-            dst_i += dst_y_skip0;
-            for (y = 0; y < y_stride; y++) {
-                src_i += src_x_skip0;
-                dst_i += dst_x_skip0;
-                memcpy(&(new_pixels[dst_i]), &(pixels[src_i]), x_stride);
-                src_i += src_x_skip1;
-                dst_i += dst_x_skip1;
-            }
-            src_i += src_y_skip1;
-            dst_i += dst_y_skip1;
+    /*PySys_FormatStdout("%d  %d    %d  %d\n", max_src_i, max_dst_i, 
+                       bufs[0].len * bufs[0].itemsize,
+                       bufs[1].len * bufs[1].itemsize);*/
+    if ((max_src_i < bufs[0].len * bufs[0].itemsize) ||
+        (max_dst_i < bufs[1].len * bufs[1].itemsize)) {
+        PyBuffer_Release(&bufs[0]);
+        PyBuffer_Release(&bufs[1]);
+        PySys_FormatStdout("Invalid offsets supplied to bitmap_io_ext.crop_pixel_data\n");
+        return Py_BuildValue("");  // return Py_None while incrementing it
+    }
+
+    pixels = (uint8*)bufs[0].buf;
+    new_pixels = (uint8*)bufs[1].buf;
+    for (z = 0; z < z_stride; z++) {
+        src_i += src_y_skip0;
+        dst_i += dst_y_skip0;
+        for (y = 0; y < y_stride; y++) {
+            src_i += src_x_skip0;
+            dst_i += dst_x_skip0;
+            /*if (src_i + x_stride > bufs[0].len * bufs[0].itemsize ||
+            dst_i + x_stride > bufs[1].len * bufs[1].itemsize) {
+            PySys_FormatStdout("FUCK\n");
+            break;
+            }*/
+            memcpy(&new_pixels[dst_i], &pixels[src_i], x_stride);
+            src_i += src_x_skip1;
+            dst_i += dst_x_skip1;
         }
+        src_i += src_y_skip1;
+        dst_i += dst_y_skip1;
     }
 
     // Release the buffer objects
@@ -229,28 +247,37 @@ static PyObject *py_crop_pixel_data(PyObject *self, PyObject *args) {
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
-static PyObject *py_swap_channels(PyObject *self, PyObject *args) {
+static PyObject *py_swap_array_items(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
     uint8  *pixels, *temp_pix;
-    uint16 *chan_map, step;
+    sint16 *chan_map, step;
     uint64 max_i, i, j;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*:swap_channels", &bufs[0], &bufs[1]))
+    if (!PyArg_ParseTuple(args, "w*w*:swap_array_items", &bufs[0], &bufs[1])) {
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     pixels   = (uint8  *)bufs[0].buf;
-    chan_map = (uint16 *)bufs[1].buf;
+    chan_map = (sint16 *)bufs[1].buf;
     max_i = bufs[0].len;
-    step  = bufs[1].len / 2;
+    step  = (sint16)(bufs[1].len / bufs[1].itemsize);
     temp_pix = malloc(step);
-    if (temp_pix == NULL)
+    if (temp_pix == NULL) {
+        PyBuffer_Release(&bufs[0]);
+        PyBuffer_Release(&bufs[1]);
+        PySys_FormatStdout("Could not allocate pixel swap buffer in bitmap_io_ext.swap_array_items\n");
         return Py_BuildValue("");  // return Py_None while incrementing it
+    }
 
     for (i = 0; i < max_i; i += step) {
         memcpy(temp_pix, &(pixels[i]), step);
         for (j = 0; j < step; j++) {
-            pixels[i + j] = temp_pix[chan_map[j]];
+            if (chan_map[j] < 0) {
+                pixels[i + j] = 0;
+            } else {
+                pixels[i + j] = temp_pix[chan_map[j]];
+            }
         }
     }
 
@@ -271,13 +298,14 @@ static PyObject *py_make_array(PyObject *self, PyObject *args) {
     Py_ssize_t len, itemsize;
     sint32 format_len;
     sint8 *format;
-    sint8 *buf = calloc(len, 1);
+    sint8 *buf;
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "u#k:make_array", format, &format_len, &len))
-        return Py_None;
+        return Py_BuildValue("");  // return Py_None while incrementing it
 
-    if (format_len != 1) {
+    buf = calloc(len, 1);
+    if (format_len != 1 || buf == NULL) {
         return Py_None;
     }
 
@@ -328,7 +356,7 @@ static PyMethodDef bitmap_io_ext_methods[] = {
     {"pad_48bit_array", py_pad_48bit_array, METH_VARARGS, ""},
     {"unpad_24bit_array", py_unpad_24bit_array, METH_VARARGS, ""},
     {"unpad_48bit_array", py_unpad_48bit_array, METH_VARARGS, ""},
-    {"swap_channels", py_swap_channels, METH_VARARGS, ""},
+    {"swap_array_items", py_swap_array_items, METH_VARARGS, ""},
     {"crop_pixel_data", py_crop_pixel_data, METH_VARARGS, ""},
     //{"make_array", py_make_array, METH_VARARGS, ""},
     //{"uncompress_rle", py_uncompress_rle, METH_VARARGS, ""},

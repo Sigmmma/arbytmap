@@ -693,28 +693,28 @@ static void pack_indexing(
     if (indexing_size == 4) {
         for (i=0; i < max_i; i++) {
             j = i<<1;
-            packed_indexing[i] = (  unpacked_indexing[j] +
-                                   (unpacked_indexing[j+1]<<4))&255;
+            packed_indexing[i] = ( unpacked_indexing[j] +
+                                  (unpacked_indexing[j+1]<<4))&255;
         }
     } else if (indexing_size == 2) {
         for (i=0; i < max_i; i++) {
             j = i<<2;
-            packed_indexing[i] = (  unpacked_indexing[j] +
-                                   (unpacked_indexing[j+1]<<2)+
-                                   (unpacked_indexing[j+2]<<4)+
-                                   (unpacked_indexing[j+3]<<6))&255;
+            packed_indexing[i] = ( unpacked_indexing[j] +
+                                  (unpacked_indexing[j+1]<<2)+
+                                  (unpacked_indexing[j+2]<<4)+
+                                  (unpacked_indexing[j+3]<<6))&255;
         }
     } else {
         for (i=0; i < max_i; i++) {
             j = i<<3;
             packed_indexing[i] = ( unpacked_indexing[j] +
-                                   (unpacked_indexing[j+1]<<1)+
-                                   (unpacked_indexing[j+2]<<2)+
-                                   (unpacked_indexing[j+3]<<3)+
-                                   (unpacked_indexing[j+4]<<4)+
-                                   (unpacked_indexing[j+5]<<5)+
-                                   (unpacked_indexing[j+6]<<6)+
-                                   (unpacked_indexing[j+7]<<7))&255;
+                                  (unpacked_indexing[j+1]<<1)+
+                                  (unpacked_indexing[j+2]<<2)+
+                                  (unpacked_indexing[j+3]<<3)+
+                                  (unpacked_indexing[j+4]<<4)+
+                                  (unpacked_indexing[j+5]<<5)+
+                                  (unpacked_indexing[j+6]<<6)+
+                                  (unpacked_indexing[j+7]<<7))&255;
         }
     }
 }
@@ -723,7 +723,7 @@ static void pack_indexing(
 static PyObject *py_pack_raw_4_channel_merge(PyObject *self, PyObject *args) {
     Py_buffer bufs[6];
     sint64 divs[4];
-    sint8 shifts[4];
+    sint8 shifts[4], i;
 
     // Get the pointers to each of the arrays, divisors, and shifts
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*LLLLbbbb:pack_raw_4_channel_merge",
@@ -745,9 +745,7 @@ static PyObject *py_pack_raw_4_channel_merge(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]); PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]); PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
@@ -755,7 +753,7 @@ static PyObject *py_pack_raw_4_channel_merge(PyObject *self, PyObject *args) {
 static PyObject *py_pack_raw_2_channel_merge(PyObject *self, PyObject *args) {
     Py_buffer bufs[4];
     sint64 divs[2];
-    sint8 shifts[2];
+    sint8 shifts[2], i;
 
     // Get the pointers to each of the arrays, divisors, and shifts
     if (!PyArg_ParseTuple(args, "w*w*w*w*LLbb:pack_raw_2_channel_merge",
@@ -774,15 +772,14 @@ static PyObject *py_pack_raw_2_channel_merge(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]); PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_raw_4_channel(PyObject *self, PyObject *args) {
     Py_buffer bufs[6];
-    sint8 shifts[4];
+    sint8 shifts[4], i;
 
     // Get the pointers to each of the arrays, masks, and shifts
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbbb:pack_raw_4_channel",
@@ -801,16 +798,14 @@ static PyObject *py_pack_raw_4_channel(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]); PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]); PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_raw_2_channel(PyObject *self, PyObject *args) {
     Py_buffer bufs[4];
-    sint8 shifts[2];
+    sint8 shifts[2], i;
 
     // Get the pointers to each of the arrays, masks, and shifts
     if (!PyArg_ParseTuple(args, "w*w*w*w*bb:pack_raw_2_channel",
@@ -826,15 +821,14 @@ static PyObject *py_pack_raw_2_channel(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]); PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]); PyBuffer_Release(&bufs[3]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_raw_1_channel(PyObject *self, PyObject *args) {
     Py_buffer bufs[3];
-    sint8 shift;
+    sint8 shift, i;
 
     // Get the pointers to each of the arrays, mask, and shift
     if (!PyArg_ParseTuple(args, "w*w*w*b:pack_raw_1_channel",
@@ -848,16 +842,14 @@ static PyObject *py_pack_raw_1_channel(PyObject *self, PyObject *args) {
     }
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_pack_indexing(PyObject *self, PyObject *args) {
     Py_buffer bufs[2];
-    sint8 indexing_size;
+    sint8 indexing_size, i;
 
     // Get the pointers to each of the arrays and indexing size
     if (!PyArg_ParseTuple(args, "w*w*b:pack_indexing",
@@ -867,8 +859,7 @@ static PyObject *py_pack_indexing(PyObject *self, PyObject *args) {
     pack_indexing(&bufs[0], &bufs[1], indexing_size);
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
