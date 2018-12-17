@@ -8,6 +8,7 @@ ab = None
 try:
     from arbytmap.ext import dds_defs_ext
     fast_dds_defs = True
+    #fast_dds_defs = False
 except Exception:
     fast_dds_defs = False
 
@@ -28,9 +29,9 @@ def initialize():
     ab.FORMAT_DXT5 = "DXT5"
 
     # uses only the alpha channel of dxt3
-    ab.FORMAT_DXT3A  = "DXT3A"           #NOT YET IMPLEMENTED
-    ab.FORMAT_DXT3Y  = "DXT3Y"           #NOT YET IMPLEMENTED
-    ab.FORMAT_DXT3AY = "DXT3AY"          #NOT YET IMPLEMENTED
+    ab.FORMAT_DXT3A  = "DXT3A"
+    ab.FORMAT_DXT3Y  = "DXT3Y"
+    ab.FORMAT_DXT3AY = "DXT3AY"
     # uses only the alpha channel of dxt3, and each bit is
     # used as an stencil mask for each of the ARGB channels.
     # this format is basically A1R1G1B1 with a dxt texel swizzle
@@ -65,38 +66,44 @@ def initialize():
         )
 
     ab.register_format(ab.FORMAT_DXT1, 1, **combine(
-        dxt_specs, bpp=4, depths=(5, 6, 5, 1),
-        offsets=(0, 5, 11, 0), masks=(31, 63, 31, 0),
+        dxt_specs, bpp=4, depths=(8, 8, 8, 8),
         unpacker=unpack_dxt1, packer=pack_dxt1))
 
     for fmt in (ab.FORMAT_DXT2, ab.FORMAT_DXT3):
         ab.register_format(fmt, 1, **combine(
-            dxt_specs, bpp=8, depths=(5, 6, 5, 4),
-            offsets=(0, 5, 11, 0), masks=(31, 63, 31, 0),
+            dxt_specs, bpp=8, depths=(8, 8, 8, 8),
             unpacker=unpack_dxt2_3, packer=pack_dxt2_3))
 
     for fmt in (ab.FORMAT_DXT4, ab.FORMAT_DXT5):
         ab.register_format(fmt, 1, **combine(
-            dxt_specs, bpp=8, depths=(5, 6, 5, 8),
-            offsets=(0, 5, 11, 0), masks=(31, 63, 31, 0),
+            dxt_specs, bpp=8, depths=(8, 8, 8, 8),
             unpacker=unpack_dxt4_5, packer=pack_dxt4_5))
+
+    for fmt in (ab.FORMAT_DXT3A, ab.FORMAT_DXT3Y):
+        ab.register_format(fmt, 1, **combine(
+            dxt_specs, bpp=4, depths=(8,)),
+            unpacker=unpack_dxt3a, packer=pack_dxt3a)
 
     for fmt in (ab.FORMAT_DXT5A, ab.FORMAT_DXT5Y):
         ab.register_format(fmt, 1, **combine(
             dxt_specs, bpp=4, depths=(8,)),
             unpacker=unpack_dxt5a, packer=pack_dxt5a)
 
+    ab.register_format(ab.FORMAT_DXT3AY, 1, **combine(
+        dxt_specs, bpp=8, depths=(8, 8),
+        unpacker=unpack_dxt3a, packer=pack_dxt3a))
+
     ab.register_format(ab.FORMAT_DXT5AY, 1, **combine(
-        dxt_specs, bpp=8, depths=(8, 8), offsets=(0, 0),
+        dxt_specs, bpp=8, depths=(8, 8),
         unpacker=unpack_dxt5a, packer=pack_dxt5a))
 
     ab.register_format(ab.FORMAT_DXN, 1, **combine(
-        dxt_specs, bpp=8, depths=(8, 8, 8), offsets=(0, 8, 16),
-        unpacker=unpack_dxn, packer=pack_dxn, masks=(0, 0xFF, 0xFF)))
+        dxt_specs, bpp=8, depths=(8, 8, 8),
+        unpacker=unpack_dxn, packer=pack_dxn))
 
     ab.register_format(ab.FORMAT_CTX1, 1, **combine(
-        dxt_specs, bpp=4, depths=(8, 8, 8), offsets=(0, 8, 16),
-        unpacker=unpack_ctx1, packer=pack_ctx1, masks=(0, 0xFF, 0xFF)))
+        dxt_specs, bpp=4, depths=(8, 8, 8),
+        unpacker=unpack_ctx1, packer=pack_ctx1))
 
     ab.register_format(ab.FORMAT_V8U8, 1, bpp=16, dds_format=True,
                        unpacker=unpack_v8u8, packer=pack_v8u8,
@@ -219,29 +226,27 @@ def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
-    has_a = chan0 >= 0
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
+
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
+
     if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_dxt1(
-            unpacked, packed, r_scale, g_scale, b_scale,
-            pixels_per_texel, chan0, chan1, chan2, chan3)
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
     else:
         channels_per_texel = ucc*pixels_per_texel
         pixel_indices = range(pixels_per_texel)
+        upscales = tuple(tuple(scale) for scale in upscales)
 
         #create the arrays to hold the color channel data
-        c_0 = [unpack_max,0,0,0]
-        c_1 = [unpack_max,0,0,0]
-        c_2 = [unpack_max,0,0,0]
-        c_3 = [unpack_max,0,0,0]
+        c_0 = [255,0,0,0]
+        c_1 = [255,0,0,0]
+        c_2 = [255,0,0,0]
+        c_3 = [255,0,0,0]
         transparent = [0,0,0,0]
 
         #stores the colors in a way we can easily access them
@@ -252,19 +257,19 @@ def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
             pxl_i = i*channels_per_texel
             j = i*2
 
-            """if the format DXT1 then the two entries in the array
-            are the colors and the color indexing in that order."""
+            #if the format DXT1 then the two entries in the array
+            #are the colors and the color indexing in that order.
             color0 = packed[j] & 65535
             color1 = (packed[j] >> 16) & 65535
             color_idx = packed[j+1]
 
-            """unpack the colors"""
-            c_0[1] = r_scale[(color0>>11) & 31]
-            c_1[1] = r_scale[(color1>>11) & 31]
-            c_0[2] = g_scale[(color0>>5) & 63]
-            c_1[2] = g_scale[(color1>>5) & 63]
-            c_1[3] = b_scale[color1 & 31]
-            c_0[3] = b_scale[color0 & 31]
+            #unpack the colors
+            c_0[1] = (((color0>>11) & 31)*255)//31
+            c_1[1] = (((color1>>11) & 31)*255)//31
+            c_0[2] = (((color0>>5) & 63)*255)//63
+            c_1[2] = (((color1>>5) & 63)*255)//63
+            c_1[3] = ((color1 & 31)*255)//31
+            c_0[3] = ((color0 & 31)*255)//31
 
             #if the first color is a larger integer
             #then color key transparency is NOT used
@@ -286,15 +291,16 @@ def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
             for j in pixel_indices:
                 color = colors[(color_idx >> (j*2))&3]
                 off = j*ucc + pxl_i
-                if has_a: unpacked[off] = color[chan0]
-                else:     unpacked[off] = unpack_max
-                if has_r: unpacked[off + 1] = color[chan1]
-                if has_g: unpacked[off + 2] = color[chan2]
-                if has_b: unpacked[off + 3] = color[chan3]
+                dst_chan = 0
+                for src_chan in chan_map:
+                    if src_chan < 0 and dst_chan == 0:
+                        # alpha and not reading alpha. set to full white
+                        unpacked[off] = unpack_max
+                    elif src_chan >= 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][color[src_chan]]
+                    dst_chan += 1
 
-    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
-
-    return unpacked
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
 
 def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
@@ -310,60 +316,54 @@ def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    channels_per_texel = ucc*pixels_per_texel
-
-    pixel_indices = range(pixels_per_texel)
 
     #create a new array to hold the pixels after we unpack them
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    #create the arrays to hold the color channel data
-    c_0 = [unpack_max,0,0,0]
-    c_1 = [unpack_max,0,0,0]
-    c_2 = [unpack_max,0,0,0]
-    c_3 = [unpack_max,0,0,0]
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
 
-    #stores the colors in a way we can easily access them
-    colors = [c_0, c_1, c_2, c_3]
-
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
-    has_a = chan0 >= 0
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
 
     if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_dxt2_3(
             unpacked, packed, a_scale, r_scale, g_scale, b_scale,
-            pixels_per_texel, chan0, chan1, chan2, chan3)
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
     else:
-        # convert to tuples for faster access
-        a_scale, r_scale, g_scale, b_scale = tuple(a_scale), tuple(r_scale),\
-                                             tuple(g_scale), tuple(b_scale)
+        channels_per_texel = ucc*pixels_per_texel
+        pixel_indices = range(pixels_per_texel)
+        upscales = tuple(tuple(scale) for scale in upscales)
+
+        #create the arrays to hold the color channel data
+        c_0 = [255,0,0,0]
+        c_1 = [255,0,0,0]
+        c_2 = [255,0,0,0]
+        c_3 = [255,0,0,0]
+
+        #stores the colors in a way we can easily access them
+        colors = [c_0, c_1, c_2, c_3]
+
         #loop through each texel
         for i in range(len(packed)//4):
             pxl_i = i*channels_per_texel
             j = i*4
 
             #DXT2/3 is much simpler than DXT4/5
-            alpha = (packed[j+1]<<32) + packed[j]
+            alpha = (packed[j+1]<<32) | packed[j]
             color0 = packed[j+2] & 65535
             color1 = (packed[j+2] >> 16) & 65535
             color_idx = packed[j+3]
 
-            """unpack the colors"""
-            c_0[1] = r_scale[(color0>>11) & 31]
-            c_1[1] = r_scale[(color1>>11) & 31]
-            c_0[2] = g_scale[(color0>>5) & 63]
-            c_1[2] = g_scale[(color1>>5) & 63]
-            c_1[3] = b_scale[color1 & 31]
-            c_0[3] = b_scale[color0 & 31]
+            #unpack the colors
+            c_0[1] = (((color0>>11) & 31)*255)//31
+            c_1[1] = (((color1>>11) & 31)*255)//31
+            c_0[2] = (((color0>>5) & 63)*255)//63
+            c_1[2] = (((color1>>5) & 63)*255)//63
+            c_1[3] = ((color1 & 31)*255)//31
+            c_0[3] = ((color0 & 31)*255)//31
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -379,27 +379,20 @@ def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
             for j in pixel_indices:
                 color = colors[(color_idx >> (j*2))&3]
                 off = j*ucc + pxl_i
-                a = (alpha >> (j*4))&15
+                a = (((alpha >> (j*4)) & 15)*255)//15
 
-                if chan0 == 0: unpacked[off] = a_scale[a]
-                elif has_a:    unpacked[off] = color[chan0]
-                else:          unpacked[off] = unpack_max
+                dst_chan = 0
+                for src_chan in chan_map:
+                    if src_chan < 0 and dst_chan == 0:
+                        # alpha and not reading alpha. set to full white
+                        unpacked[off] = unpack_max
+                    elif src_chan > 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][color[src_chan]]
+                    elif src_chan == 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][a]
+                    dst_chan += 1
 
-                if chan1 == 0: unpacked[off + 1] = a_scale[a]
-                elif has_r:    unpacked[off + 1] = color[chan1]
-                else:          unpacked[off + 1] = unpack_max
-
-                if chan2 == 0: unpacked[off + 2] = a_scale[a]
-                elif has_g:    unpacked[off + 2] = color[chan2]
-                else:          unpacked[off + 2] = unpack_max
-
-                if chan3 == 0: unpacked[off + 3] = a_scale[a]
-                elif has_b:    unpacked[off + 3] = color[chan3]
-                else:          unpacked[off + 3] = unpack_max
-
-    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
-
-    return unpacked
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
 
 def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
@@ -415,44 +408,38 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    channels_per_texel = ucc*pixels_per_texel
-
-    pixel_indices = range(pixels_per_texel)
 
     #create a new array to hold the pixels after we unpack them
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    #create the arrays to hold the color channel data
-    c_0 = [unpack_max,0,0,0]
-    c_1 = [unpack_max,0,0,0]
-    c_2 = [unpack_max,0,0,0]
-    c_3 = [unpack_max,0,0,0]
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
 
-    #stores the colors in a way we can easily access them
-    colors = [c_0, c_1, c_2, c_3]
-
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
-    has_a = chan0 >= 0
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
-
-    a_lookup = [0,0,0,0,0,0,0,0]
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
 
     if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_dxt4_5(
             unpacked, packed, a_scale, r_scale, g_scale, b_scale,
-            pixels_per_texel, chan0, chan1, chan2, chan3)
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
     else:
-        # convert to tuples for faster access
-        a_scale, r_scale, g_scale, b_scale = tuple(a_scale), tuple(r_scale),\
-                                             tuple(g_scale), tuple(b_scale)
+        a_lookup = [0,0,0,0,0,0,0,0]
+
+        channels_per_texel = ucc*pixels_per_texel
+        pixel_indices = range(pixels_per_texel)
+        upscales = tuple(tuple(scale) for scale in upscales)
+
+        #create the arrays to hold the color channel data
+        c_0 = [255,0,0,0]
+        c_1 = [255,0,0,0]
+        c_2 = [255,0,0,0]
+        c_3 = [255,0,0,0]
+
+        #stores the colors in a way we can easily access them
+        colors = [c_0, c_1, c_2, c_3]
+
         #loop through each texel
         for i in range(len(packed)//4):
             pxl_i = i*channels_per_texel
@@ -460,10 +447,10 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
 
             a_lookup[0] = alpha0 = packed[j] & 255
             a_lookup[1] = alpha1 = (packed[j] >> 8) & 255
-            alpha_idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
+            alpha_idx = ((packed[j]>>16) & 65535) | (packed[j+1] << 16)
 
-            """depending on which alpha is larger
-            the indexing is calculated differently"""
+            #depending on which alpha is larger
+            #the indexing is calculated differently
             if alpha0 > alpha1:
                 a_lookup[2] = (alpha0*6 + alpha1)//7
                 a_lookup[3] = (alpha0*5 + alpha1*2)//7
@@ -485,13 +472,13 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
             color1 = (packed[j+2]>>16) & 65535
             color_idx = packed[j+3]
 
-            """unpack the colors"""
-            c_0[1] = r_scale[(color0>>11) & 31]
-            c_1[1] = r_scale[(color1>>11) & 31]
-            c_0[2] = g_scale[(color0>>5) & 63]
-            c_1[2] = g_scale[(color1>>5) & 63]
-            c_1[3] = b_scale[color1 & 31]
-            c_0[3] = b_scale[color0 & 31]
+            #unpack the colors
+            c_0[1] = (((color0>>11) & 31)*255)//31
+            c_1[1] = (((color1>>11) & 31)*255)//31
+            c_0[2] = (((color0>>5) & 63)*255)//63
+            c_1[2] = (((color1>>5) & 63)*255)//63
+            c_1[3] = ((color1 & 31)*255)//31
+            c_0[3] = ((color0 & 31)*255)//31
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -509,25 +496,76 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
                 off = j*ucc + pxl_i
                 a = a_lookup[(alpha_idx >> (j*3))&7]
 
-                if chan0 == 0: unpacked[off] = a_scale[a]
-                elif has_a:    unpacked[off] = color[chan0]
-                else:          unpacked[off] = unpack_max
+                dst_chan = 0
+                for src_chan in chan_map:
+                    if src_chan < 0 and dst_chan == 0:
+                        # alpha and not reading alpha. set to full white
+                        unpacked[off] = unpack_max
+                    elif src_chan > 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][color[src_chan]]
+                    elif src_chan == 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][a]
+                    dst_chan += 1
 
-                if chan1 == 0: unpacked[off + 1] = a_scale[a]
-                elif has_r:    unpacked[off + 1] = color[chan1]
-                else:          unpacked[off + 1] = unpack_max
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
-                if chan2 == 0: unpacked[off + 2] = a_scale[a]
-                elif has_g:    unpacked[off + 2] = color[chan2]
-                else:          unpacked[off + 2] = unpack_max
 
-                if chan3 == 0: unpacked[off + 3] = a_scale[a]
-                elif has_b:    unpacked[off + 3] = color[chan3]
-                else:          unpacked[off + 3] = unpack_max
+def unpack_dxt3a(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
+    assert packed.typecode == 'I'
 
-    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
+    unpack_code = arby._UNPACK_ARRAY_CODE
+    unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
 
-    return unpacked
+    ucc = arby.unpacked_channel_count
+    scc = arby.source_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+
+    pixels_per_texel = (width//texel_width)*(height//texel_height)
+
+    #create a new array to hold the pixels after we unpack them
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
+
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
+
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
+
+    if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
+        dds_defs_ext.unpack_dxt3a(
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, scc, array("b", chan_map[: 4]))
+    else:
+        channels_per_texel = ucc*pixels_per_texel
+        pixel_indices = range(pixels_per_texel)
+        upscales = tuple(tuple(scale) for scale in upscales)
+        #loop through each texel
+        for dst_chan in range(ucc):
+            scale = upscales[dst_chan]
+            src_chan = chan_map[dst_chan]
+
+            if src_chan < 0:
+                # not reading anything for this destination channel.
+                # either leave it full black, or set it to full white.
+                if dst_chan == 0:
+                    # set alpha to full white
+                    for off in range(0, len(unpacked), ucc):
+                        unpacked[off] = unpack_max
+                continue
+
+            pxl_i = dst_chan
+            for i in range(2 * src_chan, len(packed), 2 * scc):
+                alpha = (packed[i+1]<<32) | packed[i]
+                for j in pixel_indices:
+                    unpacked[pxl_i] = scale[(((alpha>>(j*4)) & 15)*255)//15]
+                    pxl_i += ucc
+
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
 
 def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
@@ -536,6 +574,7 @@ def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
 
     unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = arby.unpacked_channel_count
     scc = arby.source_channel_count
@@ -543,69 +582,70 @@ def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
     texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
 
     pixels_per_texel = (width//texel_width)*(height//texel_height)
-    channels_per_texel = ucc*pixels_per_texel
 
     #create a new array to hold the pixels after we unpack them
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    scales = list(arby.channel_upscalers)
-    chans  = list(arby.channel_mapping)
-    print(chans, len(scales))
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
 
-    if False and fast_dds_defs:
-        scales.extend([array(scales[0].typecode)] * ((4 - (len(scales)%4))%4))
-        chans.extend([-1] * ((4 - (len(scales)%4))%4))
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
+
+    if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_dxt5a(
-            unpacked, packed, scales[0], scales[1], scales[2], scales[3],
-            ucc, scc, pixels_per_texel, chans[0], chans[1], chans[2], chans[3])
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, scc, array("b", chan_map[: 4]))
     else:
-        for i in range(len(scales)):
-            scales[i] = tuple(scales[i])
-
         lookup = [0,0,0,0,0,0,0,0]
+
+        channels_per_texel = ucc*pixels_per_texel
         pixel_indices = range(pixels_per_texel)
-
+        upscales = tuple(tuple(scale) for scale in upscales)
         #loop through each texel
-        for i in range(len(packed)//2):
-            #chan = chans[i%ucc]
-            chan = i % ucc
-            # TODO: Modify this with an inner loop so
-            # it can unpack the texel's channels in the
-            # order specified by the channel mapping.
-            pxl_i = (i//scc)*channels_per_texel + chan
-            scale = scales[chan]
-            j = i*2
+        for dst_chan in range(ucc):
+            scale = upscales[dst_chan]
+            src_chan = chan_map[dst_chan]
 
-            lookup[0] = val0 = packed[j] & 255
-            lookup[1] = val1 = (packed[j] >> 8) & 255
-            idx = ((packed[j]>>16) & 65535) + (packed[j+1] << 16)
+            if src_chan < 0:
+                # not reading anything for this destination channel.
+                # either leave it full black, or set it to full white.
+                if dst_chan == 0:
+                    # set alpha to full white
+                    for off in range(0, len(unpacked), ucc):
+                        unpacked[off] = unpack_max
+                continue
 
-            """depending on which value is larger
-            the indexing is calculated differently"""
-            if val0 > val1:
-                lookup[2] = scale[(val0*6 + val1)//7]
-                lookup[3] = scale[(val0*5 + val1*2)//7]
-                lookup[4] = scale[(val0*4 + val1*3)//7]
-                lookup[5] = scale[(val0*3 + val1*4)//7]
-                lookup[6] = scale[(val0*2 + val1*5)//7]
-                lookup[7] = scale[(val0   + val1*6)//7]
-            else:
-                lookup[2] = scale[(val0*4 + val1)//5]
-                lookup[3] = scale[(val0*3 + val1*2)//5]
-                lookup[4] = scale[(val0*2 + val1*3)//5]
-                lookup[5] = scale[(val0   + val1*4)//5]
-                lookup[6] = scale[0]
-                lookup[7] = scale[-1]
+            pxl_i = dst_chan
+            for i in range(2 * src_chan, len(packed), 2 * scc):
+                lookup[0] = val0 = packed[i] & 255
+                lookup[1] = val1 = (packed[i] >> 8) & 255
+                idx = ((packed[i]>>16) & 65535) | (packed[i+1] << 16)
 
-            for j in pixel_indices:
-                unpacked[pxl_i + j*ucc] = lookup[(idx >> (j*3))&7]
+                # depending on which value is larger
+                # the indexing is calculated differently
+                if val0 > val1:
+                    lookup[2] = (val0*6 + val1)//7
+                    lookup[3] = (val0*5 + val1*2)//7
+                    lookup[4] = (val0*4 + val1*3)//7
+                    lookup[5] = (val0*3 + val1*4)//7
+                    lookup[6] = (val0*2 + val1*5)//7
+                    lookup[7] = (val0   + val1*6)//7
+                else:
+                    lookup[2] = (val0*4 + val1)//5
+                    lookup[3] = (val0*3 + val1*2)//5
+                    lookup[4] = (val0*2 + val1*3)//5
+                    lookup[5] = (val0   + val1*4)//5
+                    lookup[6] = 0
+                    lookup[7] = 255
 
-    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
-    print(chans)
-    print(unpacked[:32])
+                for j in pixel_indices:
+                    unpacked[pxl_i] = scale[lookup[(idx >> (j*3))&7]]
+                    pxl_i += ucc
 
-    return unpacked
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
 
 def unpack_dxn(arby, bitmap_index, width, height, depth=1):
@@ -614,6 +654,8 @@ def unpack_dxn(arby, bitmap_index, width, height, depth=1):
 
     unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
+
     zero_point = sign_mask = 1 << ((unpack_size*8) - 1)
     mask = sign_mask - 1
     mask_sq = mask**2
@@ -629,28 +671,20 @@ def unpack_dxn(arby, bitmap_index, width, height, depth=1):
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
 
-    r_min = r_scale[0]
-    g_min = g_scale[0]
-    r_max = r_scale[-1]
-    g_max = g_scale[-1]
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
 
     if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_dxn(
-            unpacked, packed, r_scale, g_scale,
-            ucc, pixels_per_texel, chan1, chan2, chan3)
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
     else:
         # convert to tuples for faster access
-        r_scale, g_scale = tuple(r_scale), tuple(g_scale)
+        upscales = tuple(tuple(scale) for scale in upscales)
         pixel_indices = range(pixels_per_texel)
         r_lookup = [0,0,0,0,0,0,0,0]
         g_lookup = [0,0,0,0,0,0,0,0]
@@ -660,49 +694,45 @@ def unpack_dxn(arby, bitmap_index, width, height, depth=1):
             pxl_i = i*channels_per_texel
             j = i*4
 
-            g0 = packed[j]&255
-            g1 = (packed[j]>>8)&255
+            g_lookup[0] = g0 = packed[j]&255
+            g_lookup[1] = g1 = (packed[j]>>8)&255
             g_idx = ((packed[j]>>16)&65535) + (packed[j+1]<<16)
 
-            r0 = packed[j+2]&255
-            r1 = (packed[j+2]>>8)&255
+            r_lookup[0] = r0 = packed[j+2]&255
+            r_lookup[1] = r1 = (packed[j+2]>>8)&255
             r_idx = ((packed[j+2]>>16)&65535) + (packed[j+3]<<16)
 
             #depending on which alpha value is larger
             #the indexing is calculated differently
-            g_lookup[0] = g_scale[g0]
-            g_lookup[1] = g_scale[g1]
             if g0 > g1:
-                g_lookup[2] = g_scale[(g0*6 + g1  )//7]
-                g_lookup[3] = g_scale[(g0*5 + g1*2)//7]
-                g_lookup[4] = g_scale[(g0*4 + g1*3)//7]
-                g_lookup[5] = g_scale[(g0*3 + g1*4)//7]
-                g_lookup[6] = g_scale[(g0*2 + g1*5)//7]
-                g_lookup[7] = g_scale[(g0   + g1*6)//7]
+                g_lookup[2] = (g0*6 + g1  )//7
+                g_lookup[3] = (g0*5 + g1*2)//7
+                g_lookup[4] = (g0*4 + g1*3)//7
+                g_lookup[5] = (g0*3 + g1*4)//7
+                g_lookup[6] = (g0*2 + g1*5)//7
+                g_lookup[7] = (g0   + g1*6)//7
             else:
-                g_lookup[2] = g_scale[(g0*4 + g1  )//5]
-                g_lookup[3] = g_scale[(g0*3 + g1*2)//5]
-                g_lookup[4] = g_scale[(g0*2 + g1*3)//5]
-                g_lookup[5] = g_scale[(g0   + g1*4)//5]
-                g_lookup[6] = g_min
-                g_lookup[7] = g_max
+                g_lookup[2] = (g0*4 + g1  )//5
+                g_lookup[3] = (g0*3 + g1*2)//5
+                g_lookup[4] = (g0*2 + g1*3)//5
+                g_lookup[5] = (g0   + g1*4)//5
+                g_lookup[6] = 0
+                g_lookup[7] = 255
 
-            r_lookup[0] = r_scale[r0]
-            r_lookup[1] = r_scale[r1]
             if r0 > r1:
-                r_lookup[2] = r_scale[(r0*6 + r1  )//7]
-                r_lookup[3] = r_scale[(r0*5 + r1*2)//7]
-                r_lookup[4] = r_scale[(r0*4 + r1*3)//7]
-                r_lookup[5] = r_scale[(r0*3 + r1*4)//7]
-                r_lookup[6] = r_scale[(r0*2 + r1*5)//7]
-                r_lookup[7] = r_scale[(r0   + r1*6)//7]
+                r_lookup[2] = (r0*6 + r1  )//7
+                r_lookup[3] = (r0*5 + r1*2)//7
+                r_lookup[4] = (r0*4 + r1*3)//7
+                r_lookup[5] = (r0*3 + r1*4)//7
+                r_lookup[6] = (r0*2 + r1*5)//7
+                r_lookup[7] = (r0   + r1*6)//7
             else:
-                r_lookup[2] = r_scale[(r0*4 + r1  )//5]
-                r_lookup[3] = r_scale[(r0*3 + r1*2)//5]
-                r_lookup[4] = r_scale[(r0*2 + r1*3)//5]
-                r_lookup[5] = r_scale[(r0   + r1*4)//5]
-                r_lookup[6] = r_min
-                r_lookup[7] = r_max
+                r_lookup[2] = (r0*4 + r1  )//5
+                r_lookup[3] = (r0*3 + r1*2)//5
+                r_lookup[4] = (r0*2 + r1*3)//5
+                r_lookup[5] = (r0   + r1*4)//5
+                r_lookup[6] = 0
+                r_lookup[7] = 255
 
             for k in pixel_indices:
                 g = y = g_lookup[(g_idx>>(k*3))&7]
@@ -727,14 +757,17 @@ def unpack_dxn(arby, bitmap_index, width, height, depth=1):
                     r = x + zero_point if r&sign_mask else zero_point - x
                     g = y + zero_point if g&sign_mask else zero_point - y
 
-                colors = [0, r, g, b]
-                if has_r: unpacked[off + 1] = colors[chan1]
-                if has_g: unpacked[off + 2] = colors[chan2]
-                if has_b: unpacked[off + 3] = colors[chan3]
+                colors = [255, r, g, b]
+                dst_chan = 0
+                for src_chan in chan_map:
+                    if src_chan <= 0 or dst_chan == 0:
+                        # set alpha to full white
+                        unpacked[off + dst_chan] = unpack_max
+                    elif src_chan >= 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][colors[src_chan]]
+                    dst_chan += 1
 
-    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
-
-    return unpacked
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
 
 def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
@@ -743,8 +776,9 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
 
     unpack_code = arby._UNPACK_ARRAY_CODE
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
+
     zero_point = sign_mask = 1 << ((unpack_size*8) - 1)
-    unpack_max = (sign_mask<<1) - 1
     mask = sign_mask - 1
     mask_sq = mask**2
 
@@ -762,31 +796,28 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
     #create the arrays to hold the color channel data
-    c_0 = [unpack_max,0,0,0]
-    c_1 = [unpack_max,0,0,0]
-    c_2 = [unpack_max,0,0,0]
-    c_3 = [unpack_max,0,0,0]
+    c_0 = [255,0,0,0]
+    c_1 = [255,0,0,0]
+    c_2 = [255,0,0,0]
+    c_3 = [255,0,0,0]
 
     #stores the colors in a way we can easily access them
     colors = [c_0, c_1, c_2, c_3]
 
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
+
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
 
     if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_ctx1(
-            unpacked, packed, r_scale, g_scale,
-            ucc, pixels_per_texel, chan1, chan2, chan3)
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
     else:
         # convert to tuples for faster access
-        r_scale, g_scale = tuple(r_scale), tuple(g_scale)
+        upscales = tuple(tuple(scale) for scale in upscales)
 
         #loop through each texel
         for i in range(len(packed)//2):
@@ -796,13 +827,13 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
             values = packed[j]
             idx = packed[j+1]
 
-            """unpack the colors"""
-            c_0[1] = x0 = r0 = r_scale[(values) & 255]
-            c_0[2] = y0 = g0 = g_scale[(values>>8) & 255]
-            c_1[1] = x1 = r1 = r_scale[(values>>16) & 255]
-            c_1[2] = y1 = g1 = g_scale[(values>>24) & 255]
+            # unpack the colors
+            c_0[1] = x0 = r0 = (values) & 255
+            c_0[2] = y0 = g0 = (values>>8) & 255
+            c_1[1] = x1 = r1 = (values>>16) & 255
+            c_1[2] = y1 = g1 = (values>>24) & 255
 
-            """calculate the z-components"""
+            #calculate the z-components
             # we're normalizing the coordinates here, not just unpacking them
             x0 = x0&mask if x0&sign_mask else zero_point - x0
             y0 = y0&mask if y0&sign_mask else zero_point - y0
@@ -850,13 +881,16 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
             for k in pixel_indices:
                 color = colors[(idx >> (k*2))&3]
                 off = k*ucc + pxl_i
-                if has_r: unpacked[off + 1] = color[chan1]
-                if has_g: unpacked[off + 2] = color[chan2]
-                if has_b: unpacked[off + 3] = color[chan3]
+                dst_chan = 0
+                for src_chan in chan_map:
+                    if src_chan <= 0 or dst_chan == 0:
+                        # set alpha to full white
+                        unpacked[off + dst_chan] = unpack_max
+                    elif src_chan >= 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][color[src_chan]]
+                    dst_chan += 1
 
-    unpacked = unswizzle_dxt(unpacked, width, height * depth, ucc)
-
-    return unpacked
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
 
 def unpack_v8u8(arby, bitmap_index, width, height, depth=1):
@@ -872,26 +906,27 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
 
     #create a new array to hold the pixels after we unpack them
     unpack_code = arby._UNPACK_ARRAY_CODE
+    unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
+
     ucc = arby.unpacked_channel_count
-    bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
+    pixels_per_texel = (width//texel_width)*(height//texel_height)
+
+    bytes_per_pixel = unpack_size*ucc
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
 
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
 
     if fast_dds_defs:
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_vu(
-            unpacked, packed, r_scale, g_scale, b_scale,
-            ucc, chan1, chan2, chan3)
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
         return unpacked
 
     sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
@@ -900,9 +935,7 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
     dist_max_sq = dist_max**2    # == 16129 for 8bpc
 
     # convert to tuples for faster access
-    r_scale, g_scale, b_scale = tuple(r_scale),\
-                                tuple(g_scale), tuple(b_scale)
-    scales = (None, r_scale, g_scale, b_scale)
+    upscales = tuple(tuple(scale) for scale in upscales)
     for i in range(0, len(packed)):
         # RGB normal maps use unsigned chars, which maps to:
         #     [0, 255] -> [-1, 1]
@@ -912,7 +945,7 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
         # all components to have a zero point and to make both sides
         # of the zero point have an equal numbers of points.
 
-        j = ucc*i
+        off = ucc*i
         u = packed[i]&chan_mask
         v = (packed[i]>>bpc)&chan_mask
         if u&sign_mask: u -= chan_mask
@@ -928,13 +961,15 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
             v = int(v/n_len)
             w = 0
 
-        colors = [0,
-                  r_scale[u + sign_mask],
-                  g_scale[v + sign_mask],
-                  b_scale[w + sign_mask]]
-        if has_r: unpacked[j + 1] = colors[chan1]
-        if has_g: unpacked[j + 2] = colors[chan2]
-        if has_b: unpacked[j + 3] = colors[chan3]
+        colors = [255, u + sign_mask, v + sign_mask, w + sign_mask]
+        dst_chan = 0
+        for src_chan in chan_map:
+            if src_chan < 0 and dst_chan == 0:
+                # alpha and not reading alpha. set to full white
+                unpacked[off] = unpack_max
+            elif src_chan >= 0:
+                unpacked[off + dst_chan] = upscales[dst_chan][colors[src_chan]]
+            dst_chan += 1
 
     return unpacked
 
@@ -952,27 +987,26 @@ def unpack_rg(arby, bitmap_index, width, height, depth=1, bpc=8):
 
     #create a new array to hold the pixels after we unpack them
     unpack_code = arby._UNPACK_ARRAY_CODE
+    unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
+
     ucc = arby.unpacked_channel_count
-    bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
+    bytes_per_pixel = unpack_size*ucc
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
 
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
 
     if False and fast_dds_defs:
         # NOT IMPLEMENTED YET
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_gr(
-            unpacked, packed, r_scale, g_scale, b_scale,
-            ucc, chan1, chan2, chan3)
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
         return unpacked
 
     sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
@@ -981,11 +1015,9 @@ def unpack_rg(arby, bitmap_index, width, height, depth=1, bpc=8):
     dist_max_sq = dist_max**2    # == 16129 for 8bpc
 
     # convert to tuples for faster access
-    r_scale, g_scale, b_scale = tuple(r_scale),\
-                                tuple(g_scale), tuple(b_scale)
-    scales = (None, r_scale, g_scale, b_scale)
+    upscales = tuple(tuple(scale) for scale in upscales)
     for i in range(0, len(packed)):
-        j = ucc*i
+        off = ucc*i
         u = ((packed[i]>>bpc)&chan_mask) - dist_max
         v = (packed[i]&chan_mask) - dist_max
         if u < 0: u += 1
@@ -1001,13 +1033,15 @@ def unpack_rg(arby, bitmap_index, width, height, depth=1, bpc=8):
             v = int(v/n_len)
             w = 0
 
-        colors = [0,
-                  r_scale[u + sign_mask],
-                  g_scale[v + sign_mask],
-                  b_scale[w + sign_mask]]
-        if has_r: unpacked[j + 1] = colors[chan1]
-        if has_g: unpacked[j + 2] = colors[chan2]
-        if has_b: unpacked[j + 3] = colors[chan3]
+        colors = [255, u + sign_mask, v + sign_mask, w + sign_mask]
+        dst_chan = 0
+        for src_chan in chan_map:
+            if src_chan < 0 and dst_chan == 0:
+                # alpha and not reading alpha. set to full white
+                unpacked[off] = unpack_max
+            elif src_chan >= 0:
+                unpacked[off + dst_chan] = upscales[dst_chan][colors[src_chan]]
+            dst_chan += 1
 
     return unpacked
 
@@ -1025,26 +1059,26 @@ def unpack_gb(arby, bitmap_index, width, height, depth=1, bpc=8):
 
     #create a new array to hold the pixels after we unpack them
     unpack_code = arby._UNPACK_ARRAY_CODE
+    unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
+
     ucc = arby.unpacked_channel_count
-    bytes_per_pixel = ab.PIXEL_ENCODING_SIZES[unpack_code]*ucc
+    bytes_per_pixel = unpack_size*ucc
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)
 
-    chan_map = tuple(arby.channel_mapping)
-    upscales = tuple(arby.channel_upscalers)
-    chan_map += (-1, ) * (4 - len(chan_map))
-    upscales += (array("b"), ) * (4 - len(upscales))
-    chan0,   chan1,   chan2,   chan3   = chan_map[: 4]
-    a_scale, r_scale, g_scale, b_scale = upscales[: 4]
-    has_r = chan1 >= 0
-    has_g = chan2 >= 0
-    has_b = chan3 >= 0
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
+
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
 
     if False and fast_dds_defs:
         # NOT IMPLEMENTED YET
+        a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_gb(
-            unpacked, packed, r_scale, g_scale, b_scale,
-            ucc, chan1, chan2, chan3)
+            unpacked, packed, a_scale, r_scale, g_scale, b_scale,
+            pixels_per_texel, ucc, array("b", chan_map[: 4]))
         return unpacked
 
     sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
@@ -1053,11 +1087,9 @@ def unpack_gb(arby, bitmap_index, width, height, depth=1, bpc=8):
     dist_max_sq = dist_max**2    # == 16129 for 8bpc
 
     # convert to tuples for faster access
-    r_scale, g_scale, b_scale = tuple(r_scale),\
-                                tuple(g_scale), tuple(b_scale)
-    scales = (None, r_scale, g_scale, b_scale)
+    upscales = tuple(tuple(scale) for scale in upscales)
     for i in range(0, len(packed)):
-        j = ucc*i
+        off = ucc*i
         v = ((packed[i]>>bpc)&chan_mask) - dist_max
         w = (packed[i]&chan_mask) - dist_max
         if v < 0: v += 1
@@ -1073,13 +1105,15 @@ def unpack_gb(arby, bitmap_index, width, height, depth=1, bpc=8):
             w = int(w/n_len)
             u = 0
 
-        colors = [0,
-                  r_scale[u + sign_mask],
-                  g_scale[v + sign_mask],
-                  b_scale[w + sign_mask]]
-        if has_r: unpacked[j + 1] = colors[chan1]
-        if has_g: unpacked[j + 2] = colors[chan2]
-        if has_b: unpacked[j + 3] = colors[chan3]
+        colors = [255, u + sign_mask, v + sign_mask, w + sign_mask]
+        dst_chan = 0
+        for src_chan in chan_map:
+            if src_chan < 0 and dst_chan == 0:
+                # alpha and not reading alpha. set to full white
+                unpacked[off] = unpack_max
+            elif src_chan >= 0:
+                unpacked[off + dst_chan] = upscales[dst_chan][colors[src_chan]]
+            dst_chan += 1
 
     return unpacked
 
@@ -1153,8 +1187,12 @@ def pack_dxt1(arby, unpacked, width, height, depth=1):
         c_1 = upa[pxl_i+c_1i: 4+pxl_i+c_1i]
 
         # quantize the colors down to 16 bit color and repack
-        color0 = (r_scale[c_0[1]]<<11)+(g_scale[c_0[2]]<<5)+b_scale[c_0[3]]
-        color1 = (r_scale[c_1[1]]<<11)+(g_scale[c_1[2]]<<5)+b_scale[c_1[3]]
+        color0 = ((((r_scale[c_0[1]]*31+15)//255)<<11) |
+                  (((g_scale[c_0[2]]*63+31)//255)<<5) |
+                  (b_scale[c_0[3]]*31+15)//255)
+        color1 = ((((r_scale[c_1[1]]*31+15)//255)<<11) |
+                  (((g_scale[c_1[2]]*63+31)//255)<<5) |
+                  (b_scale[c_1[3]]*31+15)//255)
 
         # figure out if we are using color key transparency for this pixel
         #by seeing if any of the alpha values are below the cutoff bias
@@ -1175,16 +1213,16 @@ def pack_dxt1(arby, unpacked, width, height, depth=1):
         # the first color as an integer must be smaller or equal to the second)
         if make_alpha == (color0 > color1):
             c_0, c_1 = c_1, c_0
-            rpa[txl_i] = (color0<<16) + color1
+            rpa[txl_i] = (color0<<16) | color1
         else:
-            rpa[txl_i] = (color1<<16) + color0
+            rpa[txl_i] = (color1<<16) | color0
 
         # calculate the intermediate colors
-        """If the target format is DXT2/3/4/5 then no CK transparency is used.
-        CK mode will only be selected if both colors are the same.
-        If both colors are the same then it is fine to run non-CK
-        calculation on it since it will default to index zero.
-        That is why the DXT3/5 calculation is in this part only"""
+        #If the target format is DXT2/3/4/5 then no CK transparency is used.
+        #CK mode will only be selected if both colors are the same.
+        #If both colors are the same then it is fine to run non-CK
+        #calculation on it since it will default to index zero.
+        #That is why the DXT3/5 calculation is in this part only
         if rpa[txl_i]&65535 > rpa[txl_i]>>16:
             c_2[1] = (c_0[1]*2 + c_1[1])//3
             c_2[2] = (c_0[2]*2 + c_1[2])//3
@@ -1285,7 +1323,7 @@ def pack_dxt2_3(arby, unpacked, width, height, depth=1):
         rpa[txl_i]   = alpha&0xFFffFFff
         rpa[txl_i+1] = alpha>>32
 
-        '''CALCULATE THE COLORS'''
+        # CALCULATE THE COLORS
         # compare distance between all pixels and find the two furthest apart
         # (we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
@@ -1304,8 +1342,12 @@ def pack_dxt2_3(arby, unpacked, width, height, depth=1):
         c_1 = upa[pxl_i+c_1i: 4+pxl_i+c_1i]
 
         # quantize the colors down to 16 bit color and repack
-        color0 = (r_scale[c_0[1]]<<11)+(g_scale[c_0[2]]<<5)+b_scale[c_0[3]]
-        color1 = (r_scale[c_1[1]]<<11)+(g_scale[c_1[2]]<<5)+b_scale[c_1[3]]
+        color0 = ((((r_scale[c_0[1]]*31+15)//255)<<11) |
+                  (((g_scale[c_0[2]]*63+31)//255)<<5) |
+                  (b_scale[c_0[3]]*31+15)//255)
+        color1 = ((((r_scale[c_1[1]]*31+15)//255)<<11) |
+                  (((g_scale[c_1[2]]*63+31)//255)<<5) |
+                  (b_scale[c_1[3]]*31+15)//255)
 
         if color0 == color1:
             # do nothing except save one of the colors to the array
@@ -1339,7 +1381,7 @@ def pack_dxt2_3(arby, unpacked, width, height, depth=1):
 
                 idx += dists.index(min(dists))<<(i>>1)
 
-            rpa[txl_i+2] = (color1<<16) + color0
+            rpa[txl_i+2] = (color1<<16) | color0
             rpa[txl_i+3] = idx
 
     return repacked
@@ -1390,7 +1432,7 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
         g_pxl_i = pxl_i + 2
         b_pxl_i = pxl_i + 3
 
-        '''CALCULATE THE ALPHA'''
+        # CALCULATE THE ALPHA
         #find the most extreme values
         alpha_vals = tuple(map(lambda i: a_scale[upa[pxl_i+i]], pixel_indices))
         alpha0 = max(alpha_vals)
@@ -1403,7 +1445,7 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
         elif alpha1 and alpha0 != 255:
             # if the most extreme values are NOT 0 or
             # 255, use them as the interpolation values
-            """In this mode, value_0 must be greater than value_1"""
+            # In this mode, value_0 must be greater than value_1
             alpha_dif = alpha0 - alpha1
             half_dif = alpha_dif//2
             # calculate and store which interpolated
@@ -1418,13 +1460,13 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
                 # that the value is as a 0 to 7 int
                 tmp = ((alpha_vals[i] - alpha1)*7 + half_dif)//alpha_dif
                 if tmp == 0:
-                    alpha_idx += 1<<(i*3)
+                    alpha_idx |= 1<<(i*3)
                 elif tmp < 7:
                     # Because the colors are stored in opposite
                     # order, we need to invert the index
-                    alpha_idx += (8-tmp)<<(i*3)
+                    alpha_idx |= (8-tmp)<<(i*3)
         else:
-            """In this mode, value_0 must be less than or equal to value_1"""
+            # In this mode, value_0 must be less than or equal to value_1
             # if the most extreme values ARE 0 and 255 though, then
             # we need to calculate the second most extreme values
             alpha0 = 255
@@ -1454,23 +1496,23 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
                 comp = alpha_vals[i]
                 if comp == 0:
                     # if the value is 0 we set it to index 6
-                    alpha_idx += 6<<(i*3)
+                    alpha_idx |= 6<<(i*3)
                 elif comp == 255:
                     # if the value is 255 we set it to index 7
-                    alpha_idx += 7<<(i*3)
+                    alpha_idx |= 7<<(i*3)
                 elif alpha_dif:
                     # calculate how far between both colors
                     # that the value is as a 0 to 5 int
                     tmp = ((comp - alpha0)*5 + half_dif)//alpha_dif
                     if tmp == 5:
-                        alpha_idx += 1<<(i*3)
+                        alpha_idx |= 1<<(i*3)
                     elif tmp > 0:
-                        alpha_idx += (tmp+1)<<(i*3)
+                        alpha_idx |= (tmp+1)<<(i*3)
 
         rpa[txl_i]   = ((alpha_idx<<16) + (alpha1<<8) + alpha0)&0xFFffFFff
         rpa[txl_i+1] = alpha_idx>>16
 
-        '''CALCULATE THE COLORS'''
+        # CALCULATE THE COLORS
         # compare distance between all pixels and find the two furthest apart
         # (we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
@@ -1489,8 +1531,12 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
         c_1 = upa[pxl_i+c_1i: 4+pxl_i+c_1i]
 
         # quantize the colors down to 16 bit color and repack
-        color0 = (r_scale[c_0[1]]<<11)+(g_scale[c_0[2]]<<5)+b_scale[c_0[3]]
-        color1 = (r_scale[c_1[1]]<<11)+(g_scale[c_1[2]]<<5)+b_scale[c_1[3]]
+        color0 = ((((r_scale[c_0[1]]*31+15)//255)<<11) |
+                  (((g_scale[c_0[2]]*63+31)//255)<<5) |
+                  (b_scale[c_0[3]]*31+15)//255)
+        color1 = ((((r_scale[c_1[1]]*31+15)//255)<<11) |
+                  (((g_scale[c_1[2]]*63+31)//255)<<5) |
+                  (b_scale[c_1[3]]*31+15)//255)
 
         if color0 == color1:
             # do nothing except save one of the colors to the array
@@ -1524,8 +1570,56 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
 
                 idx += dists.index(min(dists))<<(i>>1)
 
-            rpa[txl_i+2] = (color1<<16) + color0
+            rpa[txl_i+2] = (color1<<16) | color0
             rpa[txl_i+3] = idx
+
+    return repacked
+
+
+def pack_dxt3a(arby, unpacked, width, height, depth=1):
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    #this is how many texels wide/tall the texture is
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    texel_width, texel_height, _ = ab.clip_dimensions(dxt_width//4, dxt_height//4)
+
+    #create a new array to hold the texels after we repack them
+    ucc = arby.unpacked_channel_count
+    assert arby.target_channel_count == ucc
+    bpt = ucc*8
+
+    scales = list(arby.channel_downscalers)
+    repacked = ab.bitmap_io.make_array("I", texel_width*texel_height, bpt)
+    unpacked = swizzle_dxt(unpacked, width, height * depth, ucc)
+
+    pixels_per_texel   = get_texel_pixel_count(width, height)
+    channels_per_texel = ucc*pixels_per_texel
+    pixel_indices = range(0, channels_per_texel, ucc)
+
+    if False and fast_dds_defs:
+        # NOT IMPLEMENTED
+        dds_defs_ext.pack_dxt3a(repacked, unpacked, pixels_per_texel, *scales)
+        return repacked
+
+    #shorthand names
+    rpa = repacked
+    upa = unpacked
+
+    # convert to tuples for faster access
+    for i in range(len(scales)):
+        scales[i] = tuple(scales[i])
+
+    #loop for each texel
+    for txl_i in range(0, len(repacked), 2):
+        #cache so it doesn't have to keep being calculated
+        pxl_i = (txl_i//(2*ucc))*channels_per_texel
+        chan = (txl_i//2)%ucc
+        scale = scales[chan]
+
+        # CALCULATE THE ALPHA
+        alpha = sum(scale[upa[pxl_i+i]]<<i for i in pixel_indices)
+
+        rpa[txl_i]   = alpha&0xFFffFFff
+        rpa[txl_i+1] = alpha>>32
 
     return repacked
 
@@ -1581,7 +1675,7 @@ def pack_dxt5a(arby, unpacked, width, height, depth=1):
         elif val1 and val0 != 255:
             # if the most extreme values are NOT 0 or
             # 255, use them as the interpolation values
-            """In this mode, value_0 must be greater than value_1"""
+            # In this mode, value_0 must be greater than value_1
             dif = val0 - val1
             half_dif = dif//2
             # calculate and store which interpolated
@@ -1596,13 +1690,13 @@ def pack_dxt5a(arby, unpacked, width, height, depth=1):
                 # that the value is as a 0 to 7 int
                 tmp = ((vals[i] - val1)*7 + half_dif)//dif
                 if tmp == 0:
-                    idx += 1<<(i*3)
+                    idx |= 1<<(i*3)
                 elif tmp < 7:
                     # Because the colors are stored in opposite
                     # order, we need to invert the index
-                    idx += (8-tmp)<<(i*3)
+                    idx |= (8-tmp)<<(i*3)
         else:
-            """In this mode, value_0 must be less than or equal to value_1"""
+            # In this mode, value_0 must be less than or equal to value_1
             # if the most extreme values ARE 0 and 255 though, then
             # we need to calculate the second most extreme values
             val0 = 255
@@ -1632,20 +1726,20 @@ def pack_dxt5a(arby, unpacked, width, height, depth=1):
                 comp = vals[i]
                 if comp == 0:
                     # if the value is 0 we set it to index 6
-                    idx += 6<<(i*3)
+                    idx |= 6<<(i*3)
                 elif comp == 255:
                     # if the value is 255 we set it to index 7
-                    idx += 7<<(i*3)
+                    idx |= 7<<(i*3)
                 elif dif:
                     # calculate how far between both colors
                     # that the value is as a 0 to 5 int
                     tmp = ((comp - val0)*5 + half_dif)//dif
                     if tmp == 5:
-                        idx += 1<<(i*3)
+                        idx |= 1<<(i*3)
                     elif tmp > 0:
-                        idx += (tmp+1)<<(i*3)
+                        idx |= (tmp+1)<<(i*3)
 
-        rpa[txl_i] = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
+        rpa[txl_i] = ((idx<<16) | (val1<<8) | val0)&0xFFffFFff
         rpa[txl_i+1] = idx>>16
 
     return repacked
@@ -1702,7 +1796,7 @@ def pack_dxn(arby, unpacked, width, height, depth=1):
         elif val1 and val0 != 255:
             # if the most extreme values are NOT 0 or
             # 255, use them as the interpolation values
-            """In this mode, value_0 must be greater than value_1"""
+            # In this mode, value_0 must be greater than value_1
             dif = val0 - val1
             half_dif = dif//2
             # calculate and store which interpolated
@@ -1717,13 +1811,13 @@ def pack_dxn(arby, unpacked, width, height, depth=1):
                 # that the value is as a 0 to 7 int
                 tmp = ((vals[i] - val1)*7 + half_dif)//dif
                 if tmp == 0:
-                    idx += 1<<(i*3)
+                    idx |= 1<<(i*3)
                 elif tmp < 7:
                     # Because the colors are stored in opposite
                     # order, we need to invert the index
-                    idx += (8-tmp)<<(i*3)
+                    idx |= (8-tmp)<<(i*3)
         else:
-            """In this mode, value_0 must be less than or equal to value_1"""
+            # In this mode, value_0 must be less than or equal to value_1
             # if the most extreme values ARE 0 and 255 though, then
             # we need to calculate the second most extreme values
             val0 = 255
@@ -1753,20 +1847,20 @@ def pack_dxn(arby, unpacked, width, height, depth=1):
                 comp = vals[i]
                 if comp == 0:
                     # if the value is 0 we set it to index 6
-                    idx += 6<<(i*3)
+                    idx |= 6<<(i*3)
                 elif comp == 255:
                     # if the value is 255 we set it to index 7
-                    idx += 7<<(i*3)
+                    idx |= 7<<(i*3)
                 elif dif:
                     # calculate how far between both colors
                     # that the value is as a 0 to 5 int
                     tmp = ((comp - val0)*5 + half_dif)//dif
                     if tmp == 5:
-                        idx += 1<<(i*3)
+                        idx |= 1<<(i*3)
                     elif tmp > 0:
-                        idx += (tmp+1)<<(i*3)
+                        idx |= (tmp+1)<<(i*3)
 
-        rpa[txl_i]   = ((idx<<16) + (val1<<8) + val0)&0xFFffFFff
+        rpa[txl_i]   = ((idx<<16) | (val1<<8) | val0)&0xFFffFFff
         rpa[txl_i+1] = idx>>16
 
     return repacked
@@ -1834,14 +1928,14 @@ def pack_ctx1(arby, unpacked, width, height, depth=1):
         xy_1[0] = r_scale[upa[r_pxl_i + c_1i]]
         xy_1[1] = g_scale[upa[g_pxl_i + c_1i]]
 
-        color0 = xy_0[0] + (xy_0[1]<<8)
-        color1 = xy_1[0] + (xy_1[1]<<8)
+        color0 = xy_0[0] | (xy_0[1]<<8)
+        color1 = xy_1[0] | (xy_1[1]<<8)
 
         if color0 == color1:
             #do nothing except save one of the colors to the array
             rpa[txl_i] = color0
         else:
-            rpa[txl_i] = color0 + (color1<<16)
+            rpa[txl_i] = color0 | (color1<<16)
 
             # calculate the intermediate colors
             xy_2[0] = (xy_0[0]*2 + xy_1[0])//3
@@ -1862,12 +1956,12 @@ def pack_ctx1(arby, unpacked, width, height, depth=1):
                 if dist0 <= dist1: #closer to color 0
                     if dist0 > (x-xy_2[0])**2 + (y-xy_2[1])**2:
                         #closest to color 2
-                        idx += 2<<(i//2)
+                        idx |= 2<<(i//2)
                 elif dist1 < (x-xy_3[0])**2 + (y-xy_3[1])**2:
                     #closest to color 1
-                    idx += 1<<(i//2)
+                    idx |= 1<<(i//2)
                 else: #closest to color 3
-                    idx += 3<<(i//2)
+                    idx |= 3<<(i//2)
 
         rpa[txl_i+1] = idx
 
@@ -1915,7 +2009,7 @@ def pack_vu(arby, unpacked, width, height, depth=1, bpc=8):
         # Ones compliment is used here to simplify math and to allow
         # all components to have a zero point and to make both sides
         # of the zero point have an equal numbers of points.
-        packed[i//ucc] = (((v_scale[unpacked[i + chan1]]<<bpc) +
+        packed[i//ucc] = (((v_scale[unpacked[i + chan1]]<<bpc) |
                             u_scale[unpacked[i + chan0]])^sign_mask)
 
     return packed
@@ -1953,7 +2047,7 @@ def pack_rg(arby, unpacked, width, height, depth=1, bpc=8):
     # convert to tuples for faster access
     r_scale, g_scale = tuple(r_scale), tuple(g_scale)
     for i in range(0, len(unpacked), ucc):
-        packed[i//ucc] = ((g_scale[unpacked[i + chan1]]<<bpc) +
+        packed[i//ucc] = ((g_scale[unpacked[i + chan1]]<<bpc) |
                            r_scale[unpacked[i + chan0]])
 
     return packed
@@ -1991,7 +2085,7 @@ def pack_gb(arby, unpacked, width, height, depth=1, bpc=8):
     # convert to tuples for faster access
     g_scale, b_scale = tuple(g_scale), tuple(b_scale)
     for i in range(0, len(unpacked), ucc):
-        packed[i//ucc] = ((b_scale[unpacked[i + chan1]]<<bpc) +
+        packed[i//ucc] = ((b_scale[unpacked[i + chan1]]<<bpc) |
                            g_scale[unpacked[i + chan0]])
 
     return packed

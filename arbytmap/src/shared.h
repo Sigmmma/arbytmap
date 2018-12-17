@@ -18,3 +18,8 @@ typedef uint64_t uint64;
 #define MAX_CHAN_CT 4
 #define MAX_CHAN_DEPTH 16
 #define MAX_PIXEL_SIZE 64
+
+#define RELEASE_PY_BUFFER_ARRAY(bufs, i)\
+    for (i = 0; i < (sizeof(bufs) / sizeof(bufs[0])); i++) {\
+        PyBuffer_Release(&bufs[i]);\
+    }

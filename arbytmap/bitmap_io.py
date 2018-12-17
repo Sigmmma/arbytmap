@@ -638,12 +638,13 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     bit_depth = fmt_depth = max(ab.CHANNEL_DEPTHS[fmt] + (1, ))
     target_depth = 1<<int(ceil(log(bit_depth, 2)))
     keep_alpha = kwargs.get("keep_alpha", channel_count <= 2)
+    intensity_to_rgb = kwargs.get("intensity_to_rgb", channel_count >= 2)
 
     filenames = []
 
-    if channel_count >= 2:
+    if intensity_to_rgb:
         # png doesnt allow 2 channel greyscale, so convert them to 4 channel
-        if keep_alpha and channel_count == 4:
+        if keep_alpha and channel_count != 3:
             if target_depth > 8: fmt_to_save_as = ab.FORMAT_A16R16G16B16
             else:                fmt_to_save_as = ab.FORMAT_A8R8G8B8
         else:
@@ -651,19 +652,22 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
             else:                fmt_to_save_as = ab.FORMAT_R8G8B8
     elif fmt == ab.FORMAT_A16: fmt_to_save_as = fmt = ab.FORMAT_L16
     elif fmt == ab.FORMAT_A8:  fmt_to_save_as = fmt = ab.FORMAT_L8
-    elif fmt == ab.FORMAT_A4:  fmt_to_save_as = fmt = ab.FORMAT_L4
-    elif fmt == ab.FORMAT_A2:  fmt_to_save_as = fmt = ab.FORMAT_L2
-    elif fmt == ab.FORMAT_A1:  fmt_to_save_as = fmt = ab.FORMAT_L1
+    # FORMAT_A4/2/1 are not implemented yet
+    #elif fmt == ab.FORMAT_A4:  fmt_to_save_as = fmt = ab.FORMAT_L4
+    #elif fmt == ab.FORMAT_A2:  fmt_to_save_as = fmt = ab.FORMAT_L2
+    #elif fmt == ab.FORMAT_A1:  fmt_to_save_as = fmt = ab.FORMAT_L1
     elif bit_depth > 8:      fmt_to_save_as = ab.FORMAT_L16
     elif target_depth == 8:  fmt_to_save_as = ab.FORMAT_L8
-    elif target_depth == 4:  fmt_to_save_as = ab.FORMAT_L4
-    elif target_depth == 2:  fmt_to_save_as = ab.FORMAT_L2
-    elif target_depth == 1:  fmt_to_save_as = ab.FORMAT_L1
+    # FORMAT_L4/2/1 are not implemented yet
+    elif target_depth in (4, 2, 1):  fmt_to_save_as = ab.FORMAT_L8
+    #elif target_depth == 4:  fmt_to_save_as = ab.FORMAT_L4
+    #elif target_depth == 2:  fmt_to_save_as = ab.FORMAT_L2
+    #elif target_depth == 1:  fmt_to_save_as = ab.FORMAT_L1
 
     swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
     channel_map = kwargs.pop("channel_mapping", None)
     if (bit_depth not in valid_depths or channel_map is not None or
-            fmt != fmt_to_save_as or convertor.swizzled != swizzle_mode):
+        fmt != fmt_to_save_as or convertor.swizzled != swizzle_mode):
         conv_cpy = deepcopy(convertor)
         # TODO: optimize this so the only textures loaded in and converted
         # are the mip_levels and sub_bitmaps that were requested to be saved
@@ -673,6 +677,7 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
         conv_cpy.load_new_conversion_settings(
             target_format=fmt_to_save_as, swizzle_mode=convertor.swizzle_mode,
             channel_mapping=channel_map, target_big_endian=False)
+        #conv_cpy.print_info(1,1,1)
         if not conv_cpy.convert_texture():
             return []
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
@@ -788,19 +793,19 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
                     if fmt_depth == 16:
                         stride *= 2  # no idea why this is needed, but it is...
                         if channel_count != 1:
-                            swap_channels(pix, (1, 0))
+                            swap_array_items(pix, (1, 0))
                 elif channel_count == 4:
                     pix = bytearray(pix)
                     if   fmt_depth == 8:
-                        swap_channels(pix, (2, 1, 0, 3))
+                        swap_array_items(pix, (2, 1, 0, 3))
                     elif fmt_depth == 16:
-                        swap_channels(pix, (5, 4, 3, 2, 1, 0, 7, 6))
+                        swap_array_items(pix, (5, 4, 3, 2, 1, 0, 7, 6))
                 elif fmt_depth == 8:
                     pix = bytearray(unpad_24bit_array(pix))
-                    swap_channels(pix, (2, 1, 0))
+                    swap_array_items(pix, (2, 1, 0))
                 elif fmt_depth == 16:
                     pix = bytearray(unpad_48bit_array(pix))
-                    swap_channels(pix, (5, 4, 3, 2, 1, 0))
+                    swap_array_items(pix, (5, 4, 3, 2, 1, 0))
             png_file.set_chunk_data(
                 idat_chunk, pad_idat_data(pix, stride//8),
                 png_compress_level=png_compress_level)
@@ -840,6 +845,8 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
     if len(pix) == 0:
         return new_pix
 
+    pixel_width = chan_ct * pix.itemsize
+
     src_x_skip0, src_y_skip0, src_z_skip0 = max(x0, 0), max(y0, 0), max(z0, 0)
 
     src_x_skip1 = max(width  - src_x_skip0 - new_width,  0)
@@ -858,18 +865,18 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
     dst_x_skip1 = max(new_width  - dst_x_skip0 - x_stride, 0)
     dst_y_skip1 = max(new_height - dst_y_skip0 - y_stride, 0)
 
-    src_z_skip0 *= width * height * chan_ct
-    src_y_skip0 *= width * chan_ct
-    src_y_skip1 *= width * chan_ct
-    dst_z_skip0 *= new_width * new_height * chan_ct
-    dst_y_skip0 *= new_width * chan_ct
-    dst_y_skip1 *= new_width * chan_ct
+    src_z_skip0 *= width * height * pixel_width
+    src_y_skip0 *= width * pixel_width
+    src_y_skip1 *= width * pixel_width
+    dst_z_skip0 *= new_width * new_height * pixel_width
+    dst_y_skip0 *= new_width * pixel_width
+    dst_y_skip1 *= new_width * pixel_width
 
-    src_x_skip0 *= chan_ct
-    dst_x_skip0 *= chan_ct
-    src_x_skip1 *= chan_ct
-    dst_x_skip1 *= chan_ct
-    x_stride *= chan_ct
+    src_x_skip0 *= pixel_width
+    dst_x_skip0 *= pixel_width
+    src_x_skip1 *= pixel_width
+    dst_x_skip1 *= pixel_width
+    x_stride *= pixel_width
     
     if fast_bitmap_io:
         bitmap_io_ext.crop_pixel_data(
@@ -898,23 +905,35 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
     return new_pix
 
 
-def swap_channels(pix, channel_map):
+def swap_array_items(pix, channel_map, adapt_to_itemsize=False):
     step = len(channel_map)
+    if adapt_to_itemsize and isinstance(pix, array):
+        step *= pix.itemsize
+        itemsize = pix.itemsize
+        channel_map = [channel_map[i // itemsize] * itemsize + (i % itemsize)
+                       for i in range(len(itemsize * channel_map))]
+
     channel_map = tuple(channel_map)
     src_map     = tuple(range(step))
     if channel_map == src_map:
         # no mapping difference. return without doing anything
         return
 
-    assert set(channel_map) == set(src_map)
+    for c in channel_map:
+        assert c < len(channel_map)
 
     if fast_bitmap_io:
-        return bitmap_io_ext.swap_channels(pix, array("H", channel_map))
+        bitmap_io_ext.swap_array_items(pix, array("h", channel_map))
+        return
 
-    for i in range(0, len(pix), step):
-        orig = pix[i: i + step]
-        for j in src_map:
-            pix[i + j] = orig[channel_map[j]]
+    with memoryview(pix).cast("B") as pix_bytes:
+        for i in range(0, len(pix_bytes), step):
+            orig = bytes(pix_bytes[i: i + step])
+            for j in src_map:
+                if channel_map[j] < 0:
+                    pix_bytes[i + j] = 0
+                else:
+                    pix_bytes[i + j] = orig[channel_map[j]]
 
 
 def bitmap_bytes_to_array(rawdata, offset, texture_block, fmt,
@@ -1095,7 +1114,7 @@ def byteswap_packed_bitmap(packed_pixel_data, fmt):
         channel_map.extend(list(range(i, i + size))[::-1])
         i += size
 
-    swap_channels(packed_pixel_data, channel_map)
+    swap_array_items(packed_pixel_data, channel_map)
 
 
 file_writers = {"raw":save_to_rawdata_file, "bin":save_to_rawdata_file}

@@ -7,26 +7,25 @@ static void swizzle_char_array(
     Py_ssize_t z_size, sint8 *z_offs_sint8s,
     Py_ssize_t swizz_size,   sint8 *swizz_arr_sint8s,
     Py_ssize_t unswizz_size, sint8 *unswizz_arr_sint8s,
-    Py_ssize_t stride, sint8 swizz)
+    Py_ssize_t stride, sint8 swizz, char *method_name)
 {
     sint32 i=0, zi=0, yi=0, xi=0, ci=0;
     uint32 z=0, y=0, x=0, c=0, yz=0, xyz=0, cxyz=0;
     uint32 max_i=0;
-    uint32 *c_offs = (uint32(*)[])c_offs_sint8s;
-    uint32 *x_offs = (uint32(*)[])x_offs_sint8s;
-    uint32 *y_offs = (uint32(*)[])y_offs_sint8s;
-    uint32 *z_offs = (uint32(*)[])z_offs_sint8s;
+    uint32 *c_offs = (uint32 *)c_offs_sint8s;
+    uint32 *x_offs = (uint32 *)x_offs_sint8s;
+    uint32 *y_offs = (uint32 *)y_offs_sint8s;
+    uint32 *z_offs = (uint32 *)z_offs_sint8s;
     uint8 *swizz_arr = (uint8*)swizz_arr_sint8s;
     uint8 *unswizz_arr = (uint8*)unswizz_arr_sint8s;
     c_size /= 4; x_size /= 4; y_size /= 4; z_size /= 4;
     swizz_size /= stride; unswizz_size /= stride;
-    max_i = c_size * x_size * y_size * z_size;
+    max_i = (uint32)(c_size * x_size * y_size * z_size);
 
     if ((max_i != swizz_size) || (max_i != unswizz_size)) {
-        // raise an error because the arrays aren't the right size
-        // how do i do that exactly? idk.... gotta look that up
+        PySys_FormatStdout("Pixel buffers supplied to swizzler.%s are not the expected size.\n", method_name);
         return;
-        }
+    }
 
     if (swizz) {
         if (stride == 8) {
@@ -172,6 +171,7 @@ static void swizzle_char_array(
 
 static PyObject *py_swizzle_array(PyObject *self, PyObject *args) {
     Py_buffer bufs[6];
+    sint8 i;
 
     // Get the pointers to each of the array objects
     if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*:swizzle_array",
@@ -182,24 +182,20 @@ static PyObject *py_swizzle_array(PyObject *self, PyObject *args) {
         bufs[0].len, bufs[0].buf, bufs[1].len, bufs[1].buf,
         bufs[2].len, bufs[2].buf, bufs[3].len, bufs[3].buf,
         bufs[4].len, bufs[4].buf, bufs[5].len, bufs[5].buf,
-        bufs[5].itemsize, 1);
+        bufs[5].itemsize, 1, "swizzle_array");
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
-    PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }
 
 static PyObject *py_unswizzle_array(PyObject *self, PyObject *args) {
     Py_buffer bufs[6];
+    sint8 i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*:swizzle_array",
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*:unswizzle_array",
         &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
@@ -207,15 +203,10 @@ static PyObject *py_unswizzle_array(PyObject *self, PyObject *args) {
         bufs[0].len, bufs[0].buf, bufs[1].len, bufs[1].buf,
         bufs[2].len, bufs[2].buf, bufs[3].len, bufs[3].buf,
         bufs[4].len, bufs[4].buf, bufs[5].len, bufs[5].buf,
-        bufs[5].itemsize, 0);
+        bufs[5].itemsize, 0, "unswizzle_array");
 
     // Release the buffer objects
-    PyBuffer_Release(&bufs[0]);
-    PyBuffer_Release(&bufs[1]);
-    PyBuffer_Release(&bufs[2]);
-    PyBuffer_Release(&bufs[3]);
-    PyBuffer_Release(&bufs[4]);
-    PyBuffer_Release(&bufs[5]);
+    RELEASE_PY_BUFFER_ARRAY(bufs, i)
 
     return Py_BuildValue("");  // return Py_None while incrementing it
 }

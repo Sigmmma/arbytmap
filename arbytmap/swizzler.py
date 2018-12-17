@@ -41,7 +41,7 @@ class Swizzler():
         inverse of whether or not it is swizzled'''
         mode = conv.swizzle_mode
         if force:
-            mode = not(conv.swizzled)
+            mode = not conv.swizzled
 
         # only run if the texture is swizzled and we want to
         # unswizzle it or vice versa. this prevents it from
@@ -60,9 +60,9 @@ class Swizzler():
 
         for m in range(conv.mipmap_count + 1):
             if conv.packed:
-                m_width  = conv.get_packed_depth(width, m)
-                m_height = conv.packed_height_calc(height, m)
-                m_depth  = conv.packed_depth_calc(depth, m)
+                m_width  = conv.get_packed_width(width, m)
+                m_height = conv.get_packed_height(height, m)
+                m_depth  = conv.get_packed_depth(depth, m)
             else:
                 m_width  = max(1, width >> m)
                 m_height = max(1, height >> m)
@@ -250,6 +250,7 @@ class SwizzlerMask():
     in calculating DXT texels)"""
 
     _masks = {}
+    _mask_type = ""
 
     def __init__(self, **kwargs):
         '''this is a list of functions to swizzle masks in different formats.
@@ -257,15 +258,12 @@ class SwizzlerMask():
         Default is z-order curve, or morton order'''
         
         self.swizzler_settings = kwargs
-    
-        if kwargs.get("mask_type") not in self._masks:
-            raise TypeError("Unknown swizzler mask type '%'" %
-                            kwargs.get("mask_type"))
-
-        self.mask_set = self._masks[kwargs.get("mask_type")]
+        self._mask_type = kwargs.get("mask_type")
 
     def mask_set(self, *args, **kwargs):
-        raise NotImplementedError
+        if self._mask_type not in self._masks:
+            raise TypeError("Unknown swizzler mask type '%'" % self.mask_type)
+        return self._masks[self._mask_type](self, *args, **kwargs)
 
     def add_mask(*args):
         if not args:
@@ -279,7 +277,8 @@ class SwizzlerMask():
         SwizzlerMask._masks[mask_name] = mask_func
 
 
-def _z_order_mask_set(swizz_mask, c_blocks, x_blocks, y_blocks, z_blocks,
+def _z_order_mask_set(swizzler_mask,
+                      c_blocks, x_blocks, y_blocks, z_blocks,
                       c_mask,   x_mask,   y_mask,   z_mask):
     """THIS FUNCTION WILL SWIZZLE AN ARRAY OF x, y, AND z OFFSETS
     TOGETHER IN z-ORDER STYLE. THE COLOR CHANNELS CAN ALSO BE SWIZZLED"""
@@ -304,7 +303,8 @@ def _z_order_mask_set(swizz_mask, c_blocks, x_blocks, y_blocks, z_blocks,
         i -= 1
 
 
-def _dxt_mask_set(swizz_mask, log_c,  log_x,  log_y,  log_z,
+def _dxt_mask_set(swizzler_mask,
+                  log_c,  log_x,  log_y,  log_z,
                   c_mask, x_mask, y_mask, z_mask):
     """THIS FUNCTION WILL SWIZZLE AN ARRAY OF X,
     Y, Z, AND CHANNEL OFFSETS TOGETHER SO THAT
@@ -330,12 +330,13 @@ def _dxt_mask_set(swizz_mask, log_c,  log_x,  log_y,  log_z,
     y_mask.extend([log_c+log_x+log_z]*(log_y-tmp_y))
 
 
-def _pixel_merge_mask_set(swizz_mask, log_c,  log_w,  log_h,  log_d,
+def _pixel_merge_mask_set(swizzler_mask,
+                          log_c,  log_w,  log_h,  log_d,
                           c_mask, x_mask, y_mask, z_mask):
     """THIS FUNCTION WILL SWIZZLE AN ARRAY OF C, X, Y,
     AND Z OFFSETS IN SUCH A WAY THAT THE PIXELS BEING
     MERGED END UP DIRECTLY ADJACENT EACH OTHER"""
-    config = swizz_mask.swizzler_settings
+    config = swizzler_mask.swizzler_settings
     new_width, new_height, new_depth = (
         config["new_width"], config["new_height"], config["new_depth"])
     
