@@ -160,7 +160,9 @@ _CALC_W_NORMALIZE(u, v, w, (unpacked_max>> 1), unpacked_max, ((unpacked_max + 1)
     c[1] = unpacked[r_pxl_i + i];\
     c[2] = unpacked[g_pxl_i + i];\
     c[3] = unpacked[b_pxl_i + i];\
-    packed_c = ((r_scale[c[1]]<<11) | (g_scale[c[2]]<<5) | b_scale[c[3]])&0xFFff;
+    packed_c = ((((r_scale[c[1]] * 31 + 15) / 255)<<11) |\
+                (((g_scale[c[2]] * 63 + 31) / 255)<<5) |\
+                ((b_scale[c[3]] * 31 + 15) / 255)) & 0xFFff;
 
 #define SWAP_COLORS()\
     tmp[1] = c_0[1]; tmp[2] = c_0[2]; tmp[3] = c_0[3];\
@@ -541,7 +543,7 @@ static void unpack_v16u16_8(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
+    sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint32, uint16, uint8)
     uint16 color[4] = { 0xFFff,0,0,0 };
@@ -576,7 +578,7 @@ static void unpack_v8u8_8(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
+    sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
     uint8 color[4] = { src_unpacked_max,0,0,0 };
@@ -1134,7 +1136,7 @@ static void unpack_v8u8_16(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
+    sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint16, uint8, uint16)
     uint8 color[4] = { src_unpacked_max,0,0,0 };
@@ -1169,7 +1171,7 @@ static void unpack_v16u16_16(
     Py_buffer *unpacked_pix_buf, Py_buffer *packed_pix_buf,
     Py_buffer *a_scale_buf, Py_buffer *r_scale_buf,
     Py_buffer *g_scale_buf, Py_buffer *b_scale_buf,
-    sint8 pix_per_tex, sint8 ucc, sint8 *chan_map)
+    sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint32, uint16, uint16)
     uint16 color[4] = { src_unpacked_max,0,0,0 };
@@ -1618,28 +1620,28 @@ static PyObject *py_unpack_ctx1(PyObject *self, PyObject *args) {
 
 static PyObject *py_unpack_vu(PyObject *self, PyObject *args) {
     Py_buffer bufs[7];
-    sint8 pix_per_tex, ucc, i;
+    sint8 ucc, i;
 
     // Get the pointers to each of the array objects
-    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bbw*:unpack_vu",
-        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &pix_per_tex, &ucc, &bufs[6]))
+    if (!PyArg_ParseTuple(args, "w*w*w*w*w*w*bw*:unpack_vu",
+        &bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5], &ucc, &bufs[6]))
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[1].itemsize == 2) {  // unpacking v8u8
         if (bufs[0].itemsize == 2) {  // to a16r16g16b16
             unpack_v8u8_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, bufs[6].buf);
+            ucc, bufs[6].buf);
         } else {  // to a8r8g8b8
             unpack_v8u8_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, bufs[6].buf);
+            ucc, bufs[6].buf);
         }
     } else if (bufs[1].itemsize == 4) {  // unpacking v16u16
         if (bufs[0].itemsize == 2) {  // to a16r16g16b16
             unpack_v16u16_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, bufs[6].buf);
+            ucc, bufs[6].buf);
         } else {  // to a8r8g8b8
             unpack_v16u16_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, bufs[6].buf);
+            ucc, bufs[6].buf);
         }
     }
 
