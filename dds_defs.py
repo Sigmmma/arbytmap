@@ -795,15 +795,6 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
     dxt_width, dxt_height = clip_dxt_dimensions(width, height)
     unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
 
-    #create the arrays to hold the color channel data
-    c_0 = [255,0,0,0]
-    c_1 = [255,0,0,0]
-    c_2 = [255,0,0,0]
-    c_3 = [255,0,0,0]
-
-    #stores the colors in a way we can easily access them
-    colors = [c_0, c_1, c_2, c_3]
-
     upscales = list(arby.channel_upscalers)
     chan_map = list(arby.channel_mapping)
 
@@ -816,6 +807,15 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
             unpacked, packed, a_scale, r_scale, g_scale, b_scale,
             pixels_per_texel, ucc, array("b", chan_map[: 4]))
     else:
+        #create the arrays to hold the color channel data
+        c_0 = [255,0,0,0]
+        c_1 = [255,0,0,0]
+        c_2 = [255,0,0,0]
+        c_3 = [255,0,0,0]
+
+        #stores the colors in a way we can easily access them
+        colors = [c_0, c_1, c_2, c_3]
+
         # convert to tuples for faster access
         upscales = tuple(tuple(scale) for scale in upscales)
 
@@ -910,8 +910,6 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
     unpack_max = (1<<(unpack_size*8)) - 1
 
     ucc = arby.unpacked_channel_count
-    pixels_per_texel = (width//texel_width)*(height//texel_height)
-
     bytes_per_pixel = unpack_size*ucc
     unpacked = ab.bitmap_io.make_array(
         unpack_code, width*height, bytes_per_pixel)

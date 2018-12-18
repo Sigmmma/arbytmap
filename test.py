@@ -120,7 +120,7 @@ def run_test(print_formats=False, deep_color=False,
     
 if __name__ == "__main__":
     try:
-        run_test(print_formats=False, deep_color=True,
+        run_test(print_formats=False, deep_color=False,
                  keep_alpha=False, ck_trans=False)
     except:
         print(format_exc())
