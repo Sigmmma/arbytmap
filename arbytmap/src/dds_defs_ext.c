@@ -389,13 +389,10 @@ static void unpack_dxt3a_8(
         if (src_chan < 0) {
             // not reading anything for this destination channel.
             // either leave it full black, or set it to full white.
-            if (dst_chan == 0) {
+            if (dst_chan == 0)
                 // set alpha to full white for the entire image
-                for (i = 0; i < (uint64)(unpacked_pix_buf->len / ucc); i++) {
-                    unpacked_pix[pxl_i] = dst_unpacked_max;
-                    pxl_i += ucc;
-                }
-            }
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len); i += ucc)
+                    unpacked_pix[i] = dst_unpacked_max;
             continue;
         }
 
@@ -434,13 +431,10 @@ static void unpack_dxt5a_8(
         if (src_chan < 0) {
             // not reading anything for this destination channel.
             // either leave it full black, or set it to full white.
-            if (dst_chan == 0) {
+            if (dst_chan == 0)
                 // set alpha to full white for the entire image
-                for (i = 0; i < (uint64)(unpacked_pix_buf->len / ucc); i++) {
-                    unpacked_pix[pxl_i] = dst_unpacked_max;
-                    pxl_i += ucc;
-                }
-            }
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len); i += ucc)
+                    unpacked_pix[i] = dst_unpacked_max;
             continue;
         }
 
@@ -508,7 +502,7 @@ static void unpack_ctx1_8(
     DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
     DEFINE_DXT_UNPACK_VARIABLES()
     DEFINE_DXT_COLOR_UNPACK_VARIABLES()
-    uint8 x, y;
+    uint8 x, y, a = 255;
     double d, n_len;
 
     max_i = unpacked_pix_buf->len / chans_per_tex;
@@ -537,7 +531,7 @@ static void unpack_ctx1_8(
         c_3[3] = (c_0[3] + 2 * c_1[3]) / 3;
         for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
             color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
-            UNPACK_DXT_COLORS(dst_chan);
+            UNPACK_DXT2345_COLORS(dst_chan);
         }
     }
 }
@@ -986,13 +980,10 @@ static void unpack_dxt3a_16(
         if (src_chan < 0) {
             // not reading anything for this destination channel.
             // either leave it full black, or set it to full white.
-            if (dst_chan == 0) {
+            if (dst_chan == 0)
                 // set alpha to full white for the entire image
-                for (i = 0; i < (uint64)(unpacked_pix_buf->len / (2 * ucc)); i++) {
-                    unpacked_pix[pxl_i] = dst_unpacked_max;
-                    pxl_i += ucc;
-                }
-            }
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len); i += ucc)
+                    unpacked_pix[i] = dst_unpacked_max;
             continue;
         }
 
@@ -1033,13 +1024,10 @@ static void unpack_dxt5a_16(
         if (src_chan < 0) {
             // not reading anything for this destination channel.
             // either leave it full black, or set it to full white.
-            if (dst_chan == 0) {
+            if (dst_chan == 0)
                 // set alpha to full white for the entire image
-                for (i = 0; i < (uint64)(unpacked_pix_buf->len / (2 * ucc)); i++) {
-                    unpacked_pix[pxl_i] = dst_unpacked_max;
-                    pxl_i += ucc;
-                }
-            }
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len); i += ucc)
+                    unpacked_pix[i] = dst_unpacked_max;
             continue;
         }
 
@@ -1107,7 +1095,7 @@ static void unpack_ctx1_16(
     DEFINE_UNPACK_VARIABLES(uint32, uint8, uint16)
     DEFINE_DXT_UNPACK_VARIABLES()
     DEFINE_DXT_COLOR_UNPACK_VARIABLES()
-    uint8 x, y;
+    uint8 x, y, a = 255;
     double d, n_len;
 
     max_i = (unpacked_pix_buf->len) / (2*chans_per_tex);
@@ -1136,7 +1124,7 @@ static void unpack_ctx1_16(
         c_3[3] = (c_0[3] + 2 * c_1[3]) / 3;
         for (txl_pxl_i = 0; txl_pxl_i<pix_per_tex; txl_pxl_i++) {
             color = colors[(color_idx >> (txl_pxl_i << 1)) & 3];
-            UNPACK_DXT_COLORS(dst_chan);
+            UNPACK_DXT2345_COLORS(dst_chan);
         }
     }
 }
@@ -1545,11 +1533,11 @@ static PyObject *py_unpack_dxt3a(PyObject *self, PyObject *args) {
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        unpack_dxt3a_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, scc, bufs[6].buf);
-    } else {
         unpack_dxt3a_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, scc, bufs[6].buf);
+                        pix_per_tex, ucc, scc, bufs[6].buf);
+    } else {
+        unpack_dxt3a_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+                       pix_per_tex, ucc, scc, bufs[6].buf);
     }
 
     // Release the buffer objects
@@ -1569,11 +1557,11 @@ static PyObject *py_unpack_dxt5a(PyObject *self, PyObject *args) {
         return Py_BuildValue("");  // return Py_None while incrementing it
 
     if (bufs[0].itemsize == 2) {
-        unpack_dxt5a_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, scc, bufs[6].buf);
-    } else {
         unpack_dxt5a_16(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
-        pix_per_tex, ucc, scc, bufs[6].buf);
+                        pix_per_tex, ucc, scc, bufs[6].buf);
+    } else {
+        unpack_dxt5a_8(&bufs[0], &bufs[1], &bufs[2], &bufs[3], &bufs[4], &bufs[5],
+                       pix_per_tex, ucc, scc, bufs[6].buf);
     }
 
     // Release the buffer objects
