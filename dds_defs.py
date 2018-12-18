@@ -924,7 +924,7 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
         a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_vu(
             unpacked, packed, a_scale, r_scale, g_scale, b_scale,
-            pixels_per_texel, ucc, array("b", chan_map[: 4]))
+            ucc, array("b", chan_map[: 4]))
         return unpacked
 
     sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
@@ -1004,7 +1004,7 @@ def unpack_rg(arby, bitmap_index, width, height, depth=1, bpc=8):
         a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_gr(
             unpacked, packed, a_scale, r_scale, g_scale, b_scale,
-            pixels_per_texel, ucc, array("b", chan_map[: 4]))
+            ucc, array("b", chan_map[: 4]))
         return unpacked
 
     sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
@@ -1076,7 +1076,7 @@ def unpack_gb(arby, bitmap_index, width, height, depth=1, bpc=8):
         a_scale, r_scale, g_scale, b_scale = upscales[: 4]
         dds_defs_ext.unpack_gb(
             unpacked, packed, a_scale, r_scale, g_scale, b_scale,
-            pixels_per_texel, ucc, array("b", chan_map[: 4]))
+            ucc, array("b", chan_map[: 4]))
         return unpacked
 
     sign_mask = 1 << (bpc - 1)   # == 128 for 8bpc
