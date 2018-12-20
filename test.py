@@ -54,8 +54,9 @@ def convert_chain(last_fmt, formats, **kwargs):
                 keep_alpha=keep_alpha)
             last_fmt = fmt
             print("Completed %s in %.4f seconds" % (fmt, time.time()-start))
-        except TypeError:
+        except Exception:
             print(format_exc())
+            print("Failed %s" % fmt)
 
 
 def run_test(print_formats=False, deep_color=False,
@@ -102,13 +103,13 @@ def run_test(print_formats=False, deep_color=False,
 
     input('Press "Enter" to begin conversion 5')
     convert_chain(ab.FORMAT_A8R8G8B8, (
-        #ab.FORMAT_A16,
+        ab.FORMAT_A16,
         ab.FORMAT_A8, ab.FORMAT_DXT5AY,
         #ab.FORMAT_A4, ab.FORMAT_A2, ab.FORMAT_A1,
         ), ck_trans=ck_trans, keep_alpha=keep_alpha)
 
     input('Press "Enter" to begin conversion 6')
-    convert_chain(ab.FORMAT_A8R8G8B8, (#ab.FORMAT_A16L16,
+    convert_chain(ab.FORMAT_A8R8G8B8, (ab.FORMAT_A16L16,
                                        ab.FORMAT_A8L8,
                                        ab.FORMAT_DXT5AY, ab.FORMAT_A4L4),
                   ck_trans=ck_trans, keep_alpha=keep_alpha)

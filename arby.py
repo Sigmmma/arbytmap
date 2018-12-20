@@ -27,6 +27,7 @@ except:
 try:
     from arbytmap.ext import raw_packer_ext
     fast_raw_packer = True
+    fast_raw_packer = False
 except:
     fast_raw_packer = False
 
@@ -163,9 +164,9 @@ class Arbytmap():
         """Allows changing the unpacking mode of this module
         from "true color"(32BPP) to "deep color"(64BPP).
         If the argument is None, the mode will be the default
-        one set in Format_Defs, if False the unpack format will
-        be Format_A8R8G8B8, and if True the format will be
-        FORMAT_A16R16G16B16."""
+        one set in Format_Defs, if False the unpack format
+        will be FORMAT_A8R8G8B8, and if True the format
+        will be FORMAT_A16R16G16B16."""
         if deep_state is None:
             self._UNPACK_FORMAT = DEFAULT_UNPACK_FORMAT
             self._UNPACK_ARRAY_CODE = INVERSE_PIXEL_ENCODING_SIZES[
@@ -1303,14 +1304,17 @@ class Arbytmap():
     def unpack(self, bitmap_index, width, height, depth):
         """Used for unpacking non-palettized formats"""
         if self.format in UNPACKERS:
-            unpacked_pixels = UNPACKERS[self.format](
+            unpacked = UNPACKERS[self.format](
                 self, bitmap_index, width, height, depth)
-        elif self.format not in RAW_FORMATS:
-            raise TypeError("Cannot find target format unpack method")
+        elif self.format in RAW_FORMATS:
+            unpacked = self.unpack_raw(self.texture_block[bitmap_index])
         else:
-            unpacked_pixels = self.unpack_raw(self.texture_block[bitmap_index])
+            raise TypeError("Cannot find target format unpack method")
 
-        return unpacked_pixels
+        if self.format in PREMULTIPLIED_FORMATS:
+            self.premultiply_color_by_alpha(unpacked, True)
+
+        return unpacked
 
     def unpack_raw(self, packed_array):
         '''this function takes the loaded raw
@@ -1428,7 +1432,6 @@ class Arbytmap():
             packed_palette = self.pack_raw(unpacked_palette)
 
         return packed_palette
-
 
     def _pack_indexing(self, unpacked_indexing):
         if self.target_indexing_size not in (1,2,4,8):
@@ -1548,13 +1551,20 @@ class Arbytmap():
 
     def pack(self, upa, width, height, depth):
         """Used for packing non-palettized formats"""
-        if self.target_format in PACKERS:
-            return PACKERS[self.target_format](
-                self, upa, width, height, depth)
-        elif self.target_format in RAW_FORMATS:
-            return self.pack_raw(upa)
-        else:
+        if (self.target_format not in PACKERS and
+            self.target_format not in RAW_FORMATS):
             raise TypeError("Cannot find target format pack method")
+
+        if self.target_format in PREMULTIPLIED_FORMATS:
+            self.premultiply_color_by_alpha(upa)
+
+        if self.target_format in PACKERS:
+            packed = PACKERS[self.target_format](
+                self, upa, width, height, depth)
+        else:
+            packed = self.pack_raw(upa)
+
+        return packed
 
     def pack_raw(self, unpacked_array):
         '''this function packs the 8-bit pixel array that's
@@ -1617,7 +1627,7 @@ class Arbytmap():
                 packed_array[i>>2] = ((a_scale[upa[i  ]]<<a_shift) |
                                       (r_scale[upa[i+1]]<<r_shift) |
                                       (g_scale[upa[i+2]]<<g_shift) |
-                                      (b_scale[upa[i+3]]<<b_shift) )
+                                      (b_scale[upa[i+3]]<<b_shift))
 
         return packed_array
 
@@ -1683,12 +1693,11 @@ class Arbytmap():
             r_rnd *= int(r_div != CHANNEL_ERASE_DIVISOR)
             g_rnd *= int(g_div != CHANNEL_ERASE_DIVISOR)
             b_rnd *= int(b_div != CHANNEL_ERASE_DIVISOR)
-
             for i in range(0, len(packed_array)*4, 4):
                 packed_array[i>>2] = (
-                    (a_scale[((upa[i  ]+a_rnd)//a_div)]<<a_shift) |
-                    (r_scale[((upa[i+1]+r_rnd)//r_div)]<<r_shift) |
-                    (g_scale[((upa[i+2]+g_rnd)//g_div)]<<g_shift) |
+                    (a_scale[((upa[i  ]+a_rnd)//a_div)]<<a_shift) +
+                    (r_scale[((upa[i+1]+r_rnd)//r_div)]<<r_shift) +
+                    (g_scale[((upa[i+2]+g_rnd)//g_div)]<<g_shift) +
                     (b_scale[((upa[i+3]+b_rnd)//b_div)]<<b_shift))
         return packed_array
 
@@ -1715,7 +1724,7 @@ class Arbytmap():
             i_rnd *= int(i_div != CHANNEL_ERASE_DIVISOR)
             for i in range(0, len(packed_array)*2, 2):
                 packed_array[i>>1] = (
-                    (a_scale[((upa[i  ]+a_rnd)//i_div)]<<a_shift) |
+                    (a_scale[((upa[i  ]+a_rnd)//i_div)]<<a_shift) +
                     (i_scale[((upa[i+1]+i_rnd)//i_div)]<<i_shift))
 
         return packed_array
@@ -1725,3 +1734,23 @@ class Arbytmap():
         an unpacked palette and indexing"""
         raise NotImplementedError
         return unpacked_palette, unpacked_indexing
+
+    def premultiply_color_by_alpha(self, upa, undo_premultiply=False):
+        assert self.unpacked_channel_count == 4
+        max_val = (1<<(PIXEL_ENCODING_SIZES[self._UNPACK_ARRAY_CODE]*8)) - 1
+        if False and fast_arbytmap:
+            # TODO: Not implemented
+            pass
+        elif undo_premultiply:
+            for i in range(0, len(upa), 4):
+                a = upa[i]
+                if a != 0:
+                    upa[i + 1] = min((upa[i + 1] * max_val) // a, max_val)
+                    upa[i + 2] = min((upa[i + 2] * max_val) // a, max_val)
+                    upa[i + 3] = min((upa[i + 3] * max_val) // a, max_val)
+        else:
+            for i in range(0, len(upa), 4):
+                a = upa[i]
+                upa[i + 1] = (upa[i + 1] * a) // max_val
+                upa[i + 2] = (upa[i + 2] * a) // max_val
+                upa[i + 3] = (upa[i + 3] * a) // max_val

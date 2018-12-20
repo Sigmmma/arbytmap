@@ -36,8 +36,8 @@
 PACK_ARGB_A_MERGE(typ) + PACK_ARGB_R_MERGE(typ) + PACK_ARGB_G_MERGE(typ) + PACK_ARGB_B_MERGE(typ))
 #define PACK_AI_MERGE(typ) (PACK_AI_A_MERGE(typ) + PACK_AI_I_MERGE(typ))
 
-#define PACK_ARGB(typ) (PACK_ARGB_A(typ) + PACK_ARGB_R(typ) + PACK_ARGB_G(typ) + PACK_ARGB_B(typ))
-#define PACK_AI(typ) (PACK_AI_A(typ) + PACK_AI_I(typ))
+#define PACK_ARGB(typ) (PACK_ARGB_A(typ) | PACK_ARGB_R(typ) | PACK_ARGB_G(typ) | PACK_ARGB_B(typ))
+#define PACK_AI(typ) (PACK_AI_A(typ) | PACK_AI_I(typ))
 
 //deep color versions of the above
 #define PACK_ARGB_MERGE_16(typ) (\
@@ -46,8 +46,8 @@ PACK_ARGB_G_MERGE_16(typ) + PACK_ARGB_B_MERGE_16(typ))
 #define PACK_AI_MERGE_16(typ) (PACK_AI_A_MERGE_16(typ) + PACK_AI_I_MERGE_16(typ))
 
 #define PACK_ARGB_16(typ) (\
-PACK_ARGB_A_16(typ) + PACK_ARGB_R_16(typ) + PACK_ARGB_G_16(typ) + PACK_ARGB_B_16(typ))
-#define PACK_AI_16(typ) (PACK_AI_A_16(typ) + PACK_AI_I_16(typ))
+PACK_ARGB_A_16(typ) | PACK_ARGB_R_16(typ) | PACK_ARGB_G_16(typ) | PACK_ARGB_B_16(typ))
+#define PACK_AI_16(typ) (PACK_AI_A_16(typ) | PACK_AI_I_16(typ))
 
 
 static void pack_raw_4_channel_merge_8bpp(

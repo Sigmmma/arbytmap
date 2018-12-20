@@ -546,7 +546,7 @@ static void unpack_v16u16_8(
     sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint32, uint16, uint8)
-    uint16 color[4] = { 0xFFff,0,0,0 };
+    uint16 color[4] = { 0,0,0,0 };
     sint16 u, v, w;
     double d, n_len;
 
@@ -581,7 +581,7 @@ static void unpack_v8u8_8(
     sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint32, uint8, uint8)
-    uint8 color[4] = { src_unpacked_max,0,0,0 };
+    uint8 color[4] = { 0,0,0,0 };
     sint16 u, v, w;
     double d, n_len;
 
@@ -1139,7 +1139,7 @@ static void unpack_v8u8_16(
     sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint16, uint8, uint16)
-    uint8 color[4] = { src_unpacked_max,0,0,0 };
+    uint8 color[4] = { 0,0,0,0 };
     sint16 u, v, w;
     double d, n_len;
 
@@ -1174,7 +1174,7 @@ static void unpack_v16u16_16(
     sint8 ucc, sint8 *chan_map)
 {
     DEFINE_UNPACK_VARIABLES(uint32, uint16, uint16)
-    uint16 color[4] = { src_unpacked_max,0,0,0 };
+    uint16 color[4] = { 0,0,0,0 };
     sint32 u, v, w;
     double d, n_len;
 
