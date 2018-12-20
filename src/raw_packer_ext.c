@@ -7,6 +7,7 @@
 #define PACK_ARGB_R_MERGE(typ) ((typ)r_scale[(unpacked_pix[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
 #define PACK_ARGB_G_MERGE(typ) ((typ)g_scale[(unpacked_pix[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
 #define PACK_ARGB_B_MERGE(typ) ((typ)b_scale[(unpacked_pix[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
+
 #define PACK_AI_A_MERGE(typ)   ((typ)a_scale[(unpacked_pix[i<<1]+a_rnd)/a_div]<<a_shift)
 #define PACK_AI_I_MERGE(typ)   ((typ)i_scale[(unpacked_pix[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
 
@@ -14,20 +15,24 @@
 #define PACK_ARGB_R(typ) ((typ)r_scale[unpacked_pix[(i<<2)+1]]<<r_shift)
 #define PACK_ARGB_G(typ) ((typ)g_scale[unpacked_pix[(i<<2)+2]]<<g_shift)
 #define PACK_ARGB_B(typ) ((typ)b_scale[unpacked_pix[(i<<2)+3]]<<b_shift)
+
 #define PACK_AI_A(typ)   ((typ)a_scale[unpacked_pix[(i<<1)]]<<a_shift)
 #define PACK_AI_I(typ)   ((typ)i_scale[unpacked_pix[(i<<1)+1]]<<i_shift)
 
-#define PACK_ARGB_A_MERGE_16(typ) ((typ)a_scale[(unpacked_pix[i<<2]+a_rnd)/a_div]<<a_shift)
-#define PACK_ARGB_R_MERGE_16(typ) ((typ)r_scale[(unpacked_pix[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
-#define PACK_ARGB_G_MERGE_16(typ) ((typ)g_scale[(unpacked_pix[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
-#define PACK_ARGB_B_MERGE_16(typ) ((typ)b_scale[(unpacked_pix[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
-#define PACK_AI_A_MERGE_16(typ)   ((typ)a_scale[(unpacked_pix[i<<1]+a_rnd)/a_div]<<a_shift)
-#define PACK_AI_I_MERGE_16(typ)   ((typ)i_scale[(unpacked_pix[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
+
+#define PACK_ARGB_A_MERGE_16(typ) ((typ)a_scale_16[(unpacked_pix[i<<2]+a_rnd)/a_div]<<a_shift)
+#define PACK_ARGB_R_MERGE_16(typ) ((typ)r_scale_16[(unpacked_pix[(i<<2)+1]+r_rnd)/r_div]<<r_shift)
+#define PACK_ARGB_G_MERGE_16(typ) ((typ)g_scale_16[(unpacked_pix[(i<<2)+2]+g_rnd)/g_div]<<g_shift)
+#define PACK_ARGB_B_MERGE_16(typ) ((typ)b_scale_16[(unpacked_pix[(i<<2)+3]+b_rnd)/b_div]<<b_shift)
+
+#define PACK_AI_A_MERGE_16(typ)   ((typ)a_scale_16[(unpacked_pix[i<<1]+a_rnd)/a_div]<<a_shift)
+#define PACK_AI_I_MERGE_16(typ)   ((typ)i_scale_16[(unpacked_pix[(i<<1)+1]+i_rnd)/i_div]<<i_shift)
 
 #define PACK_ARGB_A_16(typ) ((typ)a_scale_16[unpacked_pix[(i<<2)]]<<a_shift)
 #define PACK_ARGB_R_16(typ) ((typ)r_scale_16[unpacked_pix[(i<<2)+1]]<<r_shift)
 #define PACK_ARGB_G_16(typ) ((typ)g_scale_16[unpacked_pix[(i<<2)+2]]<<g_shift)
 #define PACK_ARGB_B_16(typ) ((typ)b_scale_16[unpacked_pix[(i<<2)+3]]<<b_shift)
+
 #define PACK_AI_A_16(typ)   ((typ)a_scale_16[unpacked_pix[(i<<1)]]<<a_shift)
 #define PACK_AI_I_16(typ)   ((typ)i_scale_16[unpacked_pix[(i<<1)+1]]<<i_shift)
 
@@ -65,14 +70,14 @@ static void pack_raw_4_channel_merge_8bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
     packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint8*)unpacked_pix_buf->buf;
@@ -116,15 +121,15 @@ static void pack_raw_2_channel_merge_8bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
-    packed_pix_64 = (uint64*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint8*)unpacked_pix_buf->buf;
     a_scale = (uint8*)a_scale_buf->buf;
@@ -164,14 +169,14 @@ static void pack_raw_4_channel_8bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
     packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint8*)unpacked_pix_buf->buf;
@@ -213,15 +218,15 @@ static void pack_raw_2_channel_8bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
-    packed_pix_64 = (uint64*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint8*)unpacked_pix_buf->buf;
     a_scale = (uint8*)a_scale_buf->buf;
@@ -259,14 +264,14 @@ static void pack_raw_1_channel_8bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
     packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint8*)unpacked_pix_buf->buf;
@@ -318,14 +323,14 @@ static void pack_raw_4_channel_merge_16bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
     packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint16*)unpacked_pix_buf->buf;
@@ -396,15 +401,15 @@ static void pack_raw_2_channel_merge_16bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
-    packed_pix_64 = (uint64*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint16*)unpacked_pix_buf->buf;
     a_scale = (uint8*)a_scale_buf->buf;
@@ -472,14 +477,14 @@ static void pack_raw_4_channel_16bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
     packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     a_scale = (uint8*)a_scale_buf->buf;
@@ -550,15 +555,15 @@ static void pack_raw_2_channel_16bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*) packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
-    packed_pix_64 = (uint64*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
+    packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint16*)unpacked_pix_buf->buf;
     a_scale = (uint8*)a_scale_buf->buf;
@@ -623,14 +628,14 @@ static void pack_raw_1_channel_16bpp(
 
     uint8  *packed_pix_8;
     uint16 *packed_pix_16;
-    uint32  *packed_pix_32;
+    uint32 *packed_pix_32;
     uint64 *packed_pix_64;
 
     packed_pix_size = packed_pix_buf->itemsize;
 
-    packed_pix_8  = (uint8*)packed_pix_buf->buf;
+    packed_pix_8 = (uint8*)packed_pix_buf->buf;
     packed_pix_16 = (uint16*)packed_pix_buf->buf;
-    packed_pix_32 = (uint32*) packed_pix_buf->buf;
+    packed_pix_32 = (uint32*)packed_pix_buf->buf;
     packed_pix_64 = (uint64*)packed_pix_buf->buf;
 
     unpacked_pix = (uint16*)unpacked_pix_buf->buf;

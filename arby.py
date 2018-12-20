@@ -27,7 +27,6 @@ except:
 try:
     from arbytmap.ext import raw_packer_ext
     fast_raw_packer = True
-    fast_raw_packer = False
 except:
     fast_raw_packer = False
 
@@ -1681,18 +1680,18 @@ class Arbytmap():
         a_scale, r_scale, g_scale, b_scale = (
             downscale[0], downscale[1], downscale[2], downscale[3])
 
+        # if the divisor is CHANNEL_ERASE_DIVISOR, it means to remove
+        # the channel, so we shouldnt add half the divisor to round.
+        a_rnd *= int(a_div != CHANNEL_ERASE_DIVISOR)
+        r_rnd *= int(r_div != CHANNEL_ERASE_DIVISOR)
+        g_rnd *= int(g_div != CHANNEL_ERASE_DIVISOR)
+        b_rnd *= int(b_div != CHANNEL_ERASE_DIVISOR)
         if fast_raw_packer:
             raw_packer_ext.pack_raw_4_channel_merge(
                 packed_array, upa, a_scale, r_scale, g_scale, b_scale,
                 a_div, r_div, g_div, b_div,
                 a_shift, r_shift, g_shift, b_shift)
         else:
-            # if the divisor is CHANNEL_ERASE_DIVISOR, it means to remove
-            # the channel, so we shouldnt add half the divisor to round.
-            a_rnd *= int(a_div != CHANNEL_ERASE_DIVISOR)
-            r_rnd *= int(r_div != CHANNEL_ERASE_DIVISOR)
-            g_rnd *= int(g_div != CHANNEL_ERASE_DIVISOR)
-            b_rnd *= int(b_div != CHANNEL_ERASE_DIVISOR)
             for i in range(0, len(packed_array)*4, 4):
                 packed_array[i>>2] = (
                     (a_scale[((upa[i  ]+a_rnd)//a_div)]<<a_shift) +
@@ -1713,15 +1712,15 @@ class Arbytmap():
         a_rnd, i_rnd = a_div//2, i_div//2
         a_scale, i_scale = downscale[0], downscale[1]
 
+        # if the divisor is CHANNEL_ERASE_DIVISOR, it means to remove
+        # the channel, so we shouldnt add half the divisor to round.
+        a_rnd *= int(a_div != CHANNEL_ERASE_DIVISOR)
+        i_rnd *= int(i_div != CHANNEL_ERASE_DIVISOR)
         if fast_raw_packer:
             raw_packer_ext.pack_raw_2_channel_merge(
                 packed_array, upa, a_scale, i_scale,
                 a_div, i_div, a_shift, i_shift)
         else:
-            # if the divisor is CHANNEL_ERASE_DIVISOR, it means to remove
-            # the channel, so we shouldnt add half the divisor to round.
-            a_rnd *= int(a_div != CHANNEL_ERASE_DIVISOR)
-            i_rnd *= int(i_div != CHANNEL_ERASE_DIVISOR)
             for i in range(0, len(packed_array)*2, 2):
                 packed_array[i>>1] = (
                     (a_scale[((upa[i  ]+a_rnd)//i_div)]<<a_shift) +

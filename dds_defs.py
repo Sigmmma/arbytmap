@@ -8,7 +8,7 @@ ab = None
 try:
     from arbytmap.ext import dds_defs_ext
     fast_dds_defs = True
-    fast_dds_defs = False
+    #fast_dds_defs = False
 except Exception:
     fast_dds_defs = False
 
@@ -266,12 +266,12 @@ def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
             color_idx = packed[j+1]
 
             #unpack the colors
-            c_0[1] = (((color0>>11) & 31)*255)//31
-            c_1[1] = (((color1>>11) & 31)*255)//31
-            c_0[2] = (((color0>>5) & 63)*255)//63
-            c_1[2] = (((color1>>5) & 63)*255)//63
-            c_1[3] = ((color1 & 31)*255)//31
-            c_0[3] = ((color0 & 31)*255)//31
+            c_0[1] = (((color0>>11) & 31)*255 + 15)//31
+            c_1[1] = (((color1>>11) & 31)*255 + 15)//31
+            c_0[2] = (((color0>>5) & 63)*255 + 31)//63
+            c_1[2] = (((color1>>5) & 63)*255 + 31)//63
+            c_1[3] = ((color1 & 31)*255 + 15)//31
+            c_0[3] = ((color0 & 31)*255 + 15)//31
 
             #if the first color is a larger integer
             #then color key transparency is NOT used
@@ -357,12 +357,12 @@ def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
             color_idx = packed[j+3]
 
             #unpack the colors
-            c_0[1] = (((color0>>11) & 31)*255)//31
-            c_1[1] = (((color1>>11) & 31)*255)//31
-            c_0[2] = (((color0>>5) & 63)*255)//63
-            c_1[2] = (((color1>>5) & 63)*255)//63
-            c_1[3] = ((color1 & 31)*255)//31
-            c_0[3] = ((color0 & 31)*255)//31
+            c_0[1] = (((color0>>11) & 31)*255 + 15)//31
+            c_1[1] = (((color1>>11) & 31)*255 + 15)//31
+            c_0[2] = (((color0>>5) & 63)*255 + 31)//63
+            c_1[2] = (((color1>>5) & 63)*255 + 31)//63
+            c_1[3] = ((color1 & 31)*255 + 15)//31
+            c_0[3] = ((color0 & 31)*255 + 15)//31
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -472,12 +472,12 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
             color_idx = packed[j+3]
 
             #unpack the colors
-            c_0[1] = (((color0>>11) & 31)*255)//31
-            c_1[1] = (((color1>>11) & 31)*255)//31
-            c_0[2] = (((color0>>5) & 63)*255)//63
-            c_1[2] = (((color1>>5) & 63)*255)//63
-            c_1[3] = ((color1 & 31)*255)//31
-            c_0[3] = ((color0 & 31)*255)//31
+            c_0[1] = (((color0>>11) & 31)*255 + 15)//31
+            c_1[1] = (((color1>>11) & 31)*255 + 15)//31
+            c_0[2] = (((color0>>5) & 63)*255 + 31)//63
+            c_1[2] = (((color1>>5) & 63)*255 + 31)//63
+            c_1[3] = ((color1 & 31)*255 + 15)//31
+            c_0[3] = ((color0 & 31)*255 + 15)//31
 
             if color0 < color1:
                 color0, color1 = color1, color0
@@ -1201,8 +1201,7 @@ def pack_dxt1(arby, unpacked, width, height, depth=1):
                     break
 
         if color0 == color1 and not make_alpha:
-            #do nothing except save one of the colors to the array
-            rpa[txl_i] = color0
+            rpa[txl_i] = (color1<<16) | color0
             continue
 
         # if the current color selection doesn't match what we want then
@@ -1350,10 +1349,7 @@ def pack_dxt2_3(arby, unpacked, width, height, depth=1):
                   (((g_scale[c_1[2]]*63+31)//255)<<5) |
                   (b_scale[c_1[3]]*31+15)//255)
 
-        if color0 == color1:
-            # do nothing except save one of the colors to the array
-            rpa[txl_i+2] = color0
-        else:
+        if color0 != color1:
             # if the current color selection doesn't match what
             # we want then we reverse which color is which
             if color0 < color1:
@@ -1382,8 +1378,8 @@ def pack_dxt2_3(arby, unpacked, width, height, depth=1):
 
                 idx += dists.index(min(dists))<<(i>>1)
 
-            rpa[txl_i+2] = (color1<<16) | color0
             rpa[txl_i+3] = idx
+        rpa[txl_i+2] = (color1<<16) | color0
 
     return repacked
 
@@ -1542,10 +1538,7 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
                   (((g_scale[c_1[2]]*63+31)//255)<<5) |
                   (b_scale[c_1[3]]*31+15)//255)
 
-        if color0 == color1:
-            # do nothing except save one of the colors to the array
-            rpa[txl_i+2] = color0
-        else:
+        if color0 != color1:
             # if the current color selection doesn't match what
             # we want then we reverse which color is which
             if color0 < color1:
@@ -1574,8 +1567,8 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
 
                 idx += dists.index(min(dists))<<(i>>1)
 
-            rpa[txl_i+2] = (color1<<16) | color0
             rpa[txl_i+3] = idx
+        rpa[txl_i+2] = (color1<<16) | color0
 
     return repacked
 
@@ -1935,12 +1928,8 @@ def pack_ctx1(arby, unpacked, width, height, depth=1):
         color0 = xy_0[0] | (xy_0[1]<<8)
         color1 = xy_1[0] | (xy_1[1]<<8)
 
-        if color0 == color1:
-            #do nothing except save one of the colors to the array
-            rpa[txl_i] = color0
-        else:
-            rpa[txl_i] = color0 | (color1<<16)
-
+        rpa[txl_i] = color0 | (color1<<16)
+        if color0 != color1:
             # calculate the intermediate colors
             xy_2[0] = (xy_0[0]*2 + xy_1[0])//3
             xy_2[1] = (xy_0[1]*2 + xy_1[1])//3

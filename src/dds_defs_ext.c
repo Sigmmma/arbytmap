@@ -35,13 +35,13 @@
     color1 = packed_pix[(i)]>>16;\
     color_idx = packed_pix[(i)+1];\
     \
-    c_0[1] = (((color0>>11) & 31)*255)/31;\
-    c_0[2] = (((color0>>5)  & 63)*255)/63;\
-    c_0[3] = (( color0      & 31)*255)/31;\
+    c_0[1] = (((color0>>11) & 31)*255 + 15)/31;\
+    c_0[2] = (((color0>>5)  & 63)*255 + 31)/63;\
+    c_0[3] = (( color0      & 31)*255 + 15)/31;\
     \
-    c_1[1] = (((color1>>11) & 31)*255)/31;\
-    c_1[2] = (((color1>>5)  & 63)*255)/63;\
-    c_1[3] = (( color1      & 31)*255)/31;\
+    c_1[1] = (((color1>>11) & 31)*255 + 15)/31;\
+    c_1[2] = (((color1>>5)  & 63)*255 + 31)/63;\
+    c_1[3] = (( color1      & 31)*255 + 15)/31;\
     \
     if (color0 > color1) {\
         c_2[1] = (c_0[1]*2 + c_1[1])/3;\
@@ -160,9 +160,9 @@ _CALC_W_NORMALIZE(u, v, w, (unpacked_max>> 1), unpacked_max, ((unpacked_max + 1)
     c[1] = unpacked[r_pxl_i + i];\
     c[2] = unpacked[g_pxl_i + i];\
     c[3] = unpacked[b_pxl_i + i];\
-    packed_c = ((((r_scale[c[1]] * 31 + 15) / 255)<<11) |\
-                (((g_scale[c[2]] * 63 + 31) / 255)<<5) |\
-                ((b_scale[c[3]] * 31 + 15) / 255)) & 0xFFff;
+    packed_c = ((((r_scale[c[1]] * 31 + 15UL) / 255)<<11) |\
+                (((g_scale[c[2]] * 63 + 31UL) / 255)<<5) |\
+                 ((b_scale[c[3]] * 31 + 15UL) / 255)) & 0xFFff;
 
 #define SWAP_COLORS()\
     tmp[1] = c_0[1]; tmp[2] = c_0[2]; tmp[3] = c_0[3];\
@@ -662,9 +662,7 @@ static void pack_dxt1_8(
         PACK_DXT_COLOR(c_0, c_0i, color0);
         PACK_DXT_COLOR(c_1, c_1i, color1);
 
-        if (!make_alpha && (color0 == color1)) {
-            ;// do nothing except save the colors to the array
-        } else {
+        if (make_alpha || (color0 != color1)) {
             //  make_alpha == no_alpha_for_texel
             if (make_alpha == (color0 > color1)) {
                 SWAP_COLORS()
@@ -718,7 +716,7 @@ static void pack_dxt2_3_8(
 
         // calculate the alpha
         for (j=0; j<chans_per_tex; j+=ucc) {
-            alpha |= ((uint64)a_scale[unpacked[pxl_i+j]])<<j;
+            alpha |= ((uint64)((a_scale[unpacked[pxl_i + j]] * 15 + 7) / 255)) << j;
         }
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
@@ -877,7 +875,7 @@ static void unpack_dxt1_16(
     DEFINE_DXT_UNPACK_VARIABLES()
     DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    max_i = unpacked_pix_buf->len / chans_per_tex;
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -910,7 +908,7 @@ static void unpack_dxt2_3_16(
     uint64 alpha;
     uint8 a;
 
-    max_i = unpacked_pix_buf->len / chans_per_tex;
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -942,7 +940,7 @@ static void unpack_dxt4_5_16(
     uint64 alpha_idx;
     uint8 a, alpha0, alpha1, a_lookup[8];
 
-    max_i = unpacked_pix_buf->len / chans_per_tex;
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -971,7 +969,7 @@ static void unpack_dxt3a_16(
     uint64 alpha;
     uint8 a;
 
-    max_i = unpacked_pix_buf->len / chans_per_tex;
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
 
     //loop through each destination channel
     for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
@@ -1015,7 +1013,7 @@ static void unpack_dxt5a_16(
     DEFINE_DXT_UNPACK_VARIABLES()
     uint8 val0, val1, lookup[8];
 
-    max_i = unpacked_pix_buf->len / chans_per_tex;
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
 
     //loop through each destination channel
     for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
@@ -1060,7 +1058,7 @@ static void unpack_dxn_16(
     uint64 r_idx, g_idx;
     double d, n_len;
 
-    max_i = (unpacked_pix_buf->len)/(2*chans_per_tex);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
     pxl_i = 0;
 
     // loop through each texel
@@ -1100,7 +1098,7 @@ static void unpack_ctx1_16(
     uint8 x, y, a = 255;
     double d, n_len;
 
-    max_i = (unpacked_pix_buf->len) / (2*chans_per_tex);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
 
     // loop through each texel
     for (i = 0; i < max_i; i++) {
@@ -1143,7 +1141,7 @@ static void unpack_v8u8_16(
     sint16 u, v, w;
     double d, n_len;
 
-    max_i = (unpacked_pix_buf->len) / (ucc * 2);
+    max_i = unpacked_pix_buf->len / (ucc * 2);
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -1178,7 +1176,7 @@ static void unpack_v16u16_16(
     sint32 u, v, w;
     double d, n_len;
 
-    max_i = (unpacked_pix_buf->len) / (ucc * 2);
+    max_i = unpacked_pix_buf->len / (ucc * 2);
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -1226,7 +1224,7 @@ static void pack_dxt1_16(
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/8; // 8 bytes per texel
+    max_i = packed_pix_buf->len / 8; // 8 bytes per texel
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -1255,9 +1253,7 @@ static void pack_dxt1_16(
         PACK_DXT_COLOR(c_0, c_0i, color0);
         PACK_DXT_COLOR(c_1, c_1i, color1);
 
-        if (!make_alpha && (color0 == color1)) {
-            ;// do nothing except save the colors to the array
-        } else {
+        if (make_alpha || (color0 != color1)) {
             //  make_alpha == no_alpha_for_texel
             if (make_alpha == (color0 > color1)) {
                 SWAP_COLORS()
@@ -1300,7 +1296,7 @@ static void pack_dxt2_3_16(
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/16; // 8 bytes per texel
+    max_i = packed_pix_buf->len / 16; // 8 bytes per texel
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -1312,7 +1308,7 @@ static void pack_dxt2_3_16(
 
         // calculate the alpha
         for (j=0; j<chans_per_tex; j+=ucc) {
-            alpha |= ((uint64)a_scale[unpacked[pxl_i+j]])<<j;
+            alpha |= ((uint64)((a_scale[unpacked[pxl_i+j]] * 15 + 7) / 255))<<j;
         }
         // compare distance between all pixels and find the two furthest apart
         // (we are actually comparing the area of the distance as it's faster)
@@ -1361,7 +1357,7 @@ static void pack_dxt4_5_16(
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/16; // 16 bytes per texel
+    max_i = packed_pix_buf->len / 16; // 16 bytes per texel
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -1421,7 +1417,7 @@ static void pack_v8u8_16(
     u_scale      = (uint8  *)u_scale_buf->buf;
     v_scale      = (uint8  *)v_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/2;
+    max_i = packed_pix_buf->len / 2;
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -1446,7 +1442,7 @@ static void pack_v16u16_16(
     u_scale      = (uint16 *)u_scale_buf->buf;
     v_scale      = (uint16 *)v_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/4;
+    max_i = packed_pix_buf->len / 4;
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
