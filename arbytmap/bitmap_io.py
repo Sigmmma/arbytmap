@@ -635,14 +635,18 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     else:
         valid_depths = (8, 16)
 
-    bit_depth = fmt_depth = max(ab.CHANNEL_DEPTHS[fmt] + (1, ))
-    target_depth = 1<<int(ceil(log(bit_depth, 2)))
+    bit_depth = fmt_depth = max(1, *ab.CHANNEL_DEPTHS[fmt])
+    target_depth = 1 << int(ceil(log(bit_depth, 2)))
     keep_alpha = kwargs.get("keep_alpha", channel_count <= 2)
-    intensity_to_rgb = kwargs.get("intensity_to_rgb", channel_count >= 2)
+    save_as_rgb = kwargs.get("save_as_rgb", channel_count >= 2)
+
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    channel_map = kwargs.pop("channel_mapping", None)
+    merge_map = kwargs.pop("channel_merge_mapping", None)
 
     filenames = []
 
-    if intensity_to_rgb:
+    if save_as_rgb:
         # png doesnt allow 2 channel greyscale, so convert them to 4 channel
         if keep_alpha and channel_count != 3:
             if target_depth > 8: fmt_to_save_as = ab.FORMAT_A16R16G16B16
@@ -650,6 +654,11 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
         else:
             if target_depth > 8: fmt_to_save_as = ab.FORMAT_R16G16B16
             else:                fmt_to_save_as = ab.FORMAT_R8G8B8
+
+        if channel_count == 2:
+            a_chan = 0 if (keep_alpha and channel_count != 3) else -1
+            channel_map = (a_chan, 1) if channel_map is None else channel_map
+            channel_map += (channel_map[1], ) * 2
     elif fmt == ab.FORMAT_A16: fmt_to_save_as = fmt = ab.FORMAT_L16
     elif fmt == ab.FORMAT_A8:  fmt_to_save_as = fmt = ab.FORMAT_L8
     # FORMAT_A4/2/1 are not implemented yet
@@ -664,9 +673,8 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     #elif target_depth == 2:  fmt_to_save_as = ab.FORMAT_L2
     #elif target_depth == 1:  fmt_to_save_as = ab.FORMAT_L1
 
-    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
-    channel_map = kwargs.pop("channel_mapping", None)
-    if (bit_depth not in valid_depths or channel_map is not None or
+    if (bit_depth not in valid_depths or
+        channel_map is not None or merge_map is not None or
         fmt != fmt_to_save_as or convertor.swizzled != swizzle_mode):
         conv_cpy = deepcopy(convertor)
         # TODO: optimize this so the only textures loaded in and converted
@@ -676,7 +684,8 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
 
         conv_cpy.load_new_conversion_settings(
             target_format=fmt_to_save_as, swizzle_mode=convertor.swizzle_mode,
-            channel_mapping=channel_map, target_big_endian=False)
+            channel_mapping=channel_map, channel_merge_mapping=merge_map,
+            target_big_endian=False)
         #conv_cpy.print_info(1,1,1)
         if not conv_cpy.convert_texture():
             return []
@@ -806,6 +815,7 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
                 elif fmt_depth == 16:
                     pix = bytearray(unpad_48bit_array(pix))
                     swap_array_items(pix, (5, 4, 3, 2, 1, 0))
+
             png_file.set_chunk_data(
                 idat_chunk, pad_idat_data(pix, stride//8),
                 png_compress_level=png_compress_level)
@@ -877,14 +887,17 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
     src_x_skip1 *= pixel_width
     dst_x_skip1 *= pixel_width
     x_stride *= pixel_width
-    
-    if fast_bitmap_io:
+
+    # TODO: Finish fixing the accelerator
+    if False and fast_bitmap_io:
         bitmap_io_ext.crop_pixel_data(
             pix, new_pix, z_stride, y_stride, x_stride,
             src_z_skip0, dst_z_skip0,
             src_y_skip0, dst_y_skip0, src_x_skip0, dst_x_skip0,
             src_y_skip1, dst_y_skip1, src_x_skip1, dst_x_skip1)
-    else:
+        return new_pix
+
+    with memoryview(pix).cast("B") as src, memoryview(new_pix).cast("B") as dst:
         src_i = src_z_skip0
         dst_i = dst_z_skip0
         src_x_skip1 += x_stride
@@ -895,7 +908,7 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
             for y in range(y_stride):
                 src_i += src_x_skip0
                 dst_i += dst_x_skip0
-                new_pix[dst_i: dst_i + x_stride] = pix[src_i: src_i + x_stride]
+                dst[dst_i: dst_i + x_stride] = src[src_i: src_i + x_stride]
                 src_i += src_x_skip1
                 dst_i += dst_x_skip1
 

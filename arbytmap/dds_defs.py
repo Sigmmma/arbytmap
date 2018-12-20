@@ -8,7 +8,7 @@ ab = None
 try:
     from arbytmap.ext import dds_defs_ext
     fast_dds_defs = True
-    #fast_dds_defs = False
+    fast_dds_defs = False
 except Exception:
     fast_dds_defs = False
 
@@ -72,11 +72,13 @@ def initialize():
     for fmt in (ab.FORMAT_DXT2, ab.FORMAT_DXT3):
         ab.register_format(fmt, 1, **combine(
             dxt_specs, bpp=8, depths=(8, 8, 8, 8),
+            premultiplied=(fmt == ab.FORMAT_DXT2),
             unpacker=unpack_dxt2_3, packer=pack_dxt2_3))
 
     for fmt in (ab.FORMAT_DXT4, ab.FORMAT_DXT5):
         ab.register_format(fmt, 1, **combine(
             dxt_specs, bpp=8, depths=(8, 8, 8, 8),
+            premultiplied=(fmt == ab.FORMAT_DXT4),
             unpacker=unpack_dxt4_5, packer=pack_dxt4_5))
 
     for fmt in (ab.FORMAT_DXT3A, ab.FORMAT_DXT3Y):
@@ -277,16 +279,13 @@ def unpack_dxt1(arby, bitmap_index, width, height, depth=1):
                 c_2[1] = (c_0[1]*2 + c_1[1])//3
                 c_2[2] = (c_0[2]*2 + c_1[2])//3
                 c_2[3] = (c_0[3]*2 + c_1[3])//3
-                colors[3] = [
-                    unpack_max,
-                    (c_0[1] + 2*c_1[1])//3,
-                    (c_0[2] + 2*c_1[2])//3,
-                    (c_0[3] + 2*c_1[3])//3]
+                c_3[:] = [255, (c_0[1] + 2*c_1[1])//3,
+                          (c_0[2] + 2*c_1[2])//3, (c_0[3] + 2*c_1[3])//3]
             else:
                 c_2[1] = (c_0[1]+c_1[1])//2
                 c_2[2] = (c_0[2]+c_1[2])//2
                 c_2[3] = (c_0[3]+c_1[3])//2
-                colors[3] = transparent
+                c_3[:] = transparent
 
             for j in pixel_indices:
                 color = colors[(color_idx >> (j*2))&3]
@@ -656,7 +655,7 @@ def unpack_dxn(arby, bitmap_index, width, height, depth=1):
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
     unpack_max = (1<<(unpack_size*8)) - 1
 
-    zero_point = sign_mask = 1 << ((unpack_size*8) - 1)
+    zero_point = sign_mask = 0x80
     mask = sign_mask - 1
     mask_sq = mask**2
 
@@ -757,14 +756,14 @@ def unpack_dxn(arby, bitmap_index, width, height, depth=1):
                     r = x + zero_point if r&sign_mask else zero_point - x
                     g = y + zero_point if g&sign_mask else zero_point - y
 
-                colors = [255, r, g, b]
+                color = [0, r, g, b]
                 dst_chan = 0
                 for src_chan in chan_map:
                     if src_chan <= 0 or dst_chan == 0:
                         # set alpha to full white
-                        unpacked[off + dst_chan] = unpack_max
+                        unpacked[off] = unpack_max
                     elif src_chan >= 0:
-                        unpacked[off + dst_chan] = upscales[dst_chan][colors[src_chan]]
+                        unpacked[off + dst_chan] = upscales[dst_chan][color[src_chan]]
                     dst_chan += 1
 
     return unswizzle_dxt(unpacked, width, height * depth, ucc)
@@ -778,7 +777,7 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
     unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
     unpack_max = (1<<(unpack_size*8)) - 1
 
-    zero_point = sign_mask = 1 << ((unpack_size*8) - 1)
+    zero_point = sign_mask = 0x80
     mask = sign_mask - 1
     mask_sq = mask**2
 
@@ -808,10 +807,10 @@ def unpack_ctx1(arby, bitmap_index, width, height, depth=1):
             pixels_per_texel, ucc, array("b", chan_map[: 4]))
     else:
         #create the arrays to hold the color channel data
-        c_0 = [255,0,0,0]
-        c_1 = [255,0,0,0]
-        c_2 = [255,0,0,0]
-        c_3 = [255,0,0,0]
+        c_0 = [0,0,0,0]
+        c_1 = [0,0,0,0]
+        c_2 = [0,0,0,0]
+        c_3 = [0,0,0,0]
 
         #stores the colors in a way we can easily access them
         colors = [c_0, c_1, c_2, c_3]
@@ -959,7 +958,7 @@ def unpack_vu(arby, bitmap_index, width, height, depth=1, bpc=8):
             v = int(v/n_len)
             w = 0
 
-        colors = [255, u + sign_mask, v + sign_mask, w + sign_mask]
+        colors = [0, u + sign_mask, v + sign_mask, w + sign_mask]
         dst_chan = 0
         for src_chan in chan_map:
             if src_chan < 0 and dst_chan == 0:
@@ -1031,7 +1030,7 @@ def unpack_rg(arby, bitmap_index, width, height, depth=1, bpc=8):
             v = int(v/n_len)
             w = 0
 
-        colors = [255, u + sign_mask, v + sign_mask, w + sign_mask]
+        colors = [0, u + sign_mask, v + sign_mask, w + sign_mask]
         dst_chan = 0
         for src_chan in chan_map:
             if src_chan < 0 and dst_chan == 0:
@@ -1103,7 +1102,7 @@ def unpack_gb(arby, bitmap_index, width, height, depth=1, bpc=8):
             w = int(w/n_len)
             u = 0
 
-        colors = [255, u + sign_mask, v + sign_mask, w + sign_mask]
+        colors = [0, u + sign_mask, v + sign_mask, w + sign_mask]
         dst_chan = 0
         for src_chan in chan_map:
             if src_chan < 0 and dst_chan == 0:
@@ -1167,22 +1166,22 @@ def pack_dxt1(arby, unpacked, width, height, depth=1):
         # compare distance between all pixels and find the two furthest apart
         # (we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
-            r = upa[r_pxl_i+i]
-            g = upa[g_pxl_i+i]
-            b = upa[b_pxl_i+i]
+            r = upa[r_pxl_i + i]
+            g = upa[g_pxl_i + i]
+            b = upa[b_pxl_i + i]
             for j in pixel_indices:
                 if j <= i: continue
-                dist1 = ((r-upa[r_pxl_i+j])**2+
-                         (g-upa[g_pxl_i+j])**2+
-                         (b-upa[b_pxl_i+j])**2)
+                dist1 = ((r - upa[r_pxl_i + j])**2+
+                         (g - upa[g_pxl_i + j])**2+
+                         (b - upa[b_pxl_i + j])**2)
                 if dist1 > dist0:
                     dist0 = dist1
                     c_0i = i
                     c_1i = j
 
         # store furthest apart colors for use
-        c_0 = upa[pxl_i+c_0i: 4+pxl_i+c_0i]
-        c_1 = upa[pxl_i+c_1i: 4+pxl_i+c_1i]
+        c_0 = upa[pxl_i + c_0i: pxl_i + c_0i + 4]
+        c_1 = upa[pxl_i + c_1i: pxl_i + c_1i + 4]
 
         # quantize the colors down to 16 bit color and repack
         color0 = ((((r_scale[c_0[1]]*31+15)//255)<<11) |
@@ -1316,7 +1315,8 @@ def pack_dxt2_3(arby, unpacked, width, height, depth=1):
         # calculate alpha channel for DXT 2/3
         # coincidentally, the number of channels(4) matches the number of
         # bits in the alpha(4), so the shift is the same as the channel index
-        alpha = sum(a_scale[upa[pxl_i+i]]<<i for i in pixel_indices)
+        alpha = sum(((a_scale[upa[pxl_i+i]]*15 + 7)//255) << i
+                    for i in pixel_indices)
 
         rpa[txl_i]   = alpha&0xFFffFFff
         rpa[txl_i+1] = alpha>>32
@@ -1325,19 +1325,22 @@ def pack_dxt2_3(arby, unpacked, width, height, depth=1):
         # compare distance between all pixels and find the two furthest apart
         # (we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
+            r = upa[i + r_pxl_i]
+            g = upa[i + g_pxl_i]
+            b = upa[i + b_pxl_i]
             for j in pixel_indices:
                 if j <= i: continue
-                dist1 = ((upa[r_pxl_i+i]-upa[r_pxl_i+j])**2+
-                         (upa[g_pxl_i+i]-upa[g_pxl_i+j])**2+
-                         (upa[b_pxl_i+i]-upa[b_pxl_i+j])**2)
+                dist1 = ((r - upa[r_pxl_i + j])**2+
+                         (g - upa[g_pxl_i + j])**2+
+                         (b - upa[b_pxl_i + j])**2)
                 if dist1 > dist0:
                     dist0 = dist1
                     c_0i = i
                     c_1i = j
 
         # store furthest apart colors for use
-        c_0 = upa[pxl_i+c_0i: 4+pxl_i+c_0i]
-        c_1 = upa[pxl_i+c_1i: 4+pxl_i+c_1i]
+        c_0 = upa[pxl_i + c_0i: pxl_i + c_0i + 4]
+        c_1 = upa[pxl_i + c_1i: pxl_i + c_1i + 4]
 
         # quantize the colors down to 16 bit color and repack
         color0 = ((((r_scale[c_0[1]]*31+15)//255)<<11) |
@@ -1514,19 +1517,22 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
         # compare distance between all pixels and find the two furthest apart
         # (we are actually comparing the area of the distance as it's faster)
         for i in pixel_indices:
+            r = upa[r_pxl_i + i]
+            g = upa[g_pxl_i + i]
+            b = upa[b_pxl_i + i]
             for j in pixel_indices:
                 if j <= i: continue
-                dist1 = ((upa[r_pxl_i+i]-upa[r_pxl_i+j])**2+
-                         (upa[g_pxl_i+i]-upa[g_pxl_i+j])**2+
-                         (upa[b_pxl_i+i]-upa[b_pxl_i+j])**2)
+                dist1 = ((r - upa[r_pxl_i + j])**2+
+                         (g - upa[g_pxl_i + j])**2+
+                         (b - upa[b_pxl_i + j])**2)
                 if dist1 > dist0:
                     dist0 = dist1
                     c_0i = i
                     c_1i = j
 
         # store furthest apart colors for use
-        c_0 = upa[pxl_i+c_0i: 4+pxl_i+c_0i]
-        c_1 = upa[pxl_i+c_1i: 4+pxl_i+c_1i]
+        c_0 = upa[pxl_i + c_0i: pxl_i + c_0i + 4]
+        c_1 = upa[pxl_i + c_1i: pxl_i + c_1i + 4]
 
         # quantize the colors down to 16 bit color and repack
         color0 = ((((r_scale[c_0[1]]*31+15)//255)<<11) |
@@ -1558,9 +1564,9 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
             # calculate each pixel's closest match
             # and assign it the proper index
             for i in pixel_indices:
-                r = upa[r_pxl_i+i]
-                g = upa[g_pxl_i+i]
-                b = upa[b_pxl_i+i]
+                r = upa[i + r_pxl_i]
+                g = upa[i + g_pxl_i]
+                b = upa[i + b_pxl_i]
                 dists = ((r-c_0[1])**2 + (g-c_0[2])**2 + (b-c_0[3])**2,
                          (r-c_1[1])**2 + (g-c_1[2])**2 + (b-c_1[3])**2,
                          (r-c_2[1])**2 + (g-c_2[2])**2 + (b-c_2[3])**2,
@@ -1614,8 +1620,8 @@ def pack_dxt3a(arby, unpacked, width, height, depth=1):
         scale = scales[chan]
 
         # CALCULATE THE ALPHA
-        alpha = sum(scale[upa[pxl_i+i]]<<i for i in pixel_indices)
-
+        alpha = sum(((scale[upa[pxl_i+i]]*15 + 7)//255) << i
+                    for i in pixel_indices)
         rpa[txl_i]   = alpha&0xFFffFFff
         rpa[txl_i+1] = alpha>>32
 

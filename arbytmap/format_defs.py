@@ -68,6 +68,7 @@ RAW_FORMATS = set()
 COMPRESSED_FORMATS = set()
 DDS_FORMATS = set()
 THREE_CHANNEL_FORMATS = set()
+PREMULTIPLIED_FORMATS = set()
 
 UNPACKERS = {}
 PACKERS = {}
@@ -107,6 +108,7 @@ CHANNEL_OFFSETS = {}
 ALL_FORMAT_COLLECTIONS = {
     "VALID_FORMAT":VALID_FORMATS, "BITS_PER_PIXEL":BITS_PER_PIXEL,
     "RAW_FORMAT":RAW_FORMATS, "THREE_CHANNEL_FORMAT":THREE_CHANNEL_FORMATS,
+    "PREMULTIPLIED_FORMATS": PREMULTIPLIED_FORMATS,
     "COMPRESSED_FORMAT":COMPRESSED_FORMATS, "DDS_FORMAT":DDS_FORMATS,
     "PACKED_TYPECODES":PACKED_TYPECODES, "UNPACKER":UNPACKERS,
     "CHANNEL_COUNT":CHANNEL_COUNTS, "PACKER":PACKERS,
@@ -119,7 +121,6 @@ ALL_FORMAT_COLLECTIONS = {
     "BITS_PER_BLOCK": BITS_PER_BLOCK,
     "BLOCK_WIDTHS": BLOCK_WIDTHS, "BLOCK_HEIGHTS": BLOCK_HEIGHTS,
     }
-
 
 def register_format(format_id, silence_redefine=False, **kwargs):
     """
@@ -183,9 +184,10 @@ def register_format(format_id, silence_redefine=False, **kwargs):
             if len(offsets) == 3: offsets += (0, )
             if len(masks)   == 3: masks   += (0, )
 
-        if kwargs.get("raw_format", True):  RAW_FORMATS.add(format_id)
-        if kwargs.get("dds_format", False): DDS_FORMATS.add(format_id)
-        if kwargs.get("compressed", False): COMPRESSED_FORMATS.add(format_id)
+        if kwargs.get("raw_format",    1): RAW_FORMATS.add(format_id)
+        if kwargs.get("dds_format",    0): DDS_FORMATS.add(format_id)
+        if kwargs.get("compressed",    0): COMPRESSED_FORMATS.add(format_id)
+        if kwargs.get("premultiplied", 0): PREMULTIPLIED_FORMATS.add(format_id)
 
         if kwargs.get("unpacker"):
             UNPACKERS[format_id] = kwargs["unpacker"]

@@ -211,8 +211,7 @@ static PyObject *py_crop_pixel_data(PyObject *self, PyObject *args) {
     /*PySys_FormatStdout("%d  %d    %d  %d\n", max_src_i, max_dst_i, 
                        bufs[0].len * bufs[0].itemsize,
                        bufs[1].len * bufs[1].itemsize);*/
-    if ((max_src_i < bufs[0].len * bufs[0].itemsize) ||
-        (max_dst_i < bufs[1].len * bufs[1].itemsize)) {
+    if (max_src_i < bufs[0].len || max_dst_i < bufs[1].len) {
         PyBuffer_Release(&bufs[0]);
         PyBuffer_Release(&bufs[1]);
         PySys_FormatStdout("Invalid offsets supplied to bitmap_io_ext.crop_pixel_data\n");
