@@ -380,7 +380,7 @@ static void unpack_dxt3a_8(
     uint64 alpha;
     uint8 a;
 
-    max_i = unpacked_pix_buf->len / chans_per_tex;
+    max_i = unpacked_pix_buf->len / (chans_per_tex * scc);
 
     //loop through each destination channel
     for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
@@ -422,7 +422,7 @@ static void unpack_dxt5a_8(
     DEFINE_DXT_UNPACK_VARIABLES()
     uint8 val0, val1, lookup[8];
 
-    max_i = unpacked_pix_buf->len / chans_per_tex;
+    max_i = unpacked_pix_buf->len / (chans_per_tex * scc);
 
     //loop through each destination channel
     for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
@@ -969,7 +969,7 @@ static void unpack_dxt3a_16(
     uint64 alpha;
     uint8 a;
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2 * scc);
 
     //loop through each destination channel
     for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
@@ -1013,7 +1013,7 @@ static void unpack_dxt5a_16(
     DEFINE_DXT_UNPACK_VARIABLES()
     uint8 val0, val1, lookup[8];
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * 2 * scc);
 
     //loop through each destination channel
     for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
