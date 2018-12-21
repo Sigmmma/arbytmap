@@ -875,7 +875,7 @@ static void unpack_dxt1_16(
     DEFINE_DXT_UNPACK_VARIABLES()
     DEFINE_DXT_COLOR_UNPACK_VARIABLES()
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * unpacked_pix_buf->itemsize);
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -908,7 +908,7 @@ static void unpack_dxt2_3_16(
     uint64 alpha;
     uint8 a;
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * unpacked_pix_buf->itemsize);
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -940,7 +940,7 @@ static void unpack_dxt4_5_16(
     uint64 alpha_idx;
     uint8 a, alpha0, alpha1, a_lookup[8];
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * unpacked_pix_buf->itemsize);
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -982,7 +982,7 @@ static void unpack_dxt3a_16(
             // either leave it full black, or set it to full white.
             if (dst_chan == 0)
                 // set alpha to full white for the entire image
-                for (i = 0; i < (uint64)(unpacked_pix_buf->len); i += ucc)
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len / unpacked_pix_buf->itemsize); i += ucc)
                     unpacked_pix[i] = dst_unpacked_max;
             continue;
         }
@@ -1013,7 +1013,7 @@ static void unpack_dxt5a_16(
     DEFINE_DXT_UNPACK_VARIABLES()
     uint8 val0, val1, lookup[8];
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2 * scc);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * unpacked_pix_buf->itemsize * scc);
 
     //loop through each destination channel
     for (dst_chan = 0; dst_chan < ucc; dst_chan++) {
@@ -1026,7 +1026,7 @@ static void unpack_dxt5a_16(
             // either leave it full black, or set it to full white.
             if (dst_chan == 0)
                 // set alpha to full white for the entire image
-                for (i = 0; i < (uint64)(unpacked_pix_buf->len); i += ucc)
+                for (i = 0; i < (uint64)(unpacked_pix_buf->len / unpacked_pix_buf->itemsize); i += ucc)
                     unpacked_pix[i] = dst_unpacked_max;
             continue;
         }
@@ -1058,7 +1058,7 @@ static void unpack_dxn_16(
     uint64 r_idx, g_idx;
     double d, n_len;
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * unpacked_pix_buf->itemsize);
     pxl_i = 0;
 
     // loop through each texel
@@ -1098,7 +1098,7 @@ static void unpack_ctx1_16(
     uint8 x, y, a = 255;
     double d, n_len;
 
-    max_i = unpacked_pix_buf->len / (chans_per_tex * 2);
+    max_i = unpacked_pix_buf->len / (chans_per_tex * unpacked_pix_buf->itemsize);
 
     // loop through each texel
     for (i = 0; i < max_i; i++) {
@@ -1141,7 +1141,7 @@ static void unpack_v8u8_16(
     sint16 u, v, w;
     double d, n_len;
 
-    max_i = unpacked_pix_buf->len / (ucc * 2);
+    max_i = unpacked_pix_buf->len / (ucc * unpacked_pix_buf->itemsize);
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -1176,7 +1176,7 @@ static void unpack_v16u16_16(
     sint32 u, v, w;
     double d, n_len;
 
-    max_i = unpacked_pix_buf->len / (ucc * 2);
+    max_i = unpacked_pix_buf->len / (ucc * unpacked_pix_buf->itemsize);
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
