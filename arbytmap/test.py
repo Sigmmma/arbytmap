@@ -103,8 +103,9 @@ def run_test(print_formats=False, deep_color=False,
 
     input('Press "Enter" to begin conversion 5')
     convert_chain(ab.FORMAT_A8R8G8B8, (
-        ab.FORMAT_A16,
-        ab.FORMAT_A8, ab.FORMAT_DXT5AY,
+        ab.FORMAT_A8L8,
+        ab.FORMAT_A16, ab.FORMAT_A8,
+        ab.FORMAT_DXT5AY,
         #ab.FORMAT_A4, ab.FORMAT_A2, ab.FORMAT_A1,
         ), ck_trans=ck_trans, keep_alpha=keep_alpha)
 
