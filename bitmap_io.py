@@ -390,8 +390,10 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
             fmt_flags.has_alpha  = "A" in fmt and not fmt_flags.alpha_only
 
         fmt_head.four_cc.set_to(fmt_name)
+        head.pitch_or_linearsize *= max(1, (h + 3) // 4)
     elif "DXT" in fmt.upper() or fmt in (ab.FORMAT_DXN, ):
         fmt_head.four_cc.set_to(fmt)
+        head.pitch_or_linearsize *= max(1, (h + 3) // 4)
     elif fmt in (ab.FORMAT_A1, ab.FORMAT_A4, ab.FORMAT_L4, ab.FORMAT_A4L4,
                  ab.FORMAT_L5V5U5, ab.FORMAT_X8L8V8U8, ab.FORMAT_Q8L8V8U8,
                  ab.FORMAT_Q8W8V8U8, ab.FORMAT_Q16W16V16U16,
