@@ -77,7 +77,7 @@ def run_test(print_formats=False, deep_color=False,
 
     bitmap_test.set_deep_color_mode(deep_color)
     '''
-'''
+
     input('Press "Enter" to begin conversion 1')
     convert_chain(ab.FORMAT_A8R8G8B8, (
         ab.FORMAT_R8G8B8, ab.FORMAT_R5G6B5, ab.FORMAT_R3G3B2),
@@ -100,19 +100,25 @@ def run_test(print_formats=False, deep_color=False,
         ab.FORMAT_A16B16G16R16, ab.FORMAT_A2R10G10B10, ab.FORMAT_A2B10G10R10,
         ab.FORMAT_V8U8, ab.FORMAT_DXN, ab.FORMAT_CTX1),
                   ck_trans=ck_trans, keep_alpha=keep_alpha)
-
+'''
     input('Press "Enter" to begin conversion 5')
     convert_chain(ab.FORMAT_A8R8G8B8, (
         ab.FORMAT_A8L8,
         ab.FORMAT_A16, ab.FORMAT_A8,
-        ab.FORMAT_DXT5AY,
+        ab.FORMAT_DXT5A, ab.FORMAT_DXT3A,
         #ab.FORMAT_A4, ab.FORMAT_A2, ab.FORMAT_A1,
         ), ck_trans=ck_trans, keep_alpha=keep_alpha)
 
     input('Press "Enter" to begin conversion 6')
-    convert_chain(ab.FORMAT_A8R8G8B8, (ab.FORMAT_A16L16,
-                                       ab.FORMAT_A8L8,
-                                       ab.FORMAT_DXT5AY, ab.FORMAT_A4L4),
+    convert_chain(ab.FORMAT_A8R8G8B8, (
+        ab.FORMAT_L8,
+        ab.FORMAT_DXT5Y, ab.FORMAT_DXT3Y,
+        ), ck_trans=ck_trans, keep_alpha=keep_alpha)
+
+    input('Press "Enter" to begin conversion 6')
+    convert_chain(ab.FORMAT_A8R8G8B8, (ab.FORMAT_A16L16, ab.FORMAT_A8L8,
+                                       ab.FORMAT_DXT5AY, ab.FORMAT_DXT3AY,
+                                       ab.FORMAT_A4L4),
                   ck_trans=ck_trans, keep_alpha=keep_alpha)
 
     input('Press "Enter" to begin conversion 7')
@@ -123,7 +129,7 @@ def run_test(print_formats=False, deep_color=False,
 if __name__ == "__main__":
     try:
         run_test(print_formats=False, deep_color=True,
-                 keep_alpha=False, ck_trans=False)
+                 keep_alpha=1, ck_trans=False)
     except:
         print(format_exc())
 
