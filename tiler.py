@@ -112,12 +112,11 @@ class Tiler():
     def _tile_block(self, mode, pixels, modified_pixels,
                     fmt, width, height, depth):
         b_width, b_height, b_size = get_tiling_info(fmt)
+        print(b_width, b_height, b_size)
 
         tile_method = self._methods.get(self.tile_method)
         fast_tile_method = self._fast_methods.get(self.tile_method)
-        if False and fast_tile_method:
-            # TODO: Enable this when the accelerator bug is fixed
-            # Seems to crash on visor realtime bump
+        if fast_tile_method:
             fast_tile_method(mode, pixels, modified_pixels,
                              width, height, depth,
                              b_width, b_height, b_size)
