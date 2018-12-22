@@ -549,7 +549,7 @@ static void unpack_v16u16_8(
     sint16 u, v, w;
     double d, n_len;
 
-    max_i = (unpacked_pix_buf->len)/ucc;
+    max_i = unpacked_pix_buf->len / ucc;
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -584,7 +584,7 @@ static void unpack_v8u8_8(
     sint16 u, v, w;
     double d, n_len;
 
-    max_i = (unpacked_pix_buf->len) / ucc;
+    max_i = unpacked_pix_buf->len / ucc;
 
     //loop through each pixel
     for (i=0; i < max_i; i++) {
@@ -632,7 +632,7 @@ static void pack_dxt1_8(
     g_scale  = (uint8 *)g_scale_buf->buf;
     b_scale  = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/8; // 8 bytes per texel
+    max_i = packed_pix_buf->len / 8; // 8 bytes per texel
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -703,7 +703,7 @@ static void pack_dxt2_3_8(
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/16; // 16 bytes per texel
+    max_i = packed_pix_buf->len / 16; // 16 bytes per texel
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -764,7 +764,7 @@ static void pack_dxt4_5_8(
     g_scale = (uint8 *)g_scale_buf->buf;
     b_scale = (uint8 *)b_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/16; // 16 bytes per texel
+    max_i = packed_pix_buf->len / 16; // 16 bytes per texel
 
     // loop through each texel
     for (i=0; i < max_i; i++) {
@@ -824,7 +824,7 @@ static void pack_v8u8_8(
     u_scale      = (uint8 *)u_scale_buf->buf;
     v_scale      = (uint8 *)v_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/2;
+    max_i = packed_pix_buf->len / 2;  // 2 bytes per pixel
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -849,7 +849,7 @@ static void pack_v16u16_8(
     u_scale      = (uint16 *)u_scale_buf->buf;
     v_scale      = (uint16 *)v_scale_buf->buf;
 
-    max_i = (packed_pix_buf->len)/4;
+    max_i = packed_pix_buf->len / 4;  // 4 bytes per pixel
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -1414,7 +1414,7 @@ static void pack_v8u8_16(
     u_scale      = (uint8  *)u_scale_buf->buf;
     v_scale      = (uint8  *)v_scale_buf->buf;
 
-    max_i = packed_pix_buf->len / 2;
+    max_i = packed_pix_buf->len / 2;  // 2 bytes per pixel
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;
@@ -1439,7 +1439,7 @@ static void pack_v16u16_16(
     u_scale      = (uint16 *)u_scale_buf->buf;
     v_scale      = (uint16 *)v_scale_buf->buf;
 
-    max_i = packed_pix_buf->len / 4;
+    max_i = packed_pix_buf->len / 4;  // 4 bytes per pixel
     //loop through each pixel
     for (i=0; i < max_i; i++) {
         pxl_i = i*ucc;

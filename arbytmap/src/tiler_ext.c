@@ -60,29 +60,29 @@ static PyObject *py_dxgi_tile_array(PyObject *self, PyObject *args) {
 
     x_chunks = width / b_width;
     y_chunks = height / b_height;
-    /*PySys_FormatStdout("%d\n", untiled_buf->len * untiled_buf->itemsize);
-    PySys_FormatStdout("%d  %d  %d  %d\n", width, height, depth, b_size);
-    PySys_FormatStdout("%d\n", tiled_buf->len * tiled_buf->itemsize);
-    PySys_FormatStdout("%d  %d  %d  %d\n", b_width, b_height, depth, b_size);*/
+    /*PySys_FormatStdout("UNTILED: %d  %d\n", untiled_buf->len, untiled_buf->itemsize);
+    PySys_FormatStdout("  %d  %d  %d  %d\n", width, height, depth, b_size);
+    PySys_FormatStdout("TILED: %d  %d\n", tiled_buf->len, tiled_buf->itemsize);
+    PySys_FormatStdout("  %d  %d  %d  %d\n", b_width, b_height, depth, b_size);*/
 
-    if (((x_chunks * y_chunks * depth * b_size) > (bufs[0].len * bufs[0].itemsize)) ||
-        ((x_chunks * y_chunks * depth * b_size) > (bufs[1].len * bufs[1].itemsize))) {
+    if (((x_chunks * y_chunks * depth * b_size) > bufs[0].len) ||
+        ((x_chunks * y_chunks * depth * b_size) > bufs[1].len)) {
         RELEASE_PY_BUFFER_ARRAY(bufs, i)
         PySys_FormatStdout("Invalid offsets supplied to tiler_ext.dxgi_tile_array\n");
         return Py_BuildValue("");  // return Py_None while incrementing it
     }
 
     if (tile_mode) {
-        for (i = 0; i < x_chunks; i++) {
-            for (j = 0; j < y_chunks; j++) {
+        for (i = 0; i < y_chunks; i++) {
+            for (j = 0; j < x_chunks; j++) {
                 offset = i * x_chunks + j;
                 xy_address = get_dxgi_tiled_address(offset, x_chunks, b_size);
                 x = (uint32)xy_address;
                 y = (uint32)(xy_address >> 32);
                 t_idx = offset * b_size;
                 u_idx = (y * x_chunks + x) * b_size;
-                /*if (t_idx + b_size > tiled_buf->len * tiled_buf->itemsize ||
-                    u_idx + b_size > untiled_buf->len * untiled_buf->itemsize) {
+                /*if ((t_idx + b_size > tiled_buf->len) ||
+                    (u_idx + b_size > untiled_buf->len)) {
                     PySys_FormatStdout("FUCK\n");
                     break;
                 }*/
@@ -90,16 +90,16 @@ static PyObject *py_dxgi_tile_array(PyObject *self, PyObject *args) {
             }
         }
     } else {
-        for (i = 0; i < x_chunks; i++) {
-            for (j = 0; j < y_chunks; j++) {
+        for (i = 0; i < y_chunks; i++) {
+            for (j = 0; j < x_chunks; j++) {
                 offset = i * x_chunks + j;
                 xy_address = get_dxgi_tiled_address(offset, x_chunks, b_size);
                 x = (uint32)xy_address;
                 y = (uint32)(xy_address >> 32);
                 t_idx = offset * b_size;
                 u_idx = (y * x_chunks + x) * b_size;
-                /*if ((t_idx + b_size > tiled_buf->len * tiled_buf->itemsize) ||
-                    (u_idx + b_size > untiled_buf->len * untiled_buf->itemsize)) {
+                /*if ((t_idx + b_size > tiled_buf->len) ||
+                    (u_idx + b_size > untiled_buf->len)) {
                     PySys_FormatStdout("FUCK\n");
                     break;
                 }*/
