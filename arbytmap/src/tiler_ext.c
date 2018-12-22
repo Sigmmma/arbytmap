@@ -65,8 +65,8 @@ static PyObject *py_dxgi_tile_array(PyObject *self, PyObject *args) {
     PySys_FormatStdout("%d\n", tiled_buf->len * tiled_buf->itemsize);
     PySys_FormatStdout("%d  %d  %d  %d\n", b_width, b_height, depth, b_size);*/
 
-    if ((x_chunks * y_chunks * depth * b_size > bufs[0].len * bufs[0].itemsize) ||
-        (x_chunks * y_chunks * depth * b_size > bufs[1].len * bufs[1].itemsize)) {
+    if (((x_chunks * y_chunks * depth * b_size) > (bufs[0].len * bufs[0].itemsize)) ||
+        ((x_chunks * y_chunks * depth * b_size) > (bufs[1].len * bufs[1].itemsize))) {
         RELEASE_PY_BUFFER_ARRAY(bufs, i)
         PySys_FormatStdout("Invalid offsets supplied to tiler_ext.dxgi_tile_array\n");
         return Py_BuildValue("");  // return Py_None while incrementing it
@@ -103,8 +103,6 @@ static PyObject *py_dxgi_tile_array(PyObject *self, PyObject *args) {
                     PySys_FormatStdout("FUCK\n");
                     break;
                 }*/
-                /*for (k = 0; k < b_size; k++)
-                    untiled[u_idx + k] = tiled[t_idx + k];*/
                 memcpy(&untiled[u_idx], &tiled[t_idx], (size_t)b_size);
             }
         }

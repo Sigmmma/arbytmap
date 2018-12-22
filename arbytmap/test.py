@@ -66,10 +66,11 @@ def run_test(print_formats=False, deep_color=False,
            "fast_raw_unpackers = %s\n"
            "fast_bitmap_io     = %s\n"
            "fast_swizzler      = %s\n"
-           "fast_dds_defs      = %s\n")
+           "fast_dds_defs      = %s\n"
+           "fast_tiler         = %s\n")
           % (ab.fast_arbytmap, ab.fast_raw_packer, ab.fast_raw_unpacker,
              ab.bitmap_io.fast_bitmap_io, ab.swizzler.fast_swizzler,
-             ab.dds_defs.fast_dds_defs))
+             ab.dds_defs.fast_dds_defs, ab.tiler.fast_tiler))
 
     if print_formats:
         for fmt in sorted(ab.VALID_FORMATS):
@@ -77,7 +78,7 @@ def run_test(print_formats=False, deep_color=False,
 
     bitmap_test.set_deep_color_mode(deep_color)
     '''
-
+'''
     input('Press "Enter" to begin conversion 1')
     convert_chain(ab.FORMAT_A8R8G8B8, (
         ab.FORMAT_R8G8B8, ab.FORMAT_R5G6B5, ab.FORMAT_R3G3B2),
@@ -100,7 +101,7 @@ def run_test(print_formats=False, deep_color=False,
         ab.FORMAT_A16B16G16R16, ab.FORMAT_A2R10G10B10, ab.FORMAT_A2B10G10R10,
         ab.FORMAT_V8U8, ab.FORMAT_DXN, ab.FORMAT_CTX1),
                   ck_trans=ck_trans, keep_alpha=keep_alpha)
-'''
+
     input('Press "Enter" to begin conversion 5')
     convert_chain(ab.FORMAT_A8R8G8B8, (
         ab.FORMAT_A8L8,
@@ -129,7 +130,7 @@ def run_test(print_formats=False, deep_color=False,
 if __name__ == "__main__":
     try:
         run_test(print_formats=False, deep_color=True,
-                 keep_alpha=1, ck_trans=False)
+                 keep_alpha=False, ck_trans=False)
     except:
         print(format_exc())
 
