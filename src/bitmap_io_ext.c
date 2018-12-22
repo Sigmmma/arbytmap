@@ -209,8 +209,7 @@ static PyObject *py_crop_pixel_data(PyObject *self, PyObject *args) {
     max_dst_i = dst_i + (dst_y_skip0 + (dst_x_skip0 + dst_x_skip1) * y_stride + dst_y_skip1) * z_stride;
 
     /*PySys_FormatStdout("%d  %d    %d  %d\n", max_src_i, max_dst_i, 
-                       bufs[0].len * bufs[0].itemsize,
-                       bufs[1].len * bufs[1].itemsize);*/
+                       bufs[0].len, bufs[1].len);*/
     if (max_src_i < bufs[0].len || max_dst_i < bufs[1].len) {
         PyBuffer_Release(&bufs[0]);
         PyBuffer_Release(&bufs[1]);
@@ -226,8 +225,7 @@ static PyObject *py_crop_pixel_data(PyObject *self, PyObject *args) {
         for (y = 0; y < y_stride; y++) {
             src_i += src_x_skip0;
             dst_i += dst_x_skip0;
-            /*if (src_i + x_stride > bufs[0].len * bufs[0].itemsize ||
-            dst_i + x_stride > bufs[1].len * bufs[1].itemsize) {
+            /*if (src_i + x_stride > bufs[0].len || dst_i + x_stride > bufs[1].len) {
             PySys_FormatStdout("FUCK\n");
             break;
             }*/
