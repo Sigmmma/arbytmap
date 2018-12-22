@@ -8,7 +8,6 @@ ab = None
 try:
     from arbytmap.ext import dds_defs_ext
     fast_dds_defs = True
-    #fast_dds_defs = False
 except Exception:
     fast_dds_defs = False
 
@@ -1613,8 +1612,11 @@ def pack_dxt3a(arby, unpacked, width, height, depth=1):
         scale = scales[chan]
 
         # CALCULATE THE ALPHA
-        alpha = sum(((scale[upa[pxl_i+i]]*15 + 7)//255) << i
-                    for i in pixel_indices)
+        alpha = a_shift = 0
+        for i in pixel_indices:
+            alpha |= ((scale[upa[pxl_i + i]]*15 + 7)//255) << a_shift
+            a_shift += 4
+
         rpa[txl_i]   = alpha&0xFFffFFff
         rpa[txl_i+1] = alpha>>32
 

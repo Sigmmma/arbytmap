@@ -627,7 +627,13 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     """Saves the currently loaded texture to a PNG file"""
     fmt = convertor.format
     palettized = convertor.is_palettized()
-    if fmt in ab.THREE_CHANNEL_FORMATS:
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    channel_map = kwargs.pop("channel_mapping", None)
+    merge_map = kwargs.pop("channel_merge_mapping", None)
+
+    if channel_map:
+        channel_count = len(channel_map)
+    elif fmt in ab.THREE_CHANNEL_FORMATS:
         channel_count = 3
     else:
         channel_count = ab.CHANNEL_COUNTS[fmt]
@@ -641,10 +647,6 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     target_depth = 1 << int(ceil(log(bit_depth, 2)))
     keep_alpha = kwargs.get("keep_alpha", channel_count <= 2)
     save_as_rgb = kwargs.get("save_as_rgb", channel_count >= 2)
-
-    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
-    channel_map = kwargs.pop("channel_mapping", None)
-    merge_map = kwargs.pop("channel_merge_mapping", None)
 
     filenames = []
 
@@ -660,7 +662,7 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
         if channel_count == 2:
             a_chan = 0 if (keep_alpha and channel_count != 3) else -1
             channel_map = (a_chan, 1) if channel_map is None else channel_map
-            channel_map += (channel_map[1], ) * 2
+            channel_map += (channel_map[1], ) * (4 - len(channel_map))
     elif fmt == ab.FORMAT_A16: fmt_to_save_as = fmt = ab.FORMAT_L16
     elif fmt == ab.FORMAT_A8:  fmt_to_save_as = fmt = ab.FORMAT_L8
     # FORMAT_A4/2/1 are not implemented yet
