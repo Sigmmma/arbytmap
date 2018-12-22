@@ -117,6 +117,7 @@ class Tiler():
         fast_tile_method = self._fast_methods.get(self.tile_method)
         if False and fast_tile_method:
             # TODO: Enable this when the accelerator bug is fixed
+            # Seems to crash on visor realtime bump
             fast_tile_method(mode, pixels, modified_pixels,
                              width, height, depth,
                              b_width, b_height, b_size)

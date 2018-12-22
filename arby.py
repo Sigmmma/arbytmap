@@ -762,7 +762,7 @@ class Arbytmap():
                 "Base filename must be provided when creating PhotoImages.")
 
         images = []
-        kw.update(output_path=temp_path, ext="png", png_compress_level=1)
+        kw.update(output_path=temp_path, ext="png", png_compress_level=0)
         for fname in self.save_to_file(**kw):
             # there is lag creating the first photoimage with transparency
             images.append(tkinter.PhotoImage(file=fname))
