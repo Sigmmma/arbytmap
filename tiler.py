@@ -112,7 +112,6 @@ class Tiler():
     def _tile_block(self, mode, pixels, modified_pixels,
                     fmt, width, height, depth):
         b_width, b_height, b_size = get_tiling_info(fmt)
-        print(b_width, b_height, b_size)
 
         tile_method = self._methods.get(self.tile_method)
         fast_tile_method = self._fast_methods.get(self.tile_method)
