@@ -74,7 +74,7 @@ class Swizzler():
                 
                 # make the new array to place the swizzled data into
                 if isinstance(pixels, array):
-                    swizzled = array(pixels.typecode, pixels)
+                    swizzled = array(pixels.typecode, (0,)) * len(pixels)
                 elif isinstance(pixels, bytearray):
                     swizzled = bytearray(len(pixels))
                 else:
@@ -88,9 +88,7 @@ class Swizzler():
                 # replace the old pixels with the new swizzled one
                 tex_block[i] = swizzled
 
-                # delete the old pixel array
                 if delete_old:
-                    # delete the old pixel array
                     del pixels[:]
                     
                 i += 1

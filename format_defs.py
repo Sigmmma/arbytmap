@@ -1,4 +1,5 @@
 from array import array
+from math import ceil, log
 from traceback import format_exc
 
 from arbytmap.constants import *
@@ -255,13 +256,14 @@ def print_format(format_id, printout=True):
 
 
 def get_mipmap_dimensions(width, height, depth, mip):
-    '''This function will give the dimensions of the
-    specified mipmap level, format, and fullsize dimensions'''
     return clip_dimensions(width>>mip, height>>mip, depth>>mip)
 
 
-def packed_dimension_calc(dim, mip_level):
-    return max(1, dim >> mip_level)
+def packed_dimension_calc(dim, mip_level, tiled):
+    dim = max(1, dim >> mip_level)
+    if tiled:
+        dim = 2**int(ceil(log(dim, 2.0)))
+    return dim
 
 
 def clip_dimensions(width, height, depth=1):

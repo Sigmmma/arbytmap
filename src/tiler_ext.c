@@ -81,11 +81,12 @@ static PyObject *py_dxgi_tile_array(PyObject *self, PyObject *args) {
                 y = (uint32)(xy_address >> 32);
                 t_idx = offset * b_size;
                 u_idx = (y * x_chunks + x) * b_size;
-                /*if ((t_idx + b_size > tiled_buf->len) ||
+                if ((t_idx + b_size > tiled_buf->len) ||
                     (u_idx + b_size > untiled_buf->len)) {
-                    PySys_FormatStdout("FUCK\n");
+                    PySys_FormatStdout("Calculated address outside buffer: x=%d\ty=%d\n", x, y);
+                    i = y_chunks;
                     break;
-                }*/
+                }
                 memcpy(&tiled[t_idx], &untiled[u_idx], (size_t)b_size);
             }
         }
@@ -98,11 +99,12 @@ static PyObject *py_dxgi_tile_array(PyObject *self, PyObject *args) {
                 y = (uint32)(xy_address >> 32);
                 t_idx = offset * b_size;
                 u_idx = (y * x_chunks + x) * b_size;
-                /*if ((t_idx + b_size > tiled_buf->len) ||
+                if ((t_idx + b_size > tiled_buf->len) ||
                     (u_idx + b_size > untiled_buf->len)) {
-                    PySys_FormatStdout("FUCK\n");
+                    PySys_FormatStdout("Calculated address outside buffer: x=%d\ty=%d\n", x, y);
+                    i = y_chunks;
                     break;
-                }*/
+                }
                 memcpy(&untiled[u_idx], &tiled[t_idx], (size_t)b_size);
             }
         }
