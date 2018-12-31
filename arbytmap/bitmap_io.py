@@ -322,11 +322,12 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
 
     swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
     channel_map = kwargs.pop("channel_mapping", None)
-    if channel_map is not None or convertor.swizzled != swizzle_mode:
+    if (channel_map is not None or convertor.swizzled != swizzle_mode or
+        convertor.tiled):
         conv_cpy = deepcopy(convertor)
         conv_cpy.load_new_conversion_settings(
-            swizzle_mode=swizzle_mode, channel_mapping=channel_map,
-            target_big_endian=False)
+            swizzle_mode=swizzle_mode, tile_mode=False,
+            channel_mapping=channel_map, target_big_endian=False)
         conv_cpy.convert_texture()
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
@@ -502,14 +503,14 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
 
     swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
     if ("channel_mapping" in kwargs or (fmt != ab.FORMAT_A8R8G8B8 and make_copy)
-            or convertor.swizzled != swizzle_mode):
+        or convertor.swizzled != swizzle_mode or convertor.tiled):
         conv_cpy = deepcopy(convertor)
         # TODO: optimize this so the only textures loaded in and converted
         # are the mip_levels and sub_bitmaps that were requested to be saved
         conv_cpy.load_new_conversion_settings(
-            target_format=ab.FORMAT_A8R8G8B8, swizzle_mode=swizzle_mode,
-            channel_mapping=kwargs.pop("channel_mapping", None),
-            target_big_endian=False)
+            target_format=ab.FORMAT_A8R8G8B8, target_big_endian=False,
+            swizzle_mode=swizzle_mode, tile_mode=False,
+            channel_mapping=kwargs.pop("channel_mapping", None))
         conv_cpy.convert_texture()
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
@@ -677,9 +678,10 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     #elif target_depth == 2:  fmt_to_save_as = ab.FORMAT_L2
     #elif target_depth == 1:  fmt_to_save_as = ab.FORMAT_L1
 
-    if (bit_depth not in valid_depths or
+    if (fmt != fmt_to_save_as or bit_depth not in valid_depths or
         channel_map is not None or merge_map is not None or
-        fmt != fmt_to_save_as or convertor.swizzled != swizzle_mode):
+        convertor.swizzled != swizzle_mode or convertor.tiled):
+
         conv_cpy = deepcopy(convertor)
         # TODO: optimize this so the only textures loaded in and converted
         # are the mip_levels and sub_bitmaps that were requested to be saved
@@ -687,9 +689,9 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
             conv_cpy.set_deep_color_mode(True)
 
         conv_cpy.load_new_conversion_settings(
-            target_format=fmt_to_save_as, swizzle_mode=convertor.swizzle_mode,
-            channel_mapping=channel_map, channel_merge_mapping=merge_map,
-            target_big_endian=False)
+            target_format=fmt_to_save_as, target_big_endian=False,
+            swizzle_mode=convertor.swizzle_mode, tile_mode=False,
+            channel_mapping=channel_map, channel_merge_mapping=merge_map)
         #conv_cpy.print_info(1,1,1)
         if not conv_cpy.convert_texture():
             return []
@@ -746,14 +748,18 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
         mip_levels = (mip_levels, )
 
     for m in mip_levels:
-        width  = max(convertor.width  // (1<<m), 1)
-        height = max(convertor.height // (1<<m), 1)
-        depth  = max(convertor.depth  // (1<<m), 1)
+        width  = max(convertor.width  >> m, 1)
+        height = max(convertor.height >> m, 1)
+        depth  = max(convertor.depth  >> m, 1)
         head.width  = width
         head.height = height*depth
         mip_output_path = output_path
         if len(mip_levels) > 1:
             mip_output_path = "%s_mip%s" % (mip_output_path, m)
+
+        bitmap_size = head.width * head.height
+        if not palettized:
+            bitmap_size = (bitmap_size * channel_count * head.bit_depth) // 8
 
         for sb in bitmap_indexes:
             index = sb + m*sub_bitmap_ct
@@ -819,6 +825,15 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
                 elif fmt_depth == 16:
                     pix = bytearray(unpad_48bit_array(pix))
                     swap_array_items(pix, (5, 4, 3, 2, 1, 0))
+                else:
+                    pix = bytearray(pix)
+
+            # png's NEED the pixel data to be the exact right size
+            # too large and it'll crash upon tkinter loading
+            if len(pix) < bitmap_size:
+                pix += b'\x00' * (bitmap_size - len(pix))
+            elif len(pix) > bitmap_size:
+                pix = pix[: bitmap_size]
 
             png_file.set_chunk_data(
                 idat_chunk, pad_idat_data(pix, stride//8),
@@ -829,11 +844,12 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     return filenames
 
 
-def get_pixel_bytes_size(fmt, width, height, depth=1):
+def get_pixel_bytes_size(fmt, width, height, depth=1, mip=0, tiled=False):
+    width, height, depth = (ab.packed_dimension_calc(dim, mip, tiled)
+                            for dim in (width, height, depth))
+
     if ab.PACKED_SIZE_CALCS.get(fmt):
         return ab.PACKED_SIZE_CALCS[fmt](fmt, width, height, depth)
-
-    width, height, depth = ab.clip_dimensions(width, height, depth)
     return (ab.BITS_PER_PIXEL[fmt] * height * width * depth)//8
 
 
@@ -842,7 +858,7 @@ def make_array(typecode, item_ct, item_size=None, fill=0):
     # without having to create a bytearray first and throw it away
     if item_size is None:
         item_size = PIXEL_ENCODING_SIZES.get(typecode, 1)
-    return array(typecode, bytes([fill])*item_ct*item_size)
+    return array(typecode, bytes([fill])*item_size)*item_ct
 
 
 def crop_pixel_data(pix, chan_ct, width, height, depth,
@@ -892,8 +908,7 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
     dst_x_skip1 *= pixel_width
     x_stride *= pixel_width
 
-    # TODO: Finish fixing the accelerator
-    if False and fast_bitmap_io:
+    if fast_bitmap_io:
         bitmap_io_ext.crop_pixel_data(
             pix, new_pix, z_stride, y_stride, x_stride,
             src_z_skip0, dst_z_skip0,
@@ -987,9 +1002,11 @@ def bitmap_bytes_to_array(rawdata, offset, texture_block, fmt,
     if len(pixel_array)*pixel_size < bitmap_size:
         #print("WARNING: PIXEL DATA SUPPLIED DID NOT MEET "+
         #      "THE SIZE EXPECTED. PADDING WITH ZEROS.")
+        itemsize = PIXEL_ENCODING_SIZES.get(pixel_array.typecode, 1)
         pixel_array.extend(
             make_array(pixel_array.typecode,
-                       bitmap_size - len(pixel_array)*pixel_size, 1))
+                       (bitmap_size - len(pixel_array)*pixel_size) // itemsize,
+                       itemsize))
 
     #add the pixel array to the current texture block
     texture_block.append(pixel_array)

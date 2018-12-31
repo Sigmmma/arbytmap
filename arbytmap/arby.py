@@ -76,6 +76,7 @@ class Arbytmap():
     sub_bitmap_count = 0
     mipmap_count = 0
     swizzled = False
+    was_tiled = False
     tiled = False
     packed = False
     palette_packed = False
@@ -236,7 +237,7 @@ class Arbytmap():
 
         self.big_endian = bool(texture_info.get("big_endian", False))
         self.swizzled = bool(texture_info.get("swizzled", False))
-        self.tiled = bool(texture_info.get("tiled", False))
+        self.tiled = self.was_tiled = bool(texture_info.get("tiled", False))
         self.mipmap_count = texture_info.get("mipmap_count", 0)
         self.sub_bitmap_count = texture_info.get("sub_bitmap_count", 1)
         self.filepath = texture_info.get("filepath", None)
@@ -349,6 +350,7 @@ class Arbytmap():
         # Whether to swizzle or deswizzle when the swizzler is run
         # False == Deswizzle    True == Swizzle
         self.swizzle_mode = kwargs.get("swizzle_mode", self.swizzle_mode)
+        self.tile_mode = kwargs.get("tile_mode", self.tile_mode)
 
         self.target_big_endian = bool(kwargs.get("target_big_endian",
                                                  self.target_big_endian))
@@ -473,44 +475,50 @@ class Arbytmap():
                   len(self.palette) > palette_index)
                  and self.palette[palette_index] is not None))
 
-    def get_packed_width(self, width=None, mip_level=0):
+    def get_packed_width(self, width=None, mip_level=0, tiled=None):
         width = self.width if width is None else width
+        tiled = self.was_tiled if tiled is None else tiled
         if self.packed_width_calc:
-            return self.packed_width_calc(self.format, width, mip_level)
-        return PACKED_WIDTH_CALCS[self.format](width, mip_level)
+            return self.packed_width_calc(self.format, width, mip_level, tiled)
+        return PACKED_WIDTH_CALCS[self.format](width, mip_level, tiled)
 
-    def get_packed_height(self, height=None, mip_level=0):
+    def get_packed_height(self, height=None, mip_level=0, tiled=None):
         height = self.height if height is None else height
+        tiled = self.was_tiled if tiled is None else tiled
         if self.packed_height_calc:
-            return self.packed_height_calc(self.format, height, mip_level)
-        return PACKED_HEIGHT_CALCS[self.format](height, mip_level)
+            return self.packed_height_calc(self.format, height, mip_level, tiled)
+        return PACKED_HEIGHT_CALCS[self.format](height, mip_level, tiled)
 
-    def get_packed_depth(self, depth=None, mip_level=0):
+    def get_packed_depth(self, depth=None, mip_level=0, tiled=None):
         depth = self.depth if depth is None else depth
+        tiled = self.was_tiled if tiled is None else tiled
         if self.packed_depth_calc:
-            return self.packed_depth_calc(self.format, depth, mip_level)
-        return PACKED_DEPTH_CALCS[self.format](depth, mip_level)
+            return self.packed_depth_calc(self.format, depth, mip_level, tiled)
+        return PACKED_DEPTH_CALCS[self.format](depth, mip_level, tiled)
 
-    def get_target_packed_width(self, width=None, mip_level=0):
+    def get_target_packed_width(self, width=None, mip_level=0, tiled=None):
         width = self.width if width is None else width
+        tiled = self.tile_mode if tiled is None else tiled
         if self.target_packed_width_calc:
             return self.target_packed_width_calc(
-                self.target_format, width, mip_level)
-        return PACKED_WIDTH_CALCS[self.target_format](width, mip_level)
+                self.target_format, width, mip_level, tiled)
+        return PACKED_WIDTH_CALCS[self.target_format](width, mip_level, tiled)
 
-    def get_target_packed_height(self, height=None, mip_level=0):
+    def get_target_packed_height(self, height=None, mip_level=0, tiled=None):
         height = self.height if height is None else height
+        tiled = self.tile_mode if tiled is None else tiled
         if self.target_packed_height_calc:
             return self.target_packed_height_calc(
-                self.target_format, height, mip_level)
-        return PACKED_HEIGHT_CALCS[self.target_format](height, mip_level)
+                self.target_format, height, mip_level, tiled)
+        return PACKED_HEIGHT_CALCS[self.target_format](height, mip_level, tiled)
 
-    def get_target_packed_depth(self, depth=None, mip_level=0):
+    def get_target_packed_depth(self, depth=None, mip_level=0, tiled=None):
         depth = self.depth if depth is None else depth
+        tiled = self.tile_mode if tiled is None else tiled
         if self.target_packed_depth_calc:
             return self.target_packed_depth_calc(
-                self.target_format, depth, mip_level)
-        return PACKED_DEPTH_CALCS[self.target_format](depth, mip_level)
+                self.target_format, depth, mip_level, tiled)
+        return PACKED_DEPTH_CALCS[self.target_format](depth, mip_level, tiled)
 
     def _set_all_channel_mappings(self, **kwargs):
         """Sets(or defaults) all the different channel mappings"""
@@ -862,7 +870,9 @@ class Arbytmap():
 
                 """SWIZZLE THE TEXTURE IF POSSIBLE AND THE TARGET
                 SWIZZLE MODE IS NOT THE CURRENT SWIZZLE MODE."""
-                if self.target_format not in COMPRESSED_FORMATS:
+                if self.tiled:
+                    self.detiler.tile_texture()
+                elif self.target_format not in COMPRESSED_FORMATS:
                     self.reswizzler.swizzle_texture()
 
                 return True
@@ -872,11 +882,11 @@ class Arbytmap():
             unswizzled before we can do certain conversions with it.
             We can't downsample while swizzled nor convert to a
             compressed format(swizzling unsupported)'''
-            if self.swizzled and (self.downres_amount > 0 or self.mipmap_gen or
+            if self.tiled:
+                self.detiler.tile_texture(True)
+            elif self.swizzled and (self.downres_amount > 0 or self.mipmap_gen or
                                   target_fmt in COMPRESSED_FORMATS):
                 self.deswizzler.swizzle_texture(True)
-            elif self.tiled:
-                self.detiler.tile_texture(True)
 
 
             '''figure out if we need to depalettize. some formats wont
@@ -926,13 +936,14 @@ class Arbytmap():
             self.packed_width_calc = self.target_packed_width_calc
             self.packed_height_calc = self.target_packed_height_calc
             self.packed_depth_calc = self.target_packed_depth_calc
+            self.was_tiled = self.tiled
 
             """SWIZZLE THE TEXTURE IF POSSIBLE AND THE TARGET
             SWIZZLE MODE IS NOT THE CURRENT SWIZZLE MODE."""
-            if self.target_format not in COMPRESSED_FORMATS:
-                self.reswizzler.swizzle_texture()
-            elif self.tile_mode:
+            if self.tile_mode:
                 self.retiler.tile_texture()
+            elif self.target_format not in COMPRESSED_FORMATS:
+                self.reswizzler.swizzle_texture()
 
             self._set_all_channel_mappings()
 
@@ -1260,15 +1271,17 @@ class Arbytmap():
                 bitmap_io.byteswap_packed_bitmap(packed_pixels, self.format)
 
         # store the dimensions to local variables so we can change them
-        w, h, d = self.width, self.height, self.depth
-        for m in range(self.mipmap_count+1):
+        orig_w, orig_h, orig_d = self.width, self.height, self.depth
+        for m in range(self.mipmap_count + 1):
+            w, h, d = clip_dimensions(orig_w >> m, orig_h >> m, orig_d >> m)
             for sb in range(self.sub_bitmap_count):
                 # get the index of the bitmap we'll be working with
                 i = m*self.sub_bitmap_count + sb
 
-                p_width  = self.get_packed_width(w)
-                p_height = self.get_packed_height(h)
-                p_depth  = self.get_packed_depth(d)
+                p_width  = self.get_packed_width(orig_w, m)
+                p_height = self.get_packed_height(orig_h, m)
+                p_depth  = self.get_packed_depth(orig_d, m)
+
                 if self.is_palettized(i):
                     # unpack the bitmap's palette and indexing
                     new_pal, new_pix = self.palettized_unpacker(all_pal[i],
@@ -1291,9 +1304,6 @@ class Arbytmap():
 
                 if not new_all_pix[i]:
                     raise TypeError("Unable to unpack bitmap data.")
-
-            # calculate the dimensions for the next mipmap
-            w, h, d = clip_dimensions(w//2, h//2, d//2)
 
         self.packed = False
         self.palette_packed = False
@@ -1486,7 +1496,6 @@ class Arbytmap():
             return
 
         # store the dimensions to local variables
-        w, h, d = self.width, self.height, self.depth
         all_pix = self.texture_block
         all_pal = self.palette
         new_all_pix = [None]*len(all_pix if all_pix else ())
@@ -1496,19 +1505,21 @@ class Arbytmap():
         if self.palettize and not self.is_palettized():
             new_all_pal = [None]*(self.mipmap_count + 1)*self.sub_bitmap_count
 
-        for m in range(self.mipmap_count+1):
+        orig_w, orig_h, orig_d = self.width, self.height, self.depth
+        for m in range(self.mipmap_count + 1):
+            w, h, d = clip_dimensions(orig_w >> m, orig_h >> m, orig_d >> m)
             for sb in range(self.sub_bitmap_count):
                 # get the index of the bitmap we'll be working with
                 i = m*self.sub_bitmap_count + sb
 
                 pix = all_pix[i]
 
-                p_width  = self.get_target_packed_width(w)
-                p_height = self.get_target_packed_height(h)
-                p_depth  = self.get_target_packed_depth(d)
+                p_width  = self.get_target_packed_width(orig_w, m)
+                p_height = self.get_target_packed_height(orig_h, m)
+                p_depth  = self.get_target_packed_depth(orig_d, m)
                 if p_width != w or p_height != h or p_depth != d:
-                    #print("CROPPING FROM %sx%sx%s TO %sx%sx%s" % (
-                    #      w, h, d , p_width, p_height, p_depth))
+                    print("CROPPING FROM %sx%sx%s TO %sx%sx%s" % (
+                          w, h, d , p_width, p_height, p_depth))
                     pix = bitmap_io.crop_pixel_data(
                         pix, (1 if self.is_palettized(i) else
                               self.unpacked_channel_count),
@@ -1532,9 +1543,6 @@ class Arbytmap():
                     new_all_pal[i] = pal
 
                 new_all_pix[i] = pix
-
-            # calculate the dimensions for the next mipmap
-            w, h, d = clip_dimensions(w//2, h//2, d//2)
 
         self.packed = self.palette_packed = True
         self.indexing_size = self.target_indexing_size

@@ -39,6 +39,7 @@ def initialize():
     ab.FORMAT_DXT5A  = "DXT5A"
     ab.FORMAT_DXT5Y  = "DXT5Y"
     ab.FORMAT_DXT5AY = "DXT5AY"
+    ab.FORMAT_DXT5LM = "DXT5LM"
 
     # normal map formats
     ab.FORMAT_DXT5NM = "DXT5NM"         #NOT YET IMPLEMENTED
@@ -89,6 +90,10 @@ def initialize():
         ab.register_format(fmt, 1, **combine(
             dxt_specs, bpp=4, depths=(8,)),
             unpacker=unpack_dxt5a, packer=pack_dxt5a)
+
+    ab.register_format(ab.FORMAT_DXT5LM, 1, **combine(
+        dxt_specs, bpp=8, depths=(8, 8, 8, 8),
+        unpacker=unpack_dxt5lm, packer=pack_dxt5lm))
 
     ab.register_format(ab.FORMAT_DXT3AY, 1, **combine(
         dxt_specs, bpp=8, depths=(8, 8),
@@ -200,10 +205,10 @@ def dxt_packed_size_calc(fmt, width, height, depth=1):
     return (ab.BITS_PER_PIXEL[fmt] * height * width * depth)//8
 
 
-def packed_dxt_dimension_calc(dim, mip_level):
+def packed_dxt_dimension_calc(dim, mip_level, tiled=False):
     dim = dim >> mip_level
     if dim <= 4: return 4
-    return dim + (4 - (dim  % 4)) % 4
+    return dim + (4 - (dim % 4)) % 4
 
 
 def clip_dxt_dimensions(width, height):
@@ -355,6 +360,9 @@ def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
             color1 = (packed[j+2] >> 16) & 65535
             color_idx = packed[j+3]
 
+            if color0 < color1:
+                color0, color1 = color1, color0
+
             #unpack the colors
             c_0[1] = (((color0>>11) & 31)*255 + 15)//31
             c_1[1] = (((color1>>11) & 31)*255 + 15)//31
@@ -362,9 +370,6 @@ def unpack_dxt2_3(arby, bitmap_index, width, height, depth=1):
             c_1[2] = (((color1>>5) & 63)*255 + 31)//63
             c_1[3] = ((color1 & 31)*255 + 15)//31
             c_0[3] = ((color0 & 31)*255 + 15)//31
-
-            if color0 < color1:
-                color0, color1 = color1, color0
 
             c_2[1] = (c_0[1]*2 + c_1[1])//3
             c_2[2] = (c_0[2]*2 + c_1[2])//3
@@ -470,6 +475,9 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
             color1 = (packed[j+2]>>16) & 65535
             color_idx = packed[j+3]
 
+            if color0 < color1:
+                color0, color1 = color1, color0
+
             #unpack the colors
             c_0[1] = (((color0>>11) & 31)*255 + 15)//31
             c_1[1] = (((color1>>11) & 31)*255 + 15)//31
@@ -477,9 +485,6 @@ def unpack_dxt4_5(arby, bitmap_index, width, height, depth=1):
             c_1[2] = (((color1>>5) & 63)*255 + 31)//63
             c_1[3] = ((color1 & 31)*255 + 15)//31
             c_0[3] = ((color0 & 31)*255 + 15)//31
-
-            if color0 < color1:
-                color0, color1 = color1, color0
 
             c_2[1] = (c_0[1]*2 + c_1[1])//3
             c_2[2] = (c_0[2]*2 + c_1[2])//3
@@ -642,6 +647,112 @@ def unpack_dxt5a(arby, bitmap_index, width, height, depth=1):
                 for j in pixel_indices:
                     unpacked[pxl_i] = scale[lookup[(idx >> (j*3))&7]]
                     pxl_i += ucc
+
+    return unswizzle_dxt(unpacked, width, height * depth, ucc)
+
+
+def unpack_dxt5lm(arby, bitmap_index, width, height, depth=1):
+    packed = arby.texture_block[bitmap_index]
+    assert packed.typecode == 'I'
+
+    unpack_code = arby._UNPACK_ARRAY_CODE
+    unpack_size = ab.PIXEL_ENCODING_SIZES[unpack_code]
+    unpack_max = (1<<(unpack_size*8)) - 1
+
+    ucc = arby.unpacked_channel_count
+    width, height, depth = ab.clip_dimensions(width, height, depth)
+    texel_width, texel_height, _ = ab.clip_dimensions(width//4, height//4)
+
+    pixels_per_texel = (width//texel_width)*(height//texel_height)
+
+    #create a new array to hold the pixels after we unpack them
+    dxt_width, dxt_height = clip_dxt_dimensions(width, height)
+    unpacked = ab.bitmap_io.make_array(unpack_code, dxt_width*dxt_height*ucc)
+
+    upscales = list(arby.channel_upscalers)
+    chan_map = list(arby.channel_mapping)
+
+    while len(upscales) < 4: upscales.append(array(upscales[0].typecode, [0]))
+    while len(chan_map) < 4: chan_map.append(-1)
+
+    if False and fast_dds_defs:
+        pass
+    else:
+        a_lookup = [0,0,0,0,0,0,0,0]
+
+        channels_per_texel = ucc*pixels_per_texel
+        pixel_indices = range(pixels_per_texel)
+        upscales = tuple(tuple(scale) for scale in upscales)
+
+        #create the arrays to hold the color channel data
+        c_0 = [255,0,0,0]
+        c_1 = [255,0,0,0]
+        c_2 = [255,0,0,0]
+        c_3 = [255,0,0,0]
+
+        #stores the colors in a way we can easily access them
+        colors = [c_0, c_1, c_2, c_3]
+
+        #loop through each texel
+        for i in range(len(packed)//4):
+            pxl_i = i*channels_per_texel
+            j = i*4
+
+            a_lookup[0] = alpha0 = packed[j] & 255
+            a_lookup[1] = alpha1 = (packed[j] >> 8) & 255
+            alpha_idx = ((packed[j]>>16) & 65535) | (packed[j+1] << 16)
+
+            #depending on which alpha is larger
+            #the indexing is calculated differently
+            if alpha0 > alpha1:
+                a_lookup[2] = (alpha0*6 + alpha1)//7
+                a_lookup[3] = (alpha0*5 + alpha1*2)//7
+                a_lookup[4] = (alpha0*4 + alpha1*3)//7
+                a_lookup[5] = (alpha0*3 + alpha1*4)//7
+                a_lookup[6] = (alpha0*2 + alpha1*5)//7
+                a_lookup[7] = (alpha0   + alpha1*6)//7
+            else:
+                a_lookup[2] = (alpha0*4 + alpha1)//5
+                a_lookup[3] = (alpha0*3 + alpha1*2)//5
+                a_lookup[4] = (alpha0*2 + alpha1*3)//5
+                a_lookup[5] = (alpha0   + alpha1*4)//5
+                a_lookup[6] = 0
+                a_lookup[7] = 255
+
+            #half of the first array entry in DXT4/5 format is both
+            #alpha values and the first third of the indexing
+            color0 = packed[j+2] & 65535
+            color1 = (packed[j+2]>>16) & 65535
+            color_idx = packed[j+3]
+
+            if color0 < color1:
+                color0, color1 = color1, color0
+
+            #unpack the colors
+            # Rough as fuck test unpacking
+            c_0[1] = color0 >> 8
+            c_1[1] = color1 >> 8
+            c_0[2] = c_0[3] = c_0[1]
+            c_1[2] = c_1[3] = c_1[1]
+
+            c_2[1] = c_2[2] = c_2[3] = (c_0[3]*2 + c_1[3])//3
+            c_3[1] = c_3[2] = c_3[3] = (c_0[3] + c_1[3]*2)//3
+
+            for j in pixel_indices:
+                color = colors[(color_idx >> (j*2))&3]
+                off = j*ucc + pxl_i
+                a = a_lookup[(alpha_idx >> (j*3))&7]
+
+                dst_chan = 0
+                for src_chan in chan_map:
+                    if src_chan < 0 and dst_chan == 0:
+                        # alpha and not reading alpha. set to full white
+                        unpacked[off] = unpack_max
+                    elif src_chan > 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][color[src_chan]]
+                    elif src_chan == 0:
+                        unpacked[off + dst_chan] = upscales[dst_chan][a]
+                    dst_chan += 1
 
     return unswizzle_dxt(unpacked, width, height * depth, ucc)
 
@@ -1570,6 +1681,10 @@ def pack_dxt4_5(arby, unpacked, width, height, depth=1):
         rpa[txl_i+2] = (color1<<16) | color0
 
     return repacked
+
+
+def pack_dxt5lm(arby, unpacked, width, height, depth=1):
+    pass
 
 
 def pack_dxt3a(arby, unpacked, width, height, depth=1):

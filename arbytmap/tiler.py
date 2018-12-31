@@ -49,9 +49,10 @@ class Tiler():
         conv = self.converter
         if conv is None:
             return False
+        elif not conv.packed:
+            raise TypeError("Cannot tile/untile unpacked texture.")
 
         tex_block = conv.texture_block
-
         if tex_block is None:
             print("ERROR: NO TEXTURE LOADED. CANNOT PREFORM " +
                   "TILING OPERATION WITHOUT A LOADED TEXTURE")
@@ -66,8 +67,6 @@ class Tiler():
 
         # used to keep track of which pixel array we are reading
         width, height, depth = conv.width, conv.height, conv.depth
-        if not conv.packed:
-            raise TypeError("Cannot tile/untile unpacked texture.")
 
         i = 0
         for m in range(conv.mipmap_count + 1):
@@ -81,7 +80,7 @@ class Tiler():
 
                 # make the new array to place the tiled data into
                 if isinstance(pixels, array):
-                    tiled = array(pixels.typecode, pixels)
+                    tiled = array(pixels.typecode, (0,)) * len(pixels)
                 elif isinstance(pixels, bytearray):
                     tiled = bytearray(len(pixels))
                 else:
@@ -95,9 +94,7 @@ class Tiler():
                 # replace the old pixels with the new tiled one
                 tex_block[i] = tiled
 
-                # delete the old pixel array
                 if delete_old:
-                    # delete the old pixel array
                     del pixels[:]
 
                 i += 1
