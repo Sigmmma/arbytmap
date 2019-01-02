@@ -1179,6 +1179,18 @@ class Arbytmap():
 
         return(downsamp, new_width, new_height, new_depth)
 
+    def byteswap_packed_endianness(self, target_endianness=None):
+        if not self.packed:
+            raise ValueError("Cannot byteswap unpacked texture.")
+        elif target_endianness is None:
+            target_endianness = self.target_big_endian
+
+        if self.big_endian != target_endianness:
+            for packed_pixels in self.texture_block:
+                bitmap_io.byteswap_packed_bitmap(packed_pixels, self.format)
+
+            self.big_endian = target_endianness
+
     def _unpack_palettized(self, packed_palette, packed_indexing):
         '''When supplied with a packed palette and indexing,
         this function will return them in an unpacked form'''
@@ -1265,10 +1277,8 @@ class Arbytmap():
         new_all_pix = [None]*len(all_pix if all_pix else ())
         new_all_pal = [None]*len(all_pal if all_pal else ())
 
-        # TODO: Redo this so it's not byteswapping the main copy
-        if self.big_endian:
-            for packed_pixels in self.texture_block:
-                bitmap_io.byteswap_packed_bitmap(packed_pixels, self.format)
+        # Make sure the bitmap is in little endian so we can operate on it
+        self.byteswap_packed_endianness(False)
 
         # store the dimensions to local variables so we can change them
         orig_w, orig_h, orig_d = self.width, self.height, self.depth
@@ -1549,12 +1559,7 @@ class Arbytmap():
         self.texture_block = new_all_pix
         self.palette       = new_all_pal
 
-        # TODO: Redo this so it's not byteswapping the main copy
-        if self.target_big_endian:
-            for packed_pixels in self.texture_block:
-                bitmap_io.byteswap_packed_bitmap(packed_pixels, self.format)
-
-        self.big_endian = self.target_big_endian
+        self.byteswap_packed_endianness()
 
     def pack(self, upa, width, height, depth):
         """Used for packing non-palettized formats"""
