@@ -320,7 +320,7 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     typ = convertor.texture_type
     fmt = convertor.format
 
-    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzle_mode)
     channel_map = kwargs.pop("channel_mapping", None)
     if (channel_map is not None or convertor.swizzled != swizzle_mode or
         convertor.tiled or convertor.big_endian):
@@ -509,7 +509,7 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
         ab.FORMAT_A1R5G5B5, ab.FORMAT_R8G8B8,
         ab.FORMAT_X8R8G8B8, ab.FORMAT_A8R8G8B8)
 
-    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzle_mode)
     if ("channel_mapping" in kwargs or (fmt != ab.FORMAT_A8R8G8B8 and make_copy)
         or convertor.swizzled != swizzle_mode
         or convertor.tiled or convertor.big_endian):
@@ -638,7 +638,7 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
     """Saves the currently loaded texture to a PNG file"""
     fmt = convertor.format
     palettized = convertor.is_palettized()
-    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
+    swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzle_mode)
     channel_map = kwargs.pop("channel_mapping", None)
     merge_map = kwargs.pop("channel_merge_mapping", None)
 
@@ -700,7 +700,7 @@ def save_to_png_file(convertor, output_path, ext, **kwargs):
 
         conv_cpy.load_new_conversion_settings(
             target_format=fmt_to_save_as, target_big_endian=False,
-            swizzle_mode=convertor.swizzle_mode, tile_mode=False,
+            swizzle_mode=swizzle_mode, tile_mode=False,
             channel_mapping=channel_map, channel_merge_mapping=merge_map)
         #conv_cpy.print_info(1,1,1)
         if not conv_cpy.convert_texture():
