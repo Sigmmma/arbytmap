@@ -323,11 +323,12 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
     swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
     channel_map = kwargs.pop("channel_mapping", None)
     if (channel_map is not None or convertor.swizzled != swizzle_mode or
-        convertor.tiled):
+        convertor.tiled or convertor.big_endian):
         conv_cpy = deepcopy(convertor)
         conv_cpy.load_new_conversion_settings(
             swizzle_mode=swizzle_mode, tile_mode=False,
             channel_mapping=channel_map, target_big_endian=False)
+        conv_cpy.byteswap_packed_endianness(False)
         conv_cpy.convert_texture()
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
@@ -466,7 +467,7 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
             i = m*convertor.sub_bitmap_count + sb
             pixels = convertor.texture_block[i]
             w, h, d = ab.get_mipmap_dimensions(
-                convertor.width, convertor.height, convertor.depth, m)
+                head.width, head.height, head.depth, m)
 
             if convertor.is_palettized():
                 pal = convertor.palette[i]
@@ -487,7 +488,14 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
                 pixels = unpad_24bit_array(pixels)
             dds_file.data.pixel_data += pixels
 
-    dds_file.serialize(temp=False, backup=False, calc_pointers=False)
+        if typ != ab.TYPE_CUBEMAP:
+            dds_file.filepath = "%s_tex%s.%s" % (output_path, sb, ext)
+            dds_file.serialize(temp=False, backup=False, calc_pointers=False)
+            dds_file.data.pixel_data = b''
+
+    if typ == ab.TYPE_CUBEMAP:
+        dds_file.serialize(temp=False, backup=False, calc_pointers=False)
+
     return [dds_file.filepath]
 
 
@@ -503,7 +511,8 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
 
     swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzled)
     if ("channel_mapping" in kwargs or (fmt != ab.FORMAT_A8R8G8B8 and make_copy)
-        or convertor.swizzled != swizzle_mode or convertor.tiled):
+        or convertor.swizzled != swizzle_mode
+        or convertor.tiled or convertor.big_endian):
         conv_cpy = deepcopy(convertor)
         # TODO: optimize this so the only textures loaded in and converted
         # are the mip_levels and sub_bitmaps that were requested to be saved
@@ -511,6 +520,7 @@ def save_to_tga_file(convertor, output_path, ext, **kwargs):
             target_format=ab.FORMAT_A8R8G8B8, target_big_endian=False,
             swizzle_mode=swizzle_mode, tile_mode=False,
             channel_mapping=kwargs.pop("channel_mapping", None))
+        conv_cpy.byteswap_packed_endianness(False)
         conv_cpy.convert_texture()
         return conv_cpy.save_to_file(output_path="%s.%s" % (output_path, ext),
                                      **kwargs)
