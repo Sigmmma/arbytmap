@@ -12,9 +12,8 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
      DistutilsPlatformError
 
 curr_dir = dirname(__file__)
-#               YYYY.MM.DD
-release_date = "2018.12.24"
-version = (1, 0, 0)
+
+import arbytmap
 
 
 is_pypy = hasattr(sys, 'pypy_translation_info')
@@ -55,9 +54,9 @@ except Exception:
 
 setup_kwargs = dict(
     name="arbytmap",
-    description='A power-of-2 texture manipulation module for python 3.',
+    description='A texture manipulation module for python 3.',
     long_description=long_desc,
-    version='%s.%s.%s' % version,
+    version='%s.%s.%s' % arbytmap.__version__,
     url='http://bitbucket.org/Moses_of_Egypt/arbytmap',
     author='Devin Bobadilla',
     author_email='MosesBobadilla@gmail.com',
