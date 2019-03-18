@@ -2,7 +2,7 @@
 
 ## What is this repository for?
 
-* Arbytmap is a power-of-2 bitmap conversion and manipulation module. Arbytmap is intended for use in converting bitmaps from one format to another, half-rezzing and generating mipmaps, swizzling bitmaps, and writing converted bitmaps to files. Arbytmap is currently undergoing a large scale cleanup, as much of it was written years ago when I was a much worse programmer.
+* Arbytmap is a bitmap conversion and manipulation module. Arbytmap is intended for use in converting bitmaps from one format to another, half-rezzing and generating mipmaps, swizzling bitmaps, and writing converted bitmaps to files. Arbytmap is currently undergoing a large scale cleanup, as much of it was written years ago when I was a much worse programmer.
 
 * Many of the conversion functions have accelerator modules written in C, so this module(if properly compiled and installed) can reach speeds seen in lower level languages.
 
@@ -14,15 +14,9 @@
 
 ## Todo
 
-* Completely redo the dds and tga reading/writing system(use [supyr_struct](https://bitbucket.org/moses_of_egypt/supyr_struct) for handling creating and reading the files).
-
-* Make/finish C functions for working with the remaining formats.
-
 * Clean up and standardize the interface for loading bitmaps and conversion settings into the Arbytmap class.
 
 * Cleanup/redo pretty much everything that looks/functions bad.
-
-* Anything else I can think of(I have the flu right now, so I'm having a hard time writing this).
 
 ## Who do I talk to?
 
