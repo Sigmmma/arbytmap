@@ -3,8 +3,8 @@
 # ##############
 __author__ = "Devin Bobadilla"
 #           YYYY.MM.DD
-__date__ = "2018.12.24"
-__version__ = (1, 0, 0)
+__date__ = "2019.03.21"
+__version__ = (1, 0, 1)
 
 from arbytmap import constants
 from arbytmap.arby import *
