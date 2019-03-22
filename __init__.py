@@ -9,8 +9,8 @@ __version__ = (1, 0, 1)
 from arbytmap import constants
 from arbytmap.arby import *
 from arbytmap import bitmap_io, constants, dds_defs, ext,\
-     format_defs, swizzler, test
+     format_defs, swizzler
 
 
 __all__ = ("bitmap_io", "constants", "dds_defs", "ext",
-           "format_defs", "swizzler", "test")
+           "format_defs", "swizzler")
