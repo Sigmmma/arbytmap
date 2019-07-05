@@ -15,7 +15,6 @@ try:
     from supyr_struct.defs.bitmaps.tga import tga_def
     from supyr_struct.defs.bitmaps.objs.png import pad_idat_data
     from supyr_struct.defs.bitmaps.png import png_def
-    from supyr_struct.defs.util import fcc
 except Exception:
     print("SupyrStruct was not loaded. Cannot load or save non-raw images.")
 
