@@ -361,7 +361,7 @@ class Arbytmap():
 
         if "retiler" in kwargs:
             self.retiler = tiler.Tiler(
-                converter=self, tile_method=texture_info.get("retiler", "DEFAULT"))
+                converter=self, tile_method=kwargs["retiler"])
 
         if "reswizzler" in kwargs:
             self.reswizzler = swizzler.Swizzler(
@@ -1745,7 +1745,6 @@ class Arbytmap():
         """Converts a bitmap into and returns
         an unpacked palette and indexing"""
         raise NotImplementedError
-        return unpacked_palette, unpacked_indexing
 
     def premultiply_color_by_alpha(self, upa, undo_premultiply=False):
         assert self.unpacked_channel_count == 4
