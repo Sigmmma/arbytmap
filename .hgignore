@@ -1,12 +1,10 @@
 syntax: glob
+*__pycache__/*
 v7.1.lnk
-arbytmap/ext/__pycache__/
-ext/__pycache__/
 tests/
-__pycache__
 */v15/*
-*Release\*
-Debug\*
+*Release/*
+Debug/*
 test_files/bitmaps/
 *.db
 *.suo
