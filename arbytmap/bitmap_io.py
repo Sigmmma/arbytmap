@@ -871,14 +871,14 @@ def make_array(typecode, item_ct, item_size=None, fill=0):
 
 
 def crop_pixel_data(pix, chan_ct, width, height, depth,
-                    x0=0, new_width=-1, y0=0, new_height=-1, z0=0, new_depth=-1):
-    if new_width  < 0: new_width  = width
-    if new_height < 0: new_height = height
-    if new_depth  < 0: new_depth  = depth
+                    x0=0, x1=-1, y0=0, y1=-1, z0=0, z1=-1):
+    if x1 < 0: x1 = width
+    if y1 < 0: y1 = height
+    if z1 < 0: z1 = depth
 
     new_pix = make_array(
         pix.typecode,
-        (new_width - x0) * (new_height - y0) * (new_depth - z0) * chan_ct,
+        (x1 - x0) * (y1 - y0) * (z1 - z0) * chan_ct,
         pix.itemsize)
 
     if len(pix) == 0:
@@ -888,9 +888,9 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
 
     src_x_skip0, src_y_skip0, src_z_skip0 = max(x0, 0), max(y0, 0), max(z0, 0)
 
-    src_x_skip1 = max(width  - src_x_skip0 - new_width,  0)
-    src_y_skip1 = max(height - src_y_skip0 - new_height, 0)
-    src_z_skip1 = max(depth  - src_z_skip0 - new_depth,  0)
+    src_x_skip1 = max(width  - src_x_skip0 - x1, 0)
+    src_y_skip1 = max(height - src_y_skip0 - y1, 0)
+    src_z_skip1 = max(depth  - src_z_skip0 - z1, 0)
 
     x_stride = width  - src_x_skip0 - src_x_skip1
     y_stride = height - src_y_skip0 - src_y_skip1
@@ -901,15 +901,15 @@ def crop_pixel_data(pix, chan_ct, width, height, depth,
 
     dst_x_skip0, dst_y_skip0, dst_z_skip0 = max(-x0, 0), max(-y0, 0), max(-z0, 0)
 
-    dst_x_skip1 = max(new_width  - dst_x_skip0 - x_stride, 0)
-    dst_y_skip1 = max(new_height - dst_y_skip0 - y_stride, 0)
+    dst_x_skip1 = max(x1 - dst_x_skip0 - x_stride, 0)
+    dst_y_skip1 = max(y1 - dst_y_skip0 - y_stride, 0)
 
-    src_z_skip0 *= width * height * pixel_width
+    src_z_skip0 *= width * pixel_width * height
     src_y_skip0 *= width * pixel_width
     src_y_skip1 *= width * pixel_width
-    dst_z_skip0 *= new_width * new_height * pixel_width
-    dst_y_skip0 *= new_width * pixel_width
-    dst_y_skip1 *= new_width * pixel_width
+    dst_z_skip0 *= x1 * pixel_width * y1
+    dst_y_skip0 *= x1 * pixel_width
+    dst_y_skip1 *= x1 * pixel_width
 
     src_x_skip0 *= pixel_width
     dst_x_skip0 *= pixel_width
