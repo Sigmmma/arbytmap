@@ -30,6 +30,70 @@ except:
 ab = None
 
 
+def get_channel_order_by_masks(a_mask=0, r_mask=0, g_mask=0, b_mask=0):
+    # shift the masks right until they're all the same scale
+    a_shift = r_shift = g_shift = b_shift = 0
+    while a_mask and not(a_mask&1):
+        a_mask = a_mask >> 1
+        a_shift += 1
+
+    while r_mask and not(r_mask&1):
+        r_mask = r_mask >> 1
+        r_shift += 1
+
+    while g_mask and not(g_mask&1):
+        g_mask = g_mask >> 1
+        g_shift += 1
+
+    while b_mask and not(b_mask&1):
+        b_mask = b_mask >> 1
+        b_shift += 1
+
+    src_order_map = {}
+    if a_mask: src_order_map[a_shift] = 'a'
+    if r_mask: src_order_map[r_shift] = 'r'
+    if g_mask: src_order_map[g_shift] = 'g'
+    if b_mask: src_order_map[b_shift] = 'b'
+    return "".join(src_order_map[k] for k in sorted(src_order_map))
+
+
+def get_dds_channel_map(a_mask=0, r_mask=0, g_mask=0, b_mask=0,
+                        dst_order=C_ORDER_BGRA):
+    src_order = get_channel_order_by_masks(a_mask, r_mask, g_mask, b_mask)
+    channel_map = get_channel_swap_mapping(src_order, dst_order)
+    new_order = "".join(("bgra"[i] if i in range(4) else "x")
+                        for i in channel_map[::-1])
+    return get_channel_swap_mapping(C_ORDER_ARGB, new_order)
+
+
+def get_channel_swap_mapping(src_order, dst_order=C_ORDER_ARGB):
+    '''Takes a source channel order string and a destination channel
+    order string and returns a 4 item tuple that maps the source
+    channels to the destination order.
+    Valid src channel strings contain any arrangement of 'argb'.
+    The same appliesfor dst channel strings, but 'x' can also be used
+    to signify a channel is to be made blank(dropped from the source).
+    '''
+    src_order = src_order.lower()
+    dst_order = dst_order.lower()
+    assert set(src_order).issubset("argb"), (
+        "Source channel order must contain only the characters 'argbARGB'. "
+        "'%s' is an invalid channel order." % src_order
+        )
+    assert set(dst_order).issubset("argbx"), (
+        "Source channel order must contain only the characters 'argbxARGBX'. "
+        "'%s' is an invalid channel order." % dst_order
+        )
+    channel_map = []
+    for c in dst_order:
+        if c in src_order:
+            channel_map.append(src_order.index(c))
+        else:
+            channel_map.append(-1)
+
+    return tuple(channel_map)
+
+
 def load_from_dds_file(convertor, input_path, ext, **kwargs):
     """Loads a DDS file into the convertor."""
     dds_file = dds_def.build(filepath="%s.%s" % (input_path, ext))
@@ -120,15 +184,20 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
         chan_ct = ab.CHANNEL_COUNTS[fmt]
         channel_map = None
         if not fmt_flags.four_cc and chan_ct > 2:
-            channel_map = (fmt_head.a_bitmask, fmt_head.r_bitmask,
-                           fmt_head.g_bitmask, fmt_head.b_bitmask)[: chan_ct]
+            # swap channels so everything is ARGB
+            # NOTE: This is extremely confusing and carefully calibrated
+            # to work with ARGB and RGB channels. DO NOT TOUCH
+            channel_map = get_dds_channel_map(
+                fmt_head.a_bitmask, fmt_head.r_bitmask,
+                fmt_head.g_bitmask, fmt_head.b_bitmask,
+                C_ORDER_BGRA)[: chan_ct]
+
 
         tex_info = {"width": head.width, "height": head.height,
                     "depth": max(head.depth, 1), "texture_type": typ,
                     "filepath": dds_file.filepath, "format": fmt,
                     "mipmap_count": mipmap_count,
-                    "sub_bitmap_count": sub_bitmap_count,
-                    "channel_mapping": channel_map}
+                    "sub_bitmap_count": sub_bitmap_count}
 
         temp = []
         #loop over each mipmap and cube face
@@ -146,8 +215,14 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
             for sb in range(sub_bitmap_count):
                 tex_block[m*sub_bitmap_count + sb] = temp[
                     sb*(mipmap_count + 1) + m]
+
         convertor.load_new_texture(texture_block=tex_block,
                                    texture_info=tex_info)
+
+        if channel_map:
+            convertor.load_new_conversion_settings(
+                channel_mapping=channel_map)
+            convertor.convert_texture()
     except:
         print(format_exc())
 
