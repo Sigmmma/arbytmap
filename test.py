@@ -42,7 +42,7 @@ def convert_chain(last_fmt, formats, **kwargs):
 
         try:
             bitmap_test.load_from_file(
-                input_path=curr_dir + "\\test_files\\disc_%s.dds" % last_fmt)
+                input_path=curr_dir + "\\test_files\\disc_%s_tex0.dds" % last_fmt)
             bitmap_test.load_new_conversion_settings(
                 target_format=fmt, color_key_transparency=ck_trans, **kw)
             start = time.time()
