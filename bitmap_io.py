@@ -59,6 +59,8 @@ def get_channel_order_by_masks(a_mask=0, r_mask=0, g_mask=0, b_mask=0):
 
 def get_dds_channel_map(a_mask=0, r_mask=0, g_mask=0, b_mask=0,
                         dst_order=C_ORDER_BGRA):
+    # NOTE: This is extremely confusing and carefully calibrated
+    # to work with ARGB and RGB channels. DO NOT TOUCH
     src_order = get_channel_order_by_masks(a_mask, r_mask, g_mask, b_mask)
     channel_map = get_channel_swap_mapping(src_order, dst_order)
     new_order = "".join(("bgra"[i] if i in range(4) else "x")
@@ -185,8 +187,6 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
         channel_map = None
         if not fmt_flags.four_cc and chan_ct > 2:
             # swap channels so everything is ARGB
-            # NOTE: This is extremely confusing and carefully calibrated
-            # to work with ARGB and RGB channels. DO NOT TOUCH
             channel_map = get_dds_channel_map(
                 fmt_head.a_bitmask, fmt_head.r_bitmask,
                 fmt_head.g_bitmask, fmt_head.b_bitmask,
