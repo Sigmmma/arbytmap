@@ -1,0 +1,10 @@
+**__pycache__/
+v7.1.lnk
+tests/
+**/v15/
+**Release/
+Debug/
+test_files/bitmaps/
+**.db
+**.suo
+**.pyd
