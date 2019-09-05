@@ -1528,8 +1528,8 @@ class Arbytmap():
                 p_height = self.get_target_packed_height(orig_h, m)
                 p_depth  = self.get_target_packed_depth(orig_d, m)
                 if p_width != w or p_height != h or p_depth != d:
-                    print("CROPPING FROM %sx%sx%s TO %sx%sx%s" % (
-                          w, h, d , p_width, p_height, p_depth))
+                    #print("CROPPING FROM %sx%sx%s TO %sx%sx%s" % (
+                    #      w, h, d , p_width, p_height, p_depth))
                     pix = bitmap_io.crop_pixel_data(
                         pix, (1 if self.is_palettized(i) else
                               self.unpacked_channel_count),
