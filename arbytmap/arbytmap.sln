@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26430.16
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "arbytmap_ext", "arbytmap.vcxproj", "{BC2E1514-9F8C-435B-A8E3-E4AE0FDDE663}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "arbytmap_ext", "arbytmap_ext\arbytmap.vcxproj", "{BC2E1514-9F8C-435B-A8E3-E4AE0FDDE663}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bitmap_io_ext", "bitmap_io_ext\bitmap_io_ext.vcxproj", "{1E53A95D-AE4A-46EF-AAC8-491E63D30325}"
 EndProject
