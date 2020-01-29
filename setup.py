@@ -41,7 +41,7 @@ class ve_build_ext(build_ext):
             build_ext.build_extension(self, ext)
 
 
-long_desc = open(curr_dir, "README.md").read()
+long_desc = open("README.md").read()
 
 setup_kwargs = dict(
     name="arbytmap",
