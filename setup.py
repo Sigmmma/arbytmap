@@ -47,6 +47,7 @@ setup_kwargs = dict(
     name="arbytmap",
     description='A texture manipulation module for python 3.',
     long_description=long_desc,
+    long_description_content_type='text/markdown',
     version='%s.%s.%s' % arbytmap.__version__,
     url='https://github.com/MosesofEgypt/arbytmap',
     author='Devin Bobadilla',
@@ -65,8 +66,7 @@ setup_kwargs = dict(
         Extension("arbytmap.ext.swizzler_ext",     ["arbytmap/src/swizzler_ext.c"])
         ],
     package_data={
-        '': ['*.txt', '*.md', '*.rst'],
-        'arbytmap': ["src/*"]
+        'arbytmap': ["src/*", '*.txt', '*.md', '*.rst'],
         },
     platforms=["POSIX", "Windows"],
     keywords="arbytmap, texture, bitmap, converter, image, editing",
@@ -84,6 +84,8 @@ setup_kwargs = dict(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3 :: Only",
+        "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+        "Programming Language :: C",
         ],
     zip_safe=False,
     cmdclass=dict(build_ext=ve_build_ext)
