@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import sys
-from os.path import dirname, join
 from traceback import format_exc
-    
+
 try:
     from setuptools import setup, Extension, Command
 except ImportError:
@@ -10,8 +9,6 @@ except ImportError:
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
      DistutilsPlatformError
-
-curr_dir = dirname(__file__)
 
 import arbytmap
 
@@ -44,21 +41,14 @@ class ve_build_ext(build_ext):
             build_ext.build_extension(self, ext)
 
 
-try:
-    try:
-        long_desc = open(join(curr_dir, "readme.rst")).read()
-    except Exception:
-        long_desc = "Since PyPI refuses to let me upload due to my readme being Markdown, I wont be using a readme."
-        #long_desc = open(join(curr_dir, "readme.md")).read()
-except Exception:
-    long_desc = 'Could not read long description from readme.'
+long_desc = open(curr_dir, "README.md").read()
 
 setup_kwargs = dict(
     name="arbytmap",
     description='A texture manipulation module for python 3.',
     long_description=long_desc,
     version='%s.%s.%s' % arbytmap.__version__,
-    url='http://bitbucket.org/Moses_of_Egypt/arbytmap',
+    url='https://github.com/MosesofEgypt/arbytmap',
     author='Devin Bobadilla',
     author_email='MosesBobadilla@gmail.com',
     license='MIT',
@@ -89,6 +79,11 @@ setup_kwargs = dict(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3 :: Only",
         ],
     zip_safe=False,
     cmdclass=dict(build_ext=ve_build_ext)
@@ -103,8 +98,8 @@ if not is_pypy:
     except BuildFailed:
         print(format_exc())
         print('*' * 80)
-        print("WARNING: The C accelerator modules could not be compiled.\n" +
-              "Attempting to install without accelerators now.\n" +
+        print("WARNING: The C accelerator modules could not be compiled.\n"
+              "Attempting to install without accelerators now.\n"
               "Any errors that occurred are printed above.")
         print('*' * 80)
 
