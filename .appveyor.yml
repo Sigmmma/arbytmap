@@ -30,6 +30,10 @@ artifacts:
   # bdist_wheel puts the built wheel in the dist directory
   - path: dist\*
 
+# The build identifier shown in our webhook
+version: '{branch}.{build}'
+
+# Our Discord webhook
 notifications:
 - provider: Webhook
   url:
