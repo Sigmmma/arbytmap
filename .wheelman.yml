@@ -7,6 +7,7 @@ name: arbytmap
 include_files:
     - "README.md"
     - "LICENSE.TXT"
+    - "CHANGELOG.MD"
 
 pypi:
     # Only uploads on a github release tag.
