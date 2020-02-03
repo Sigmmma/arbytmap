@@ -5,6 +5,7 @@ environment:
   matrix:
     # Environment vars to send to the build VM
     - PYTHON: "C:\\Python38-x64\\python.exe"
+      WHEELMAN_TARGET: windows
       WHEELMAN_REPO: "https://github.com/gbMichelle/wheelman.git"
       TWINE_USERNAME:
           secure: EnVF0Efkdy2CMUFOw91AOg==
@@ -24,7 +25,7 @@ build: off
   # No tests, how horrible D:<
 
 after_test:
-  - cmd: "%PYTHON% wheelman\\wheelman.py --target windows"
+  - cmd: "%PYTHON% wheelman\\wheelman.py --target %WHEELMAN_TARGET%"
 
 artifacts:
   # bdist_wheel puts the built wheel in the dist directory
