@@ -1,55 +1,19 @@
-#!/usr/bin/env python
-import sys
-from traceback import format_exc
-
 try:
     from setuptools import setup, Extension, Command
 except ImportError:
     from distutils.core import setup, Extension, Command
-from distutils.command.build_ext import build_ext
-from distutils.errors import CCompilerError, DistutilsExecError, \
-     DistutilsPlatformError
 
 import arbytmap
 
-
-is_pypy = hasattr(sys, 'pypy_translation_info')
-ext_errors = None
-if sys.platform == 'win32':
-   ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError,
-                 IOError, ValueError)
-
-class BuildFailed(Exception):
-    pass
-
-class ve_build_ext(build_ext):
-    # This class allows C extension building to fail.
-
-    def run(self):
-        try:
-            build_ext.run(self)
-        except DistutilsPlatformError:
-            raise BuildFailed()
-
-    def build_extension(self, ext):
-        if ext_errors:
-            try:
-                build_ext.build_extension(self, ext)
-            except ext_errors:
-                raise BuildFailed()
-        else:
-            build_ext.build_extension(self, ext)
-
-
 long_desc = open("README.md").read()
 
-setup_kwargs = dict(
+setup(
     name="arbytmap",
     description='A texture manipulation module for python 3.',
     long_description=long_desc,
     long_description_content_type='text/markdown',
     version='%s.%s.%s' % arbytmap.__version__,
-    url='https://github.com/MosesofEgypt/arbytmap',
+    url='https://github.com/Sigmmma/arbytmap',
     author='Devin Bobadilla',
     author_email='MosesBobadilla@gmail.com',
     license='MIT',
@@ -66,7 +30,7 @@ setup_kwargs = dict(
         Extension("arbytmap.ext.swizzler_ext",     ["arbytmap/src/swizzler_ext.c"])
         ],
     package_data={
-        'arbytmap': ["src/*", '*.txt', '*.md', '*.rst'],
+        'arbytmap': ["src/*", '*.[tT][xX][tT]', '*.[mM][dD]'],
         },
     platforms=["POSIX", "Windows"],
     keywords="arbytmap, texture, bitmap, converter, image, editing",
@@ -88,24 +52,4 @@ setup_kwargs = dict(
         "Programming Language :: C",
         ],
     zip_safe=False,
-    cmdclass=dict(build_ext=ve_build_ext)
     )
-
-success = False
-kwargs = dict(setup_kwargs)
-if not is_pypy:
-    try:
-        setup(**kwargs)
-        success = True
-    except BuildFailed:
-        print(format_exc())
-        print('*' * 80)
-        print("WARNING: The C accelerator modules could not be compiled.\n"
-              "Attempting to install without accelerators now.\n"
-              "Any errors that occurred are printed above.")
-        print('*' * 80)
-
-if not success:
-    kwargs.pop('ext_modules')
-    setup(**kwargs)
-    print("Installation successful.")
