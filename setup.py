@@ -5,7 +5,11 @@ except ImportError:
 
 import arbytmap
 
-long_desc = open("README.md").read()
+long_desc = ""
+try:
+    long_desc = open("README.MD").read()
+except Exception:
+    print("Couldn't read readme.")
 
 setup(
     name="arbytmap",
