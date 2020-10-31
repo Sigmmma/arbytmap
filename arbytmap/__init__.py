@@ -1,10 +1,10 @@
 # ##############
 #   metadata   #
 # ##############
-__author__ = "Devin Bobadilla"
+__author__ = "Sigmmma"
 #           YYYY.MM.DD
-__date__ = "2020.02.14"
-__version__ = (1, 1, 1)
+__date__ = "2020.10.30"
+__version__ = (1, 1, 2)
 
 from arbytmap import constants
 from arbytmap.arby import *
