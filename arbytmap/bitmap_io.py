@@ -396,8 +396,12 @@ def save_to_dds_file(convertor, output_path, ext, **kwargs):
 
     swizzle_mode = kwargs.pop("swizzle_mode", convertor.swizzle_mode)
     channel_map = kwargs.pop("channel_mapping", None)
-    if (channel_map is not None or convertor.swizzled != swizzle_mode or
-        convertor.tiled or convertor.big_endian):
+    if ((isinstance(channel_map, (list, tuple)) and 
+         list(channel_map) != list(range(len(channel_map)))
+         ) or
+        convertor.swizzled != swizzle_mode or
+        convertor.tiled or convertor.big_endian
+        ):
         conv_cpy = deepcopy(convertor)
         conv_cpy.load_new_conversion_settings(
             swizzle_mode=swizzle_mode, tile_mode=False,
