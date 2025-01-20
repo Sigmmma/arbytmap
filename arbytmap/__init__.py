@@ -3,8 +3,8 @@
 # ##############
 __author__ = "Sigmmma"
 #           YYYY.MM.DD
-__date__ = "2020.10.30"
-__version__ = (1, 1, 2)
+__date__ = "2025.01.18"
+__version__ = (1, 2, 0)
 
 from arbytmap import constants
 from arbytmap.arby import *
