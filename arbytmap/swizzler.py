@@ -260,14 +260,13 @@ class SwizzlerMask():
 
     def mask_set(self, *args, **kwargs):
         if self._mask_type not in self._masks:
-            raise TypeError("Unknown swizzler mask type '%'" % self.mask_type)
+            raise TypeError("Unknown swizzler mask type '%s'" % self._mask_type)
         return self._masks[self._mask_type](self, *args, **kwargs)
 
+    @staticmethod
     def add_mask(*args):
         if not args:
             return
-        elif isinstance(args[0], SwizzlerMask):
-            args = args[1:]
 
         mask_name, mask_func = args
         if mask_name in SwizzlerMask._masks:
@@ -314,10 +313,8 @@ def _dxt_mask_set(swizzler_mask,
     FOLLOWED BY THE REMAINDER OF THE Y BITS, FOLLOWED BY
     THE REMAINDER OF THE Z BITS"""
 
-    tmp_x = log_x
-    tmp_y = log_y
-    if tmp_x > 2: tmp_x = 2
-    if tmp_y > 2: tmp_y = 2
+    tmp_x = min(log_x, 2)
+    tmp_y = min(log_y, 2)
 
     c_mask.extend([0]*log_c)
     x_mask.extend([log_c]*tmp_x)
@@ -351,7 +348,7 @@ def _pixel_merge_mask_set(swizzler_mask,
     axis_bit = 0
     bit_shifts = [0, 0, 0, 0]
     
-    x_bit = y_bit = z_bit = c_bit = i = 0
+    x_bit = y_bit = z_bit = c_bit = 0
     
     # Loop for each of the bits in the integer (W*H*D*C)
     for i in range(x_merge + y_merge + z_merge + log_c):

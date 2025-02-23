@@ -29,14 +29,13 @@ class Tiler():
         self.tile_method = kwargs.get("tile_method", "DEFAULT")
 
         if self.tile_method not in self._methods:
-            raise TypeError("Unknown tiler method '%'" %
+            raise TypeError("Unknown tiler method '%s'" %
                             kwargs.get("tile_method"))
 
+    @staticmethod
     def add_method(*args, fast=False):
         if not args:
             return
-        elif isinstance(args[0], Tiler):
-            args = args[1:]
 
         tile_method, tile_func = args
         methods = Tiler._fast_methods if fast else Tiler._methods
