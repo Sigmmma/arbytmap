@@ -120,7 +120,7 @@ def load_from_dds_file(convertor, input_path, ext, **kwargs):
             typ = ab.TYPE_3D
         elif head.caps2.cubemap:
             typ = ab.TYPE_CUBEMAP
-            sub_bitmap_count = sum(bool(head.caps2[n]) for name in
+            sub_bitmap_count = sum(bool(head.caps2[name]) for name in
                                    ("pos_x", "pos_y", "pos_z",
                                     "neg_x", "neg_y", "neg_z"))
 
